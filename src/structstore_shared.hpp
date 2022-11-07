@@ -82,6 +82,10 @@ public:
         return shm_ptr->data;
     }
 
+    StructStoreField& operator[](HashString name) {
+        return shm_ptr->data[name];
+    }
+
     StructStoreField& operator[](const char* name) {
         return shm_ptr->data[name];
     }

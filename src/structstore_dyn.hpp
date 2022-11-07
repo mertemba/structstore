@@ -17,13 +17,16 @@ struct StructStoreDyn : StructStore<StructStoreDyn> {
         return field;
     }
 
-    StructStoreField& operator[](const char* name) {
-        HashString name_str{name};
-        auto it = fields.find(name_str);
+    StructStoreField& operator[](HashString name) {
+        auto it = fields.find(name);
         if (it == fields.end()) {
-            throw std::runtime_error("could not find field " + std::string(name));
+            throw std::runtime_error("could not find field " + std::string(name.str));
         }
         return it->second;
+    }
+
+    StructStoreField& operator[](const char* name) {
+        return (*this)[HashString{name}];
     }
 
 private:
