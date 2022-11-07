@@ -9,9 +9,9 @@ struct StructStoreDyn : StructStore<StructStoreDyn> {
     template<typename T>
     T& add_field(const char* name) {
         HashString name_str = internal_string(name);
-        std::shared_ptr<T> ptr{new T()};
+        T* ptr = ArenaAllocator<T>(arena).allocate(1);
+        new(ptr) T();
         T& field = *ptr;
-        fields_data.emplace_back(std::move(ptr));
         fields.emplace(name_str, StructStoreField(field));
         slots.emplace_back(name_str.str);
         return field;
@@ -28,8 +28,6 @@ struct StructStoreDyn : StructStore<StructStoreDyn> {
 
 private:
     void list_fields() {}
-
-    std::vector<std::shared_ptr<void>> fields_data;
 };
 
 #endif

@@ -39,7 +39,7 @@ class ArenaAllocator {
 public:
     using value_type = T;
 
-    explicit ArenaAllocator(Arena* a) : arena(a) {}
+    explicit ArenaAllocator(Arena& a) : arena(&a) {}
 
     template<typename U>
     ArenaAllocator(const ArenaAllocator<U>& other) : arena(other.arena) {}

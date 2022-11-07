@@ -44,7 +44,7 @@ protected:
 
     StructStoreBase(size_t bufsize, void* buffer) :
             arena(bufsize, buffer),
-            alloc(&arena),
+            alloc(arena),
             fields(alloc),
             slots(alloc) {}
 

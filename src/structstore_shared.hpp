@@ -33,7 +33,7 @@ public:
         shm_fd = shm_open(shm_path.c_str(), O_CREAT | O_RDWR, 0600);
         ssize_t size = sizeof(SharedData);
 
-        // check if shared mem already exists
+        // check if shared memory already exists
         struct stat shm_stat = {0};
         fstat(shm_fd, &shm_stat);
         if (shm_stat.st_size > 0 && shm_stat.st_size != size) {
@@ -80,6 +80,10 @@ public:
 
     T& operator*() {
         return shm_ptr->data;
+    }
+
+    StructStoreField& operator[](const char* name) {
+        return shm_ptr->data[name];
     }
 
     ~StructStoreShared() {
