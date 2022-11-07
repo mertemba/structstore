@@ -8,13 +8,12 @@ struct StructStoreDyn : StructStore<StructStoreDyn> {
 
     template<typename T>
     T& add_field(const char* name) {
-        // TODO: use ManagedHashString instead?
-        const char* name_ = strdup(name);
+        HashString name_str = internal_string(name);
         std::shared_ptr<T> ptr{new T()};
         T& field = *ptr;
         fields_data.emplace_back(std::move(ptr));
-        fields.emplace(HashString{name_}, StructStoreField(field));
-        slots.emplace_back(name_);
+        fields.emplace(name_str, StructStoreField(field));
+        slots.emplace_back(name_str.str);
         return field;
     }
 

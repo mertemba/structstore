@@ -21,7 +21,7 @@ class StructStoreShared {
 
     struct SharedData {
         SharedData* original_ptr = nullptr;
-        T data = {};
+        T data{};
     };
 
     int shm_fd;

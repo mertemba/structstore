@@ -7,7 +7,7 @@ struct Subsettings : StructStore<Subsettings> {
     friend class StructStore<Subsettings>;
 
     int subnum = 42;
-    std::string substr = "bar";
+    arena_str substr = {"bar", alloc};
 
     Subsettings() : StructStore<Subsettings>() {}
 
@@ -23,7 +23,7 @@ struct Settings : StructStore<Settings> {
 
     int num = 5;
     bool flag = true;
-    std::string str = "foo";
+    arena_str str = {"foo", alloc};
     Subsettings subsettings{};
 
 private:

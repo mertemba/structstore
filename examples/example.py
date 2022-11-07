@@ -7,6 +7,7 @@ def __main__():
     print(type(settings))
     print(settings.__slots__)
     print(settings.num)
+    settings.str = "foobar"
     print(settings.to_yaml())
 
     state = structstore.StructStore()

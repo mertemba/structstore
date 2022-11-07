@@ -5,17 +5,17 @@
 #include <type_traits>
 #include <yaml-cpp/yaml.h>
 
-#include "hashstring.hpp"
-#include "serialization.hpp"
+#include "structstore_alloc.hpp"
 
 class StructStoreBase;
 
-template<class Subclass>
+template<class, size_t>
 class StructStore;
 
-enum class FieldTypeValue {
+enum class FieldTypeValue : uint8_t {
     INT,
     STRING,
+    ARENA_STR,
     BOOL,
     STRUCT,
 };
@@ -34,6 +34,11 @@ struct FieldType<std::string> {
 };
 
 template<>
+struct FieldType<arena_str> {
+    static constexpr auto value = FieldTypeValue::ARENA_STR;
+};
+
+template<>
 struct FieldType<bool> {
     static constexpr auto value = FieldTypeValue::BOOL;
 };
@@ -43,34 +48,28 @@ struct FieldType<StructStoreBase> {
     static constexpr auto value = FieldTypeValue::STRUCT;
 };
 
-template<typename T>
-struct FieldType<T, std::enable_if_t<std::is_base_of_v<StructStore<T>, T>>> {
+template<class T>
+struct FieldType<T, std::enable_if_t<std::is_base_of_v<StructStoreBase, T>>> {
     static constexpr auto value = FieldTypeValue::STRUCT;
 };
 
 class StructStoreField {
 private:
     void* data;
-    SerializeTextFunc* ser_text_func;
-    SerializeYamlFunc* ser_yaml_func;
 
 public:
     const FieldTypeValue type;
 
     template<typename T>
-    StructStoreField(T& field)
-            :data(&field),
-             type(FieldType<T>::value),
-             ser_text_func(serialize_text<T>),
-             ser_yaml_func(serialize_yaml<T>) {}
+    StructStoreField(T& field) : data(&field), type(FieldType<T>::value) {}
 
     friend std::ostream& operator<<(std::ostream& os, const StructStoreField& self) {
-        self.ser_text_func(os, self.data);
+        ser_text_funcs[self.type](os, self.data);
         return os;
     }
 
     friend YAML::Node to_yaml(const StructStoreField& self) {
-        return self.ser_yaml_func(self.data);
+        return ser_yaml_funcs[self.type](self.data);
     }
 
     template<typename T>
