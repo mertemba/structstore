@@ -35,6 +35,10 @@ class ExampleGui:
         self.shstate.add_str('mystr')
         self.shstate.add_bool('flag')
 
+        self.shmem2 = structstore_example.SettingsShared("/shdata_store")
+        self.shsettings = self.shmem2.get_store()
+
+
     def update_gui(self):
         start = timeit.default_timer()
         if viz.begin_window('Settings'):
@@ -47,6 +51,9 @@ class ExampleGui:
         viz.end_window()
         if viz.begin_window('SharedState'):
             viz.autogui(self.shstate)
+        viz.end_window()
+        if viz.begin_window('SharedSettings'):
+            viz.autogui(self.shsettings)
         viz.end_window()
         end = timeit.default_timer()
         if random.random() < 0.01:

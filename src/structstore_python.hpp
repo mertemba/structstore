@@ -4,6 +4,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include "structstore.hpp"
+#include "structstore_shared.hpp"
 
 pybind11::object field_to_object(StructStoreField& field) {
     switch (field.type) {
@@ -37,9 +38,10 @@ void set_field_to_object(StructStoreField& field, const pybind11::object& value)
         case FieldTypeValue::BOOL:
             (bool&) field = pybind11::bool_(value);
             break;
-//        case FieldTypeValue::STRUCT:
-//            (StructStoreBase&) field = pybind11::cast<StructStoreBase>(value);
-//            break;
+        case FieldTypeValue::STRUCT:
+            // TODO
+            // (StructStoreBase&) field = pybind11::cast<StructStoreBase>(value);
+            break;
         default:
             std::cerr << "internal error: unknown field type\n";
             throw pybind11::type_error("internal error: unknown field type");
@@ -109,6 +111,11 @@ pybind11::class_<T> register_pystruct(pybind11::module_& m, const char* name, bo
     cls.def("to_dict", [](T& store) {
         return to_dict(store);
     });
+
+    std::string shared_name = name + std::string("Shared");
+    auto shcls = pybind11::class_<StructStoreShared<T>>(m, shared_name.c_str());
+    shcls.def(pybind11::init<const std::string&>());
+    shcls.def("get_store", &StructStoreShared<T>::operator*, pybind11::return_value_policy::reference);
     return cls;
 }
 
