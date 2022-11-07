@@ -20,6 +20,13 @@ def __main__():
     print(state.num)
     print(state.to_yaml())
 
+    shmem = structstore.StructStoreShared("/dyn_shdata_store")
+    shstore = shmem.get_store()
+    shstore.add_int('num')
+    shstore.add_str('mystr')
+    shstore.add_bool('flag')
+    print(shstore.to_dict())
+
 
 if __name__ == '__main__':
     __main__()

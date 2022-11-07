@@ -29,6 +29,12 @@ class ExampleGui:
         print(self.state.num)
         print(self.state.to_yaml())
 
+        self.shmem = structstore.StructStoreShared("/dyn_shdata_store")
+        self.shstate = self.shmem.get_store()
+        self.shstate.add_int('num')
+        self.shstate.add_str('mystr')
+        self.shstate.add_bool('flag')
+
     def update_gui(self):
         start = timeit.default_timer()
         if viz.begin_window('Settings'):
@@ -38,6 +44,9 @@ class ExampleGui:
         if viz.begin_window('State'):
             # viz.autogui(self.state)
             viz.autogui(self.state.to_dict())
+        viz.end_window()
+        if viz.begin_window('SharedState'):
+            viz.autogui(self.shstate)
         viz.end_window()
         end = timeit.default_timer()
         if random.random() < 0.01:
