@@ -20,13 +20,16 @@ struct object;
 }
 
 class StructStoreBase {
-    friend class StructStoreDyn;
+    template<size_t _bufsize>
+    friend
+    class StructStoreDyn;
 
     template<typename T>
-    friend pybind11::class_<T> register_pystruct(pybind11::module_&, const char*, bool register_base);
+    friend pybind11::class_<T> register_pystruct(pybind11::module_&, const char*, pybind11::object* base_cls);
 
 protected:
-    Arena arena;
+    bool dynamic = false;
+    Arena& arena;
     ArenaAllocator<char> alloc;
 
 private:
@@ -42,8 +45,8 @@ protected:
 
     StructStoreBase& operator=(StructStoreBase&&) = delete;
 
-    StructStoreBase(size_t bufsize, void* buffer) :
-            arena(bufsize, buffer),
+    explicit StructStoreBase(Arena& arena) :
+            arena(arena),
             alloc(arena),
             fields(alloc),
             slots(alloc) {}
@@ -58,7 +61,7 @@ protected:
     }
 
 public:
-    StructStoreBase() : StructStoreBase(0, nullptr) {
+    StructStoreBase() : StructStoreBase(*(Arena*) nullptr) {
         throw std::runtime_error("StructStoreBase should not be initialized directly");
     }
 
@@ -71,17 +74,29 @@ public:
     friend YAML::Node to_yaml(const StructStoreBase& self);
 
     friend pybind11::object to_dict(StructStoreBase& store);
+
+    bool is_dynamic() const {
+        return dynamic;
+    }
 };
 
-template<class Subclass, size_t bufsize = 1024>
+template<class Subclass, size_t _bufsize = 1024>
 class StructStore : public StructStoreBase {
+public:
+    static constexpr size_t bufsize = _bufsize;
+
 protected:
-    StructStore() : StructStoreBase(bufsize, arena_mem.data()) {
+    StructStore() : arena(_bufsize, arena_mem.data()), StructStoreBase(arena) {
+        ((Subclass*) this)->list_fields();
+    }
+
+    explicit StructStore(Arena& arena) : arena(0, nullptr), StructStoreBase(arena) {
         ((Subclass*) this)->list_fields();
     }
 
 private:
-    std::array<uint8_t, bufsize> arena_mem = {};
+    std::array<uint8_t, _bufsize> arena_mem = {};
+    Arena arena;
 };
 
 #endif

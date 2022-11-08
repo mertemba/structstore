@@ -11,7 +11,12 @@ int main() {
     state[H("num")] = 42;
     std::cout << "num is " << (int) state["num"] << std::endl;
 
-    StructStoreShared<StructStoreDyn> shdata("/dyn_shdata_store");
+    auto& substate = state.add_field<StructStoreDyn<0>>("substate");
+    substate.add_field<int>("subnum") = 77;
+    std::cout << "subnum: " << substate[H("subnum")] << std::endl;
+    std::cout << "complete state: " << state << std::endl;
+
+    StructStoreShared<StructStoreDyn<>> shdata("/dyn_shdata_store");
     std::cout << "shared data: " << *shdata << std::endl;
     std::cout << "got data" << std::endl;
     shdata->add_field<int>("num");

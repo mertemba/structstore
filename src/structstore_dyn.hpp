@@ -3,14 +3,25 @@
 
 #include "structstore.hpp"
 
-struct StructStoreDyn : StructStore<StructStoreDyn> {
-    friend class StructStore<StructStoreDyn>;
+template<size_t _bufsize = 1024>
+struct StructStoreDyn : StructStore<StructStoreDyn<_bufsize>, _bufsize> {
+private:
+    using Base = StructStore<StructStoreDyn<_bufsize>, _bufsize>;
+
+public:
+    StructStoreDyn() : Base() {
+        Base::dynamic = true;
+    }
+
+    explicit StructStoreDyn(Arena& arena) : Base(arena) {
+        Base::dynamic = true;
+    }
 
     template<typename T>
     T& add_field(const char* name) {
-        HashString name_str = internal_string(name);
-        auto it = fields.find(name_str);
-        if (it != fields.end()) {
+        HashString name_str = Base::internal_string(name);
+        auto it = Base::fields.find(name_str);
+        if (it != Base::fields.end()) {
             // field already exists, silently ignore this
             StructStoreField& field = it->second;
             if (field.type != FieldType<T>::value) {
@@ -18,17 +29,22 @@ struct StructStoreDyn : StructStore<StructStoreDyn> {
             }
             return (T&) field;
         }
-        T* ptr = ArenaAllocator<T>(arena).allocate(1);
-        new(ptr) T();
+        T* ptr = ArenaAllocator<T>(StructStoreBase::arena).allocate(1);
+        if constexpr (std::is_base_of<StructStoreBase, T>::value) {
+            static_assert(T::bufsize == 0);
+            new(ptr) T(StructStoreBase::arena);
+        } else {
+            new(ptr) T();
+        }
         T& field = *ptr;
-        fields.emplace(name_str, StructStoreField(field));
-        slots.emplace_back(name_str.str);
+        Base::fields.emplace(name_str, StructStoreField(field));
+        Base::slots.emplace_back(name_str.str);
         return field;
     }
 
     StructStoreField& operator[](HashString name) {
-        auto it = fields.find(name);
-        if (it == fields.end()) {
+        auto it = Base::fields.find(name);
+        if (it == Base::fields.end()) {
             throw std::runtime_error("could not find field " + std::string(name.str));
         }
         return it->second;
@@ -38,7 +54,7 @@ struct StructStoreDyn : StructStore<StructStoreDyn> {
         return (*this)[HashString{name}];
     }
 
-private:
+public:
     void list_fields() {}
 };
 

@@ -5,6 +5,6 @@
 namespace py = pybind11;
 
 PYBIND11_MODULE(structstore_example, m) {
-    register_pystruct<Subsettings>(m, "Subsettings", false);
-    register_pystruct<Settings>(m, "Settings", false);
+    register_pystruct<Subsettings>(m, "Subsettings", nullptr);
+    register_pystruct<Settings>(m, "Settings", nullptr);
 }

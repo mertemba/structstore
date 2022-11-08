@@ -5,6 +5,7 @@
 #include <pybind11/stl.h>
 #include "structstore.hpp"
 #include "structstore_shared.hpp"
+#include "structstore_dyn.hpp"
 
 pybind11::object field_to_object(StructStoreField& field) {
     switch (field.type) {
@@ -16,8 +17,14 @@ pybind11::object field_to_object(StructStoreField& field) {
             return pybind11::str(((arena_str&) field).c_str());
         case FieldTypeValue::BOOL:
             return pybind11::bool_((bool&) field);
-        case FieldTypeValue::STRUCT:
-            return pybind11::cast((StructStoreBase&) field, pybind11::return_value_policy::reference);
+        case FieldTypeValue::STRUCT: {
+            auto& store = (StructStoreBase&) field;
+            if (store.is_dynamic()) {
+                return pybind11::cast((StructStoreDyn<0>&) store, pybind11::return_value_policy::reference);
+            } else {
+                return pybind11::cast(store, pybind11::return_value_policy::reference);
+            }
+        }
         default:
             std::cerr << "internal error: unknown field type\n";
             throw pybind11::type_error("internal error: unknown field type");
@@ -61,16 +68,12 @@ pybind11::object to_dict(StructStoreBase& store) {
 }
 
 template<typename T>
-pybind11::class_<T> register_pystruct(pybind11::module_& m, const char* name, bool register_base) {
+pybind11::class_<T> register_pystruct(pybind11::module_& m, const char* name, pybind11::object* base_cls) {
     // TODO: register only StructStoreBase?
     static_assert(std::is_base_of<StructStoreBase, T>::value, "Template argument must be derived from StructStoreBase");
-    pybind11::object base_cls;
-    if (register_base) {
-        base_cls = register_pystruct<StructStoreBase>(m, "StructStoreBase", false);
-    }
     pybind11::class_<T> cls =
-            register_base
-            ? pybind11::class_<T>{m, name, base_cls}
+            base_cls
+            ? pybind11::class_<T>{m, name, *base_cls}
             : pybind11::class_<T>{m, name};
     cls.def(pybind11::init<>());
     cls.def_readonly("__slots__", &StructStore<T>::slots);

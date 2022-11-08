@@ -34,6 +34,9 @@ class ExampleGui:
         self.shstate.add_int('num')
         self.shstate.add_str('mystr')
         self.shstate.add_bool('flag')
+        self.shstate.add_store('substate')
+        self.shstate.substate.add_int('subnum')
+        self.num_cnt = 0
 
         self.shmem2 = structstore_example.SettingsShared("/shdata_store")
         self.shsettings = self.shmem2.get_store()
@@ -51,6 +54,9 @@ class ExampleGui:
         viz.end_window()
         if viz.begin_window('SharedState'):
             viz.autogui(self.shstate)
+            if viz.button('Add number'):
+                self.shstate.add_int(f'num{self.num_cnt}')
+                self.num_cnt += 1
         viz.end_window()
         if viz.begin_window('SharedSettings'):
             viz.autogui(self.shsettings)
