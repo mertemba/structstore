@@ -1,6 +1,7 @@
 import collections
 import random
 import timeit
+from dataclasses import dataclass
 from typing import Dict
 
 import imviz as viz
@@ -8,6 +9,20 @@ import yaml
 
 from lib import structstore
 from lib import structstore_example
+from lib import structstore_utils
+
+
+@dataclass
+class Substate:
+    subnum: int
+
+
+@dataclass
+class State:
+    num: int
+    mystr: str
+    flag: bool
+    substate: Substate
 
 
 class ExampleGui:
@@ -31,11 +46,8 @@ class ExampleGui:
 
         self.shmem = structstore.StructStoreShared("/dyn_shdata_store")
         self.shstate = self.shmem.get_store()
-        self.shstate.add_int('num')
-        self.shstate.add_str('mystr')
-        self.shstate.add_bool('flag')
-        self.shstate.add_store('substate')
-        self.shstate.substate.add_int('subnum')
+        shstate = State(5, 'foo', True, Substate(42))
+        structstore_utils.construct_from_obj(self.shstate, shstate)
         self.num_cnt = 0
 
         self.shmem2 = structstore_example.SettingsShared("/shdata_store")

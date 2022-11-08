@@ -1,5 +1,21 @@
+from dataclasses import dataclass
+
 from lib import structstore
 from lib import structstore_example
+from lib import structstore_utils
+
+
+@dataclass
+class Substate:
+    subnum: int
+
+
+@dataclass
+class State:
+    num: int
+    mystr: str
+    flag: bool
+    substate: Substate
 
 
 def __main__():
@@ -15,16 +31,10 @@ def __main__():
     state.add_str('mystr')
     state.add_bool('flag')
 
-    print(type(state))
-    print(state.__slots__)
-    print(state.num)
-    print(state.to_yaml())
-
     shmem = structstore.StructStoreShared("/dyn_shdata_store")
     shstore = shmem.get_store()
-    shstore.add_int('num')
-    shstore.add_str('mystr')
-    shstore.add_bool('flag')
+    shstate = State(5, 'foo', True, Substate(42))
+    structstore_utils.construct_from_obj(shstore, shstate)
     print(shstore.to_dict())
 
 
