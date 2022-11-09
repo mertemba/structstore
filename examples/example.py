@@ -28,7 +28,7 @@ def __main__():
     state.add_str('mystr')
     state.add_bool('flag')
 
-    shmem = structstore.StructStoreShared("/dyn_shdata_store")
+    shmem = structstore.StructStoreShared("/dyn_shdata_store", 16384)
     shstore = shmem.get_store()
     shstate = State(5, 'foo', True, Substate(42))
     structstore_utils.construct_from_obj(shstore, shstate)

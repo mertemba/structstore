@@ -25,6 +25,9 @@ class StructStoreBase;
 template<class, size_t>
 class StructStore;
 
+template<typename T>
+class StructStoreShared;
+
 enum class FieldTypeValue : uint8_t {
     INT,
     STRING,
@@ -159,6 +162,8 @@ public:
 
 template<class Subclass, size_t _bufsize = 1024>
 class StructStore : public StructStoreBase {
+    friend class structstore::StructStoreShared<Subclass>;
+
 public:
     static constexpr size_t bufsize = _bufsize;
 

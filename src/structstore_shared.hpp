@@ -24,6 +24,7 @@ class StructStoreShared {
     struct SharedData {
         SharedData* original_ptr = nullptr;
         T data{};
+        Arena extra_arena{0, nullptr};
     };
 
     int shm_fd;
@@ -31,9 +32,12 @@ class StructStoreShared {
     SharedData* shm_ptr;
 
 public:
-    explicit StructStoreShared(const std::string& shm_path) : shm_path(shm_path) {
+    explicit StructStoreShared(const std::string& shm_path, ssize_t extra_bufsize = 0) : shm_path(shm_path) {
         shm_fd = shm_open(shm_path.c_str(), O_CREAT | O_RDWR, 0600);
         ssize_t size = sizeof(SharedData);
+        if (extra_bufsize > 0) {
+            size += extra_bufsize;
+        }
 
         // check if shared memory already exists
         struct stat shm_stat = {0};
@@ -73,6 +77,12 @@ public:
             shm_ptr->original_ptr = shm_ptr;
             // initialize data
             new(&shm_ptr->data) T();
+
+            // add extra memory buffer
+            if (extra_bufsize > 0) {
+                shm_ptr->extra_arena = Arena(extra_bufsize, (char*) shm_ptr + sizeof(SharedData));
+                shm_ptr->data.own_arena.extra_arena = &shm_ptr->extra_arena;
+            }
         }
     }
 

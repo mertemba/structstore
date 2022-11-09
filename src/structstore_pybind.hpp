@@ -63,10 +63,14 @@ pybind11::class_<T> register_pystruct(pybind11::module_& m, const char* name, py
         return to_dict(store);
     });
 
-    std::string shared_name = name + std::string("Shared");
-    auto shcls = pybind11::class_<StructStoreShared<T>>(m, shared_name.c_str());
-    shcls.def(pybind11::init<const std::string&>());
-    shcls.def("get_store", &StructStoreShared<T>::operator*, pybind11::return_value_policy::reference_internal);
+    if constexpr (!std::is_same<T, StructStoreBase>::value) {
+        // there is no shared variant of StructStoreBase directly
+        std::string shared_name = name + std::string("Shared");
+        auto shcls = pybind11::class_<StructStoreShared<T>>(m, shared_name.c_str());
+        shcls.def(pybind11::init<const std::string&>());
+        shcls.def(pybind11::init<const std::string&, ssize_t>());
+        shcls.def("get_store", &StructStoreShared<T>::operator*, pybind11::return_value_policy::reference_internal);
+    }
     return cls;
 }
 

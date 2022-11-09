@@ -11,6 +11,7 @@ struct Arena {
     char* buffer;
     size_t size;
     size_t allocated;
+    Arena* extra_arena = nullptr;
 
     Arena(size_t size, void* buffer) : buffer((char*) buffer), size(size), allocated(0) {}
 
@@ -21,6 +22,10 @@ struct Arena {
     void* allocate(size_t field_size) {
         field_size = ((field_size + 7) / 8) * 8;
         if (allocated + field_size > size) {
+            if (extra_arena != nullptr) {
+                std::cout << "allocating from extra arena ..." << std::endl;
+                return extra_arena->allocate(field_size);
+            }
             throw std::runtime_error("insufficient space in arena region");
         }
         void* ret = buffer + allocated;

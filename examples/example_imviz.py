@@ -35,7 +35,7 @@ class ExampleGui:
         self.state.add_bool('flag')
         print(self.state.to_yaml())
 
-        self.shmem = structstore.StructStoreShared("/dyn_shdata_store")
+        self.shmem = structstore.StructStoreShared("/dyn_shdata_store", 16384)
         self.shstate = self.shmem.get_store()
         shstate = State(5, 'foo', True, Substate(42))
         structstore_utils.construct_from_obj(self.shstate, shstate)
