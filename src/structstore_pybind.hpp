@@ -38,7 +38,7 @@ pybind11::class_<T> register_pystruct(pybind11::module_& m, const char* name, py
             std::cerr << "in getattr on field " << name << ": " << e.what() << "\n";
             throw;
         }
-    }, pybind11::return_value_policy::reference);
+    }, pybind11::return_value_policy::reference_internal);
     cls.def("__setattr__", [](T& store, const std::string& name, pybind11::object value) {
         HashString name_str{name.c_str()};
         auto it = store.fields.find(name_str);
@@ -66,7 +66,7 @@ pybind11::class_<T> register_pystruct(pybind11::module_& m, const char* name, py
     std::string shared_name = name + std::string("Shared");
     auto shcls = pybind11::class_<StructStoreShared<T>>(m, shared_name.c_str());
     shcls.def(pybind11::init<const std::string&>());
-    shcls.def("get_store", &StructStoreShared<T>::operator*, pybind11::return_value_policy::reference);
+    shcls.def("get_store", &StructStoreShared<T>::operator*, pybind11::return_value_policy::reference_internal);
     return cls;
 }
 
