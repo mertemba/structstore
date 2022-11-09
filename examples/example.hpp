@@ -1,32 +1,28 @@
 #ifndef EXAMPLE_HPP
 #define EXAMPLE_HPP
 
-#include "structstore.hpp"
+#include <structstore.hpp>
 
-struct Subsettings : StructStore<Subsettings> {
-    friend class StructStore<Subsettings>;
+namespace stst = structstore;
 
+struct Subsettings : stst::StructStore<Subsettings> {
     int subnum = 42;
-    arena_str substr = {"bar", alloc};
+    stst::arena_str substr = {"bar", alloc};
 
     Subsettings() : StructStore<Subsettings>() {}
 
-private:
     void list_fields() {
         register_field("subnum", subnum);
         register_field("substr", substr);
     }
 };
 
-struct Settings : StructStore<Settings> {
-    friend class StructStore<Settings>;
-
+struct Settings : stst::StructStore<Settings> {
     int num = 5;
     bool flag = true;
-    arena_str str = {"foo", alloc};
+    stst::arena_str str = {"foo", alloc};
     Subsettings subsettings{};
 
-private:
     void list_fields() {
         register_field("num", num);
         register_field("flag", flag);

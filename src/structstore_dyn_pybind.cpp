@@ -1,8 +1,9 @@
 #include <pybind11/pybind11.h>
 #include "structstore_dyn.hpp"
-#include "structstore_python.hpp"
+#include "structstore_pybind.hpp"
 
 namespace py = pybind11;
+using namespace structstore;
 
 PYBIND11_MODULE(structstore, m) {
     auto basecls = register_pystruct<StructStoreBase>(m, "StructStoreBase", nullptr);

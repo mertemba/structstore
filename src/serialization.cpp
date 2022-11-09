@@ -1,6 +1,8 @@
 #include "serialization.hpp"
 #include "structstore.hpp"
 
+namespace structstore {
+
 template<typename T>
 void serialize_text(std::ostream& os, void* val) {
     os << *(T*) val;
@@ -51,4 +53,6 @@ YAML::Node to_yaml(const std::string& val) {
 
 YAML::Node to_yaml(const arena_str& val) {
     return YAML::Node(val.c_str());
+}
+
 }

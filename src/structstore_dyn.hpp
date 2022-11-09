@@ -3,6 +3,8 @@
 
 #include "structstore.hpp"
 
+namespace structstore {
+
 template<size_t _bufsize = 1024>
 struct StructStoreDyn : StructStore<StructStoreDyn<_bufsize>, _bufsize> {
 private:
@@ -57,5 +59,7 @@ public:
 public:
     void list_fields() {}
 };
+
+}
 
 #endif

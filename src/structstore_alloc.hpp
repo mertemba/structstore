@@ -5,6 +5,8 @@
 #include <scoped_allocator>
 #include <unordered_map>
 
+namespace structstore {
+
 struct Arena {
     char* buffer;
     size_t size;
@@ -70,5 +72,7 @@ using arena_vec = std::vector<T, ArenaAllocator<T>>;
 
 template<class K, class T>
 using arena_map = std::unordered_map<K, T, std::hash<K>, std::equal_to<K>, ArenaAllocator<std::pair<const K, T>>>;
+
+}
 
 #endif

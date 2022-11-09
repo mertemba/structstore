@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
+namespace structstore {
+
 template<typename T>
 class StructStoreShared {
     static_assert(std::is_base_of<StructStoreBase, T>::value,
@@ -95,5 +97,7 @@ public:
         close(shm_fd);
     }
 };
+
+}
 
 #endif

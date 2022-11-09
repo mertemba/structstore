@@ -5,6 +5,8 @@
 #include <yaml-cpp/yaml.h>
 #include "structstore_alloc.hpp"
 
+namespace structstore {
+
 using SerializeTextFunc = void(std::ostream&, void*);
 using SerializeYamlFunc = YAML::Node(void*);
 
@@ -19,5 +21,7 @@ YAML::Node to_yaml(const bool& val);
 YAML::Node to_yaml(const std::string& val);
 
 YAML::Node to_yaml(const arena_str& val);
+
+}
 
 #endif

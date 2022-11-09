@@ -20,10 +20,7 @@ class State:
 
 def __main__():
     settings = structstore_example.Settings()
-    print(type(settings))
-    print(settings.__slots__)
     print(settings.num)
-    settings.str = "foobar"
     print(settings.to_yaml())
 
     state = structstore.StructStore()
