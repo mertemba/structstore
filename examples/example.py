@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
 from lib import structstore
-from lib import structstore_example
 from lib import structstore_utils
 
 
@@ -19,10 +18,6 @@ class State:
 
 
 def __main__():
-    settings = structstore_example.Settings()
-    print(settings.num)
-    print(settings.to_yaml())
-
     state = structstore.StructStore()
     state.add_int('num')
     state.add_str('mystr')

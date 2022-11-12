@@ -5,7 +5,6 @@ from dataclasses import dataclass
 import imviz as viz
 
 from lib import structstore
-from lib import structstore_example
 from lib import structstore_utils
 
 
@@ -26,31 +25,24 @@ class ExampleGui:
     def __init__(self):
         viz.set_main_window_title('structstore example')
 
-        self.settings = structstore_example.Settings()
-        print(self.settings.to_yaml())
-
         self.state = structstore.StructStore()
         self.state.add_int('num')
         self.state.add_str('mystr')
         self.state.add_bool('flag')
         print(self.state.to_yaml())
 
-        self.shmem = structstore.StructStoreShared("/dyn_shdata_store", 16384)
+        self.shmem = structstore.StructStoreShared("/shdata_store", 16384)
         self.shstate = self.shmem.get_store()
         shstate = State(5, 'foo', True, Substate(42))
         structstore_utils.construct_from_obj(self.shstate, shstate)
         self.num_cnt = 0
 
-        self.shmem2 = structstore_example.SettingsShared("/shdata_store")
+        self.shmem2 = structstore.StructStoreShared("/shsettings_store")
         self.shsettings = self.shmem2.get_store()
 
 
     def update_gui(self):
         start = timeit.default_timer()
-        if viz.begin_window('Settings'):
-            # viz.autogui(self.settings)
-            viz.autogui(self.settings.to_dict())
-        viz.end_window()
         if viz.begin_window('State'):
             # viz.autogui(self.state)
             viz.autogui(self.state.to_dict())

@@ -87,10 +87,10 @@ C++:
 
 ```c++
 stst::StructStoreDyn state;
-int& num = state.add_field<int>("num");
+int& num = state.get<int>("num");
 num = 5;
-auto& substate = state.add_field<stst::StructStoreDyn<0>>("substate");
-substate.add_field<int>("subnum") = 77;
+auto& substate = state.get<stst::StructStoreDyn<0>>("substate");
+substate.get<int>("subnum") = 77;
 std::cout << "complete state: " << state << std::endl;
 ```
 

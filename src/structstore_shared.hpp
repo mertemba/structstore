@@ -8,11 +8,7 @@
 
 namespace structstore {
 
-template<typename T>
 class StructStoreShared {
-    static_assert(std::is_base_of<StructStoreBase, T>::value,
-                  "Template argument must be derived from StructStoreBase");
-
     StructStoreShared(const StructStoreShared&) = delete;
 
     StructStoreShared(StructStoreShared&&) = delete;
@@ -22,9 +18,11 @@ class StructStoreShared {
     StructStoreShared& operator=(StructStoreShared&&) = delete;
 
     struct SharedData {
-        SharedData* original_ptr = nullptr;
-        T data{};
-        Arena extra_arena{0, nullptr};
+        SharedData* original_ptr;
+        Arena arena;
+        StructStore data;
+
+        SharedData() = delete;
     };
 
     int shm_fd;
@@ -32,12 +30,9 @@ class StructStoreShared {
     SharedData* shm_ptr;
 
 public:
-    explicit StructStoreShared(const std::string& shm_path, ssize_t extra_bufsize = 0) : shm_path(shm_path) {
+    explicit StructStoreShared(const std::string& shm_path, ssize_t bufsize = 1024) : shm_path(shm_path) {
         shm_fd = shm_open(shm_path.c_str(), O_CREAT | O_RDWR, 0600);
-        ssize_t size = sizeof(SharedData);
-        if (extra_bufsize > 0) {
-            size += extra_bufsize;
-        }
+        ssize_t size = sizeof(SharedData) + bufsize;
 
         // check if shared memory already exists
         struct stat shm_stat = {0};
@@ -72,22 +67,18 @@ public:
                 throw std::runtime_error("mmap'ing new memory failed");
             }
             shm_ptr->original_ptr = shm_ptr;
+            // add memory buffer
+            shm_ptr->arena = Arena(bufsize, (char*) shm_ptr + sizeof(SharedData));
             // initialize data
-            new(&shm_ptr->data) T();
-
-            // add extra memory buffer
-            if (extra_bufsize > 0) {
-                shm_ptr->extra_arena = Arena(extra_bufsize, (char*) shm_ptr + sizeof(SharedData));
-                shm_ptr->data.get_own_arena().extra_arena = &shm_ptr->extra_arena;
-            }
+            new(&shm_ptr->data) StructStore(shm_ptr->arena);
         }
     }
 
-    T* operator->() {
+    StructStore* operator->() {
         return &shm_ptr->data;
     }
 
-    T& operator*() {
+    StructStore& operator*() {
         return shm_ptr->data;
     }
 
