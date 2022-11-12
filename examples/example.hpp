@@ -7,7 +7,7 @@ namespace stst = structstore;
 
 struct Subsettings : stst::StructStore<Subsettings> {
     int subnum = 42;
-    stst::arena_str substr = {"bar", alloc};
+    stst::string substr = {"bar", alloc};
 
     Subsettings() : StructStore<Subsettings>() {}
 
@@ -20,7 +20,7 @@ struct Subsettings : stst::StructStore<Subsettings> {
 struct Settings : stst::StructStore<Settings> {
     int num = 5;
     bool flag = true;
-    stst::arena_str str = {"foo", alloc};
+    stst::string str = {"foo", alloc};
     Subsettings subsettings{};
 
     void list_fields() {

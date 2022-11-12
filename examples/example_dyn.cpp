@@ -6,7 +6,7 @@ namespace stst = structstore;
 
 struct DynSubsettings : stst::StructStoreDyn<0> {
     int& subnum = add_field<int>("subnum") = 42;
-    stst::arena_str& substr = add_field<stst::arena_str>("substr") = "bar";
+    stst::string& substr = add_field<stst::string>("substr") = "bar";
 
     explicit DynSubsettings(stst::Arena& arena) : stst::StructStoreDyn<0>(arena) {}
 };
@@ -14,7 +14,7 @@ struct DynSubsettings : stst::StructStoreDyn<0> {
 struct DynSettings : stst::StructStoreDyn<> {
     int& num = add_field<int>("num") = 5;
     bool& flag = add_field<bool>("flag") = true;
-    stst::arena_str& str = add_field<stst::arena_str>("str") = "foo";
+    stst::string& str = add_field<stst::string>("str") = "foo";
     DynSubsettings& subsettings = add_field<DynSubsettings>("subsettings");
 };
 

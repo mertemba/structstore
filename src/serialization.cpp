@@ -14,8 +14,8 @@ void serialize_text<bool>(std::ostream& os, void* val) {
 }
 
 template<>
-void serialize_text<std::string>(std::ostream& os, void* val) {
-    os << '"' << *(std::string*) val << '"';
+void serialize_text<structstore::string>(std::ostream& os, void* val) {
+    os << '"' << *(structstore::string*) val << '"';
 }
 
 template<typename T>
@@ -24,19 +24,17 @@ YAML::Node serialize_yaml(void* val) {
 }
 
 std::unordered_map<FieldTypeValue, SerializeTextFunc*> ser_text_funcs{
-        {FieldTypeValue::INT,       serialize_text<int>},
-        {FieldTypeValue::STRING,    serialize_text<std::string>},
-        {FieldTypeValue::ARENA_STR, serialize_text<arena_str>},
-        {FieldTypeValue::BOOL,      serialize_text<bool>},
-        {FieldTypeValue::STRUCT,    serialize_text<StructStoreBase>},
+        {FieldTypeValue::INT,    serialize_text<int>},
+        {FieldTypeValue::STRING, serialize_text<structstore::string>},
+        {FieldTypeValue::BOOL,   serialize_text<bool>},
+        {FieldTypeValue::STRUCT, serialize_text<StructStoreBase>},
 };
 
 std::unordered_map<FieldTypeValue, SerializeYamlFunc*> ser_yaml_funcs{
-        {FieldTypeValue::INT,       serialize_yaml<int>},
-        {FieldTypeValue::STRING,    serialize_yaml<std::string>},
-        {FieldTypeValue::ARENA_STR, serialize_yaml<arena_str>},
-        {FieldTypeValue::BOOL,      serialize_yaml<bool>},
-        {FieldTypeValue::STRUCT,    serialize_yaml<StructStoreBase>},
+        {FieldTypeValue::INT,    serialize_yaml<int>},
+        {FieldTypeValue::STRING, serialize_yaml<structstore::string>},
+        {FieldTypeValue::BOOL,   serialize_yaml<bool>},
+        {FieldTypeValue::STRUCT, serialize_yaml<StructStoreBase>},
 };
 
 YAML::Node to_yaml(const int& val) {
@@ -47,11 +45,7 @@ YAML::Node to_yaml(const bool& val) {
     return YAML::Node(val);
 }
 
-YAML::Node to_yaml(const std::string& val) {
-    return YAML::Node(val);
-}
-
-YAML::Node to_yaml(const arena_str& val) {
+YAML::Node to_yaml(const structstore::string& val) {
     return YAML::Node(val.c_str());
 }
 

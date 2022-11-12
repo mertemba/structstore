@@ -18,9 +18,7 @@ YAML::Node to_yaml(const int& val);
 
 YAML::Node to_yaml(const bool& val);
 
-YAML::Node to_yaml(const std::string& val);
-
-YAML::Node to_yaml(const arena_str& val);
+YAML::Node to_yaml(const structstore::string& val);
 
 }
 

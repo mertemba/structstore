@@ -7,9 +7,7 @@ pybind11::object field_to_object(StructStoreField& field) {
         case FieldTypeValue::INT:
             return pybind11::int_((int&) field);
         case FieldTypeValue::STRING:
-            return pybind11::str((std::string&) field);
-        case FieldTypeValue::ARENA_STR:
-            return pybind11::str(((arena_str&) field).c_str());
+            return pybind11::str(((structstore::string&) field).c_str());
         case FieldTypeValue::BOOL:
             return pybind11::bool_((bool&) field);
         case FieldTypeValue::STRUCT: {
@@ -32,10 +30,7 @@ void set_field_to_object(StructStoreField& field, const pybind11::object& value)
             (int&) field = pybind11::int_(value);
             break;
         case FieldTypeValue::STRING:
-            (std::string&) field = pybind11::str(value);
-            break;
-        case FieldTypeValue::ARENA_STR:
-            (arena_str&) field = std::string(pybind11::str(value));
+            (structstore::string&) field = std::string(pybind11::str(value));
             break;
         case FieldTypeValue::BOOL:
             (bool&) field = pybind11::bool_(value);

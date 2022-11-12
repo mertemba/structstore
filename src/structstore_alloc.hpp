@@ -70,13 +70,13 @@ public:
     }
 };
 
-using arena_str = std::basic_string<char, std::char_traits<char>, ArenaAllocator<char>>;
+using string = std::basic_string<char, std::char_traits<char>, ArenaAllocator<char>>;
 
 template<class T>
-using arena_vec = std::vector<T, ArenaAllocator<T>>;
+using vector = std::vector<T, ArenaAllocator<T>>;
 
 template<class K, class T>
-using arena_map = std::unordered_map<K, T, std::hash<K>, std::equal_to<K>, ArenaAllocator<std::pair<const K, T>>>;
+using unordered_map = std::unordered_map<K, T, std::hash<K>, std::equal_to<K>, ArenaAllocator<std::pair<const K, T>>>;
 
 }
 

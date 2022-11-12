@@ -31,7 +31,6 @@ class StructStoreShared;
 enum class FieldTypeValue : uint8_t {
     INT,
     STRING,
-    ARENA_STR,
     BOOL,
     STRUCT,
 };
@@ -45,13 +44,8 @@ struct FieldType<int> {
 };
 
 template<>
-struct FieldType<std::string> {
+struct FieldType<structstore::string> {
     static constexpr auto value = FieldTypeValue::STRING;
-};
-
-template<>
-struct FieldType<arena_str> {
-    static constexpr auto value = FieldTypeValue::ARENA_STR;
 };
 
 template<>
@@ -113,8 +107,8 @@ protected:
     ArenaAllocator<char> alloc;
 
 private:
-    arena_map<HashString, StructStoreField> fields;
-    arena_vec<const char*> slots;
+    unordered_map<HashString, StructStoreField> fields;
+    vector<const char*> slots;
 
 protected:
     StructStoreBase(const StructStoreBase&) = delete;
