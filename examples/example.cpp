@@ -4,7 +4,7 @@
 
 namespace stst = structstore;
 
-struct Subsettings : public stst::StructStore {
+struct Subsettings {
     stst::StructStore& store;
 
     int& subnum = store.get<int>("subnum") = 42;
@@ -25,13 +25,14 @@ struct Settings {
 };
 
 int main() {
-    stst::StructStore state;
-    int& num = state.get<int>("num");
+    stst::StructStore store;
+    int& num = store.get<int>("num");
     num = 5;
+    std::cout << "store: " << store << std::endl;
 
-    auto& substate = state.get<stst::StructStore>("substate");
-    substate.get<int>("subnum") = 77;
-    std::cout << "complete state: " << state << std::endl;
+    Settings settings{store};
+    settings.num = 42;
+    std::cout << "settings: " << store << std::endl;
 
     stst::StructStoreShared shdata_store("/shdata_store");
     std::cout << "shared data: " << *shdata_store << std::endl;
