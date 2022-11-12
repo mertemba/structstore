@@ -42,10 +42,7 @@ public:
         // check if shared memory already exists
         struct stat shm_stat = {0};
         fstat(shm_fd, &shm_stat);
-        if (shm_stat.st_size > 0 && shm_stat.st_size != size) {
-            throw std::runtime_error("shared mem " + shm_path + " already exists with a different size");
-        }
-        if (shm_stat.st_size == size) {
+        if (shm_stat.st_size > 0) {
             std::cout << "using existing memory ..." << std::endl;
             // use existing memory
             SharedData* original_ptr;
@@ -81,7 +78,7 @@ public:
             // add extra memory buffer
             if (extra_bufsize > 0) {
                 shm_ptr->extra_arena = Arena(extra_bufsize, (char*) shm_ptr + sizeof(SharedData));
-                shm_ptr->data.own_arena.extra_arena = &shm_ptr->extra_arena;
+                shm_ptr->data.get_own_arena().extra_arena = &shm_ptr->extra_arena;
             }
         }
     }

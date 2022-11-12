@@ -167,6 +167,10 @@ class StructStore : public StructStoreBase {
 public:
     static constexpr size_t bufsize = _bufsize;
 
+    Arena& get_own_arena() {
+        return own_arena;
+    }
+
 protected:
     StructStore() : own_arena(_bufsize, arena_mem.data()), StructStoreBase(own_arena) {
         registering_fields = true;

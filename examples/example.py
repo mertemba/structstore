@@ -34,6 +34,10 @@ def __main__():
     structstore_utils.construct_from_obj(shstore, shstate)
     print(shstore.to_dict())
 
+    shmem2 = structstore.StructStoreShared("/dyn_settings")
+    settings = shmem2.get_store()
+    print(settings.to_dict())
+
 
 if __name__ == '__main__':
     __main__()

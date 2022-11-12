@@ -35,6 +35,8 @@ public:
         if constexpr (std::is_base_of<StructStoreBase, T>::value) {
             static_assert(T::bufsize == 0);
             new(ptr) T(StructStoreBase::arena);
+        } else if constexpr (std::is_same<T, structstore::arena_str>::value) {
+            new(ptr) T(ArenaAllocator<char>(StructStoreBase::arena));
         } else {
             new(ptr) T();
         }
