@@ -60,15 +60,15 @@ pybind11::class_<T> register_pystruct(pybind11::module_& m, const char* name) {
 pybind11::object field_to_object(StructStoreField& field) {
     switch (field.type) {
         case FieldTypeValue::INT:
-            return pybind11::int_((int&) field);
+            return pybind11::int_(field.get<int>());
         case FieldTypeValue::DOUBLE:
-            return pybind11::float_((double&) field);
+            return pybind11::float_(field.get<double>());
         case FieldTypeValue::STRING:
-            return pybind11::str(((structstore::string&) field).c_str());
+            return pybind11::str(field.get<structstore::string>().c_str());
         case FieldTypeValue::BOOL:
-            return pybind11::bool_((bool&) field);
+            return pybind11::bool_(field.get<bool>());
         case FieldTypeValue::STRUCT:
-            return pybind11::cast((StructStore&) field, pybind11::return_value_policy::reference);
+            return pybind11::cast(field.get<StructStore>(), pybind11::return_value_policy::reference);
         default:
             std::cerr << "internal error: unknown field type\n";
             throw pybind11::type_error("internal error: unknown field type");
@@ -78,23 +78,22 @@ pybind11::object field_to_object(StructStoreField& field) {
 void set_field_to_object(StructStoreField& field, const pybind11::object& value) {
     switch (field.type) {
         case FieldTypeValue::INT:
-            (int&) field = pybind11::int_(value);
+            field.get<int>() = pybind11::int_(value);
             break;
         case FieldTypeValue::DOUBLE:
-            (double&) field = pybind11::float_(value);
+            field.get<double>() = pybind11::float_(value);
             break;
         case FieldTypeValue::STRING:
-            (structstore::string&) field = std::string(pybind11::str(value));
+            field.get<structstore::string>() = std::string(pybind11::str(value));
             break;
         case FieldTypeValue::BOOL:
-            (bool&) field = pybind11::bool_(value);
+            field.get<bool>() = pybind11::bool_(value);
             break;
         case FieldTypeValue::STRUCT:
             // TODO
             // (StructStoreBase&) field = pybind11::cast<StructStoreBase>(value);
             break;
         default:
-            std::cerr << "internal error: unknown field type\n";
             throw pybind11::type_error("internal error: unknown field type");
     }
 }
@@ -103,7 +102,7 @@ pybind11::object to_dict(StructStore& store) {
     auto dict = pybind11::dict();
     for (auto& [key, value]: store.fields) {
         if (value.type == FieldTypeValue::STRUCT) {
-            dict[key.str] = to_dict(value);
+            dict[key.str] = to_dict(value.get<StructStore>());
         } else {
             dict[key.str] = field_to_object(value);
         }

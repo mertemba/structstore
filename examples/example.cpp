@@ -7,8 +7,8 @@ namespace stst = structstore;
 struct Subsettings {
     stst::StructStore& store;
 
-    int& subnum = store.get<int>("subnum") = 42;
-    stst::string& substr = store.get<stst::string>("substr") = "bar";
+    int& subnum = store["subnum"] = 42;
+    stst::string& substr = store["substr"] = (const char*) "bar";
 
     explicit Subsettings(stst::StructStore& store) : store(store) {}
 };
@@ -16,10 +16,10 @@ struct Subsettings {
 struct Settings {
     stst::StructStore& store;
 
-    int& num = store.get<int>("num") = 5;
-    double& value = store.get<double>("value") = 3.14;
-    bool& flag = store.get<bool>("flag") = true;
-    stst::string& str = store.get<stst::string>("str") = "foo";
+    int& num = store["num"] = 5;
+    double& value = store["value"] = 3.14;
+    bool& flag = store["flag"] = true;
+    stst::string& str = store["str"] = (const char*) "foo";
     Subsettings subsettings{store.get<stst::StructStore>("subsettings")};
 
     explicit Settings(stst::StructStore& store) : store(store) {}
@@ -27,7 +27,7 @@ struct Settings {
 
 int main() {
     stst::StructStore store;
-    int& num = store.get<int>("num");
+    int& num = store["num"];
     num = 5;
     std::cout << "store: " << store << std::endl;
 

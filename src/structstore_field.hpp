@@ -75,17 +75,8 @@ public:
     }
 
     template<typename T>
-    operator T&() {
-        if (type != FieldType<T>::value) {
-            throw std::runtime_error("field is not of type " + std::string(typeid(T).name()));
-        }
+    T& get() {
         return *(T*) data;
-    }
-
-    template<typename T>
-    StructStoreField& operator=(const T& value) {
-        (T&) *this = value;
-        return *this;
     }
 };
 

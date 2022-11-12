@@ -21,6 +21,36 @@ struct object;
 
 namespace structstore {
 
+class StructStoreAccess {
+    StructStore& store;
+    HashString name;
+
+public:
+    StructStoreAccess() = delete;
+
+    StructStoreAccess(StructStore& store, HashString name) : store(store), name(name) {}
+
+    StructStoreAccess(const StructStoreAccess& other) = default;
+
+    StructStoreAccess& operator=(const StructStoreAccess& other) = delete;
+
+    template<typename T>
+    T& get();
+
+    template<typename T>
+    operator T&() {
+        return get<T>();
+    }
+
+    template<typename T>
+    StructStoreAccess& operator=(const T& value) {
+        get<T>() = value;
+        return *this;
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const StructStoreAccess& self);
+};
+
 class StructStore {
     template<typename T>
     friend pybind11::class_ <T> register_pystruct(pybind11::module_&, const char*);
@@ -42,11 +72,15 @@ protected:
     explicit StructStore(Arena& arena)
             : own_arena(), arena(arena), alloc(arena), fields(alloc), slots(alloc) {}
 
-    HashString internal_string(const char* str) {
-        size_t len = std::strlen(str);
+    HashString internal_string(HashString str) {
+        size_t len = std::strlen(str.str);
         char* buf = (char*) arena.allocate(len + 1);
-        std::strcpy(buf, str);
-        return {buf, const_hash(buf)};
+        std::strcpy(buf, str.str);
+        return {buf, str.hash};
+    }
+
+    HashString internal_string(const char* str) {
+        return internal_string(HashString{str});
     }
 
 public:
@@ -87,17 +121,30 @@ public:
 
     friend pybind11::object to_dict(StructStore& store);
 
+    StructStoreField& get_field(HashString name_str) {
+        std::cout << "getting field " << name_str.str << std::endl;
+        auto it = fields.find(name_str);
+        if (it == fields.end()) {
+            throw std::runtime_error("field " + std::string(name_str.str) + " does not exist");
+        }
+        return it->second;
+    }
+
     template<typename T>
     T& get(const char* name) {
-        HashString name_str = internal_string(name);
-        auto it = fields.find(name_str);
+        return this->get_hashed<T>(HashString{name});
+    }
+
+    template<typename T>
+    T& get_hashed(HashString name) {
+        auto it = fields.find(name);
         if (it != fields.end()) {
-            // field already exists, silently ignore this
+            // field already exists, directly return
             StructStoreField& field = it->second;
             if (field.type != FieldType<T>::value) {
-                throw std::runtime_error("field " + std::string(name) + " already exists with a different type");
+                throw std::runtime_error("field " + std::string(name.str) + " has a different type");
             }
-            return (T&) field;
+            return field.get<T>();
         }
         T* ptr = ArenaAllocator<T>(arena).allocate(1);
         if constexpr (std::is_base_of<StructStore, T>::value) {
@@ -108,23 +155,36 @@ public:
             new(ptr) T();
         }
         T& field = *ptr;
-        fields.emplace(name_str, StructStoreField(field));
-        slots.emplace_back(name_str.str);
+        HashString name_int = internal_string(name);
+        fields.emplace(name_int, StructStoreField(field));
+        slots.emplace_back(name_int.str);
         return field;
     }
 
-    StructStoreField& operator[](HashString name) {
-        auto it = fields.find(name);
-        if (it == fields.end()) {
-            throw std::runtime_error("could not find field " + std::string(name.str));
-        }
-        return it->second;
+    StructStoreAccess operator[](HashString name) {
+        return {*this, name};
     }
 
-    StructStoreField& operator[](const char* name) {
-        return (*this)[HashString{name}];
+    StructStoreAccess operator[](const char* name) {
+        return {*this, HashString{name}};
     }
 };
+
+template<typename T>
+T& StructStoreAccess::get() {
+    return store.get_hashed<T>(name);
+}
+
+template<>
+StructStoreAccess& StructStoreAccess::operator=<const char*>(const char* const& value) {
+    get<structstore::string>() = value;
+    return *this;
+}
+
+std::ostream& operator<<(std::ostream& os, const StructStoreAccess& self) {
+    os << self.store.get_field(self.name);
+    return os;
+}
 
 }
 
