@@ -17,6 +17,7 @@ struct Settings {
     stst::StructStore& store;
 
     int& num = store.get<int>("num") = 5;
+    double& value = store.get<double>("value") = 3.14;
     bool& flag = store.get<bool>("flag") = true;
     stst::string& str = store.get<stst::string>("str") = "foo";
     Subsettings subsettings{store.get<stst::StructStore>("subsettings")};

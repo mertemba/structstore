@@ -13,6 +13,7 @@ class StructStore;
 
 enum class FieldTypeValue : uint8_t {
     INT,
+    DOUBLE,
     STRING,
     BOOL,
     STRUCT,
@@ -27,6 +28,11 @@ struct FieldType;
 template<>
 struct FieldType<int> {
     static constexpr auto value = FieldTypeValue::INT;
+};
+
+template<>
+struct FieldType<double> {
+    static constexpr auto value = FieldTypeValue::DOUBLE;
 };
 
 template<>

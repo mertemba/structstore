@@ -12,6 +12,7 @@ class Substate:
 @dataclass
 class State:
     num: int
+    value: float
     mystr: str
     flag: bool
     substate: Substate
@@ -20,12 +21,14 @@ class State:
 def __main__():
     state = structstore.StructStore()
     state.add_int('num')
+    state.add_float('value')
     state.add_str('mystr')
     state.add_bool('flag')
+    print(state.to_dict())
 
     shmem = structstore.StructStoreShared("/dyn_shdata_store", 16384)
     shstore = shmem.get_store()
-    shstate = State(5, 'foo', True, Substate(42))
+    shstate = State(5, 3.14, 'foo', True, Substate(42))
     structstore_utils.construct_from_obj(shstore, shstate)
     print(shstore.to_dict())
 

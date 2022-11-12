@@ -10,6 +10,8 @@ def construct_from_obj(store: structstore.StructStore, obj):
             store.add_bool(name)
         elif isinstance(value, int):
             store.add_int(name)
+        elif isinstance(value, float):
+            store.add_float(name)
         elif isinstance(value, str):
             store.add_str(name)
         elif hasattr(value, '__dict__'):

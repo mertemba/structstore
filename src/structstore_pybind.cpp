@@ -61,6 +61,8 @@ pybind11::object field_to_object(StructStoreField& field) {
     switch (field.type) {
         case FieldTypeValue::INT:
             return pybind11::int_((int&) field);
+        case FieldTypeValue::DOUBLE:
+            return pybind11::float_((double&) field);
         case FieldTypeValue::STRING:
             return pybind11::str(((structstore::string&) field).c_str());
         case FieldTypeValue::BOOL:
@@ -77,6 +79,9 @@ void set_field_to_object(StructStoreField& field, const pybind11::object& value)
     switch (field.type) {
         case FieldTypeValue::INT:
             (int&) field = pybind11::int_(value);
+            break;
+        case FieldTypeValue::DOUBLE:
+            (double&) field = pybind11::float_(value);
             break;
         case FieldTypeValue::STRING:
             (structstore::string&) field = std::string(pybind11::str(value));
@@ -111,6 +116,7 @@ pybind11::object to_dict(StructStore& store) {
 PYBIND11_MODULE(structstore, m) {
     auto cls = structstore::register_pystruct<structstore::StructStore>(m, "StructStore");
     cls.def("add_int", &structstore::StructStore::get<int>);
+    cls.def("add_float", &structstore::StructStore::get<double>);
     cls.def("add_str", &structstore::StructStore::get<structstore::string>);
     cls.def("add_bool", &structstore::StructStore::get<bool>);
     cls.def("add_store", &structstore::StructStore::get<structstore::StructStore>,

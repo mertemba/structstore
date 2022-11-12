@@ -29,6 +29,10 @@ YAML::Node to_yaml(const int& val) {
     return YAML::Node(val);
 }
 
+YAML::Node to_yaml(const double& val) {
+    return YAML::Node(val);
+}
+
 YAML::Node to_yaml(const bool& val) {
     return YAML::Node(val);
 }
@@ -49,20 +53,13 @@ using SerializeYamlFunc = YAML::Node(void*);
 
 enum class FieldTypeValue : uint8_t;
 
-static std::unordered_map<FieldTypeValue, SerializeTextFunc*> ser_text_funcs{
-};
-
-static std::unordered_map<FieldTypeValue, SerializeYamlFunc*> ser_yaml_funcs{
-        {FieldTypeValue::INT,    serialize_yaml<int>},
-        {FieldTypeValue::STRING, serialize_yaml<structstore::string>},
-        {FieldTypeValue::BOOL,   serialize_yaml<bool>},
-        {FieldTypeValue::STRUCT, serialize_yaml<StructStore>},
-};
-
 void serialize_text(std::ostream& os, FieldTypeValue type, void* data) {
     switch (type) {
         case FieldTypeValue::INT:
             serialize_text<int>(os, data);
+            break;
+        case FieldTypeValue::DOUBLE:
+            serialize_text<double>(os, data);
             break;
         case FieldTypeValue::STRING:
             serialize_text<structstore::string>(os, data);
@@ -82,6 +79,8 @@ YAML::Node serialize_yaml(FieldTypeValue type, void* data) {
     switch (type) {
         case FieldTypeValue::INT:
             return serialize_yaml<int>(data);
+        case FieldTypeValue::DOUBLE:
+            return serialize_yaml<double>(data);
         case FieldTypeValue::STRING:
             return serialize_yaml<structstore::string>(data);
         case FieldTypeValue::BOOL:

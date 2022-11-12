@@ -119,8 +119,8 @@ mmap'ed by several processes.
 
 ## Limitations
 
-* The library currently only supports the following types: int, string, bool,
-  nested structure.
+* The library currently only supports the following types: int, double, string,
+  bool, nested structures.
 * The arena memory region currently has a fixed size, i.e. at some point,
   additional allocations will throw an exception.
 * Shared memory is mmap'ed to the same address in all processes (using
