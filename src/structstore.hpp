@@ -21,6 +21,9 @@ struct object;
 
 namespace structstore {
 
+static constexpr size_t malloc_size = 1 << 16;
+static MiniMalloc static_alloc{malloc_size, malloc(malloc_size)};
+
 class StructStoreAccess {
     StructStore& store;
     HashString name;
@@ -57,38 +60,30 @@ class StructStore {
 
     friend class StructStoreShared;
 
-private:
-    std::unique_ptr<CompactArena<1024>> own_arena;
-
 protected:
-    Arena& arena;
-    ArenaAllocator<char> alloc;
+    MiniMalloc& mm_alloc;
+    StlAllocator<char> alloc;
 
 private:
     unordered_map<HashString, StructStoreField> fields;
     vector<const char*> slots;
 
-protected:
-    explicit StructStore(Arena& arena)
-            : own_arena(), arena(arena), alloc(arena), fields(alloc), slots(alloc) {}
-
     HashString internal_string(HashString str) {
         size_t len = std::strlen(str.str);
-        char* buf = (char*) arena.allocate(len + 1);
+        char* buf = (char*) mm_alloc.allocate(len + 1);
         std::strcpy(buf, str.str);
         return {buf, str.hash};
     }
 
-    HashString internal_string(const char* str) {
-        return internal_string(HashString{str});
+protected:
+    explicit StructStore(MiniMalloc& mm_alloc)
+            : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {
+        std::cout << "initializing StructStore with alloc " << &mm_alloc << std::endl;
     }
 
 public:
     StructStore()
-            : own_arena(std::make_unique<CompactArena<1024>>()),
-              arena(own_arena->arena), alloc(arena), fields(alloc), slots(alloc) {
-        std::cout << "creating a compact arena ..." << std::endl;
-    }
+            : mm_alloc(static_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {}
 
     StructStore(const StructStore&) = delete;
 
@@ -99,7 +94,7 @@ public:
     StructStore& operator=(StructStore&&) = delete;
 
     size_t allocated_size() const {
-        return arena.allocated;
+        return mm_alloc.allocated;
     }
 
     friend std::ostream& operator<<(std::ostream& os, const StructStore& self) {
@@ -146,9 +141,10 @@ public:
             }
             return field.get<T>();
         }
-        T* ptr = ArenaAllocator<T>(arena).allocate(1);
+        StlAllocator<T> tmp_alloc{mm_alloc};
+        T* ptr = tmp_alloc.allocate(1);
         if constexpr (std::is_base_of<StructStore, T>::value) {
-            new(ptr) T(arena);
+            new(ptr) T(mm_alloc);
         } else if constexpr (std::is_same<T, structstore::string>::value) {
             new(ptr) T(alloc);
         } else {

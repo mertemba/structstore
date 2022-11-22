@@ -33,6 +33,8 @@ int main() {
 
     Settings settings{store};
     settings.num = 42;
+    settings.subsettings.subnum = 43;
+    std::cout << "subsettings: " << store["subsettings"] << std::endl;
     std::cout << "settings: " << store << std::endl;
 
     stst::StructStoreShared shdata_store("/shdata_store");

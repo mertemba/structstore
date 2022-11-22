@@ -19,7 +19,7 @@ class StructStoreShared {
 
     struct SharedData {
         SharedData* original_ptr;
-        Arena arena;
+        MiniMalloc mm_alloc;
         StructStore data;
 
         SharedData() = delete;
@@ -30,7 +30,7 @@ class StructStoreShared {
     SharedData* shm_ptr;
 
 public:
-    explicit StructStoreShared(const std::string& shm_path, ssize_t bufsize = 1024) : shm_path(shm_path) {
+    explicit StructStoreShared(const std::string& shm_path, ssize_t bufsize = 2048) : shm_path(shm_path) {
         shm_fd = shm_open(shm_path.c_str(), O_CREAT | O_RDWR, 0600);
         ssize_t size = sizeof(SharedData) + bufsize;
 
@@ -68,9 +68,9 @@ public:
             }
             shm_ptr->original_ptr = shm_ptr;
             // add memory buffer
-            shm_ptr->arena = Arena(bufsize, (char*) shm_ptr + sizeof(SharedData));
+            new(&shm_ptr->mm_alloc) MiniMalloc(bufsize, (char*) shm_ptr + sizeof(SharedData));
             // initialize data
-            new(&shm_ptr->data) StructStore(shm_ptr->arena);
+            new(&shm_ptr->data) StructStore(shm_ptr->mm_alloc);
         }
     }
 
