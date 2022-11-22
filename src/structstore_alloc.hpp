@@ -341,11 +341,11 @@ public:
     template<typename U>
     StlAllocator(const StlAllocator<U>& other) : mm_alloc(other.mm_alloc) {}
 
-    T* allocate(std::size_t n) & {
+    T* allocate(std::size_t n) {
         return static_cast<T*>(mm_alloc.allocate(n * sizeof(T)));
     }
 
-    void deallocate(T* p, std::size_t n) & {
+    void deallocate(T* p, std::size_t n) {
         mm_alloc.deallocate(p);
     }
 

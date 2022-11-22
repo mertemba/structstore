@@ -82,11 +82,11 @@ public:
         return shm_ptr->data;
     }
 
-    StructStoreAccess operator[](HashString name) {
+    FieldAccess operator[](HashString name) {
         return shm_ptr->data[name];
     }
 
-    StructStoreAccess operator[](const char* name) {
+    FieldAccess operator[](const char* name) {
         return shm_ptr->data[name];
     }
 

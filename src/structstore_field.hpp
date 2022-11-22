@@ -12,6 +12,7 @@ namespace structstore {
 class StructStore;
 
 enum class FieldTypeValue : uint8_t {
+    EMPTY,
     INT,
     DOUBLE,
     STRING,
@@ -58,12 +59,49 @@ struct FieldType<T, std::enable_if_t<std::is_base_of_v<StructStore, T>>> {
 class StructStoreField {
 private:
     void* data;
+    FieldTypeValue type;
+
+    void assert_nonempty() {
+        if (data == nullptr || type == FieldTypeValue::EMPTY) {
+            throw std::runtime_error("field is not yet initialized!");
+        }
+    }
+
+    void assert_empty() {
+        if (data != nullptr || type != FieldTypeValue::EMPTY) {
+            throw std::runtime_error("field is replaced/deleted while still initialized!");
+        }
+    }
 
 public:
-    const FieldTypeValue type;
+    StructStoreField() : data(nullptr), type(FieldTypeValue::EMPTY) {}
 
     template<typename T>
-    StructStoreField(T& field) : data(&field), type(FieldType<T>::value) {}
+    explicit StructStoreField(T* data) : data(data), type(FieldType<T>::value) {}
+
+    StructStoreField(StructStoreField&& other) noexcept: data(other.data), type(other.type) {
+        other.data = nullptr;
+        other.type = FieldTypeValue::EMPTY;
+    }
+
+    StructStoreField(const StructStoreField&) = delete;
+
+    template<typename T>
+    void replace_data(T* new_data, MiniMalloc& mm_alloc) {
+        if (data) {
+            mm_alloc.deallocate(data);
+        }
+        data = new_data;
+        type = FieldType<T>::value;
+    }
+
+    StructStoreField& operator=(StructStoreField&&) = delete;
+
+    StructStoreField& operator=(const StructStoreField&) = delete;
+
+    [[nodiscard]] FieldTypeValue get_type() const {
+        return type;
+    }
 
     friend std::ostream& operator<<(std::ostream& os, const StructStoreField& self) {
         serialize_text(os, self.type, self.data);
@@ -76,6 +114,7 @@ public:
 
     template<typename T>
     T& get() {
+        assert_nonempty();
         return *(T*) data;
     }
 };

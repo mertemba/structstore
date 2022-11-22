@@ -24,21 +24,37 @@ namespace structstore {
 static constexpr size_t malloc_size = 1 << 16;
 static MiniMalloc static_alloc{malloc_size, malloc(malloc_size)};
 
-class StructStoreAccess {
-    StructStore& store;
-    HashString name;
+class FieldAccess {
+    StructStoreField& field;
+    MiniMalloc& mm_alloc;
 
 public:
-    StructStoreAccess() = delete;
+    FieldAccess() = delete;
 
-    StructStoreAccess(StructStore& store, HashString name) : store(store), name(name) {}
+    FieldAccess(StructStoreField& field, MiniMalloc& mm_alloc) : field(field), mm_alloc(mm_alloc) {}
 
-    StructStoreAccess(const StructStoreAccess& other) = default;
+    FieldAccess(const FieldAccess& other) = default;
 
-    StructStoreAccess& operator=(const StructStoreAccess& other) = delete;
+    FieldAccess& operator=(const FieldAccess& other) = delete;
 
     template<typename T>
-    T& get();
+    T& get() {
+        if (field.get_type() != FieldTypeValue::EMPTY) {
+            // field already exists, directly return
+            return field.get<T>();
+        }
+        StlAllocator<T> tmp_alloc{mm_alloc};
+        T* ptr = tmp_alloc.allocate(1);
+        if constexpr (std::is_base_of<StructStore, T>::value) {
+            new(ptr) T(mm_alloc);
+        } else if constexpr (std::is_same<T, structstore::string>::value) {
+            new(ptr) T(tmp_alloc);
+        } else {
+            new(ptr) T();
+        }
+        field.replace_data(ptr, mm_alloc);
+        return field.get<T>();
+    }
 
     template<typename T>
     operator T&() {
@@ -46,12 +62,14 @@ public:
     }
 
     template<typename T>
-    StructStoreAccess& operator=(const T& value) {
+    FieldAccess& operator=(const T& value) {
         get<T>() = value;
         return *this;
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const StructStoreAccess& self);
+    friend std::ostream& operator<<(std::ostream& os, const FieldAccess& self) {
+        return os << self.field;
+    }
 };
 
 class StructStore {
@@ -59,6 +77,8 @@ class StructStore {
     friend pybind11::class_ <T> register_pystruct(pybind11::module_&, const char*);
 
     friend class StructStoreShared;
+
+    friend class FieldAccess;
 
 protected:
     MiniMalloc& mm_alloc;
@@ -77,13 +97,10 @@ private:
 
 protected:
     explicit StructStore(MiniMalloc& mm_alloc)
-            : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {
-        std::cout << "initializing StructStore with alloc " << &mm_alloc << std::endl;
-    }
+            : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {}
 
 public:
-    StructStore()
-            : mm_alloc(static_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {}
+    StructStore() : mm_alloc(static_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {}
 
     StructStore(const StructStore&) = delete;
 
@@ -116,70 +133,41 @@ public:
 
     friend pybind11::object to_dict(StructStore& store);
 
-    StructStoreField& get_field(HashString name_str) {
-        std::cout << "getting field " << name_str.str << std::endl;
-        auto it = fields.find(name_str);
+    StructStoreField& get_field(HashString name) {
+        auto it = fields.find(name);
         if (it == fields.end()) {
-            throw std::runtime_error("field " + std::string(name_str.str) + " does not exist");
+            HashString name_int = internal_string(name);
+            it = fields.emplace(name_int, StructStoreField{}).first;
+            slots.emplace_back(name_int.str);
         }
         return it->second;
     }
 
     template<typename T>
     T& get(const char* name) {
-        return this->get_hashed<T>(HashString{name});
+        return (*this)[HashString{name}];
     }
 
     template<typename T>
     T& get_hashed(HashString name) {
-        auto it = fields.find(name);
-        if (it != fields.end()) {
-            // field already exists, directly return
-            StructStoreField& field = it->second;
-            if (field.type != FieldType<T>::value) {
-                throw std::runtime_error("field " + std::string(name.str) + " has a different type");
-            }
-            return field.get<T>();
-        }
-        StlAllocator<T> tmp_alloc{mm_alloc};
-        T* ptr = tmp_alloc.allocate(1);
-        if constexpr (std::is_base_of<StructStore, T>::value) {
-            new(ptr) T(mm_alloc);
-        } else if constexpr (std::is_same<T, structstore::string>::value) {
-            new(ptr) T(alloc);
-        } else {
-            new(ptr) T();
-        }
-        T& field = *ptr;
-        HashString name_int = internal_string(name);
-        fields.emplace(name_int, StructStoreField(field));
-        slots.emplace_back(name_int.str);
-        return field;
+        return (*this)[name];
     }
 
-    StructStoreAccess operator[](HashString name) {
-        return {*this, name};
+    FieldAccess operator[](HashString name) {
+        return {get_field(name), mm_alloc};
     }
 
-    StructStoreAccess operator[](const char* name) {
-        return {*this, HashString{name}};
+    FieldAccess operator[](const char* name) {
+        return {get_field(HashString{name}), mm_alloc};
     }
 };
 
-template<typename T>
-T& StructStoreAccess::get() {
-    return store.get_hashed<T>(name);
-}
-
 template<>
-StructStoreAccess& StructStoreAccess::operator=<const char*>(const char* const& value) {
-    get<structstore::string>() = value;
+FieldAccess& FieldAccess::operator=<const char*>(const char* const& value) {
+    structstore::string* str = StlAllocator<structstore::string>(mm_alloc).allocate(1);
+    new(str) structstore::string(value, StlAllocator<char>(mm_alloc));
+    field.replace_data(str, mm_alloc);
     return *this;
-}
-
-std::ostream& operator<<(std::ostream& os, const StructStoreAccess& self) {
-    os << self.store.get_field(self.name);
-    return os;
 }
 
 }

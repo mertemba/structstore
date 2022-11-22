@@ -58,7 +58,7 @@ pybind11::class_<T> register_pystruct(pybind11::module_& m, const char* name) {
 }
 
 pybind11::object field_to_object(StructStoreField& field) {
-    switch (field.type) {
+    switch (field.get_type()) {
         case FieldTypeValue::INT:
             return pybind11::int_(field.get<int>());
         case FieldTypeValue::DOUBLE:
@@ -76,7 +76,7 @@ pybind11::object field_to_object(StructStoreField& field) {
 }
 
 void set_field_to_object(StructStoreField& field, const pybind11::object& value) {
-    switch (field.type) {
+    switch (field.get_type()) {
         case FieldTypeValue::INT:
             field.get<int>() = pybind11::int_(value);
             break;
@@ -101,7 +101,7 @@ void set_field_to_object(StructStoreField& field, const pybind11::object& value)
 pybind11::object to_dict(StructStore& store) {
     auto dict = pybind11::dict();
     for (auto& [key, value]: store.fields) {
-        if (value.type == FieldTypeValue::STRUCT) {
+        if (value.get_type() == FieldTypeValue::STRUCT) {
             dict[key.str] = to_dict(value.get<StructStore>());
         } else {
             dict[key.str] = field_to_object(value);
@@ -121,4 +121,3 @@ PYBIND11_MODULE(structstore, m) {
     cls.def("add_store", &structstore::StructStore::get<structstore::StructStore>,
             pybind11::return_value_policy::reference_internal);
 }
-
