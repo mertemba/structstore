@@ -11,6 +11,8 @@ namespace structstore {
 
 class StructStore;
 
+class List;
+
 enum class FieldTypeValue : uint8_t {
     EMPTY,
     INT,
@@ -18,6 +20,7 @@ enum class FieldTypeValue : uint8_t {
     STRING,
     BOOL,
     STRUCT,
+    LIST,
 };
 
 void serialize_text(std::ostream& os, FieldTypeValue type, void* data);
@@ -54,6 +57,11 @@ struct FieldType<StructStore> {
 template<class T>
 struct FieldType<T, std::enable_if_t<std::is_base_of_v<StructStore, T>>> {
     static constexpr auto value = FieldTypeValue::STRUCT;
+};
+
+template<>
+struct FieldType<List> {
+    static constexpr auto value = FieldTypeValue::LIST;
 };
 
 class StructStoreField {
@@ -116,6 +124,17 @@ public:
     T& get() {
         assert_nonempty();
         return *(T*) data;
+    }
+
+    template<typename T>
+    operator T&() {
+        return get<T>();
+    }
+
+    template<typename T>
+    StructStoreField& operator=(const T& value) {
+        get<T>() = value;
+        return *this;
     }
 };
 

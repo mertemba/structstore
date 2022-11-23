@@ -2,6 +2,7 @@
 #include <pybind11/stl.h>
 #include "structstore.hpp"
 #include "structstore_shared.hpp"
+#include "structstore_containers.hpp"
 
 namespace structstore {
 

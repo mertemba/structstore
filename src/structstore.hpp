@@ -49,6 +49,8 @@ public:
             new(ptr) T(mm_alloc);
         } else if constexpr (std::is_same<T, structstore::string>::value) {
             new(ptr) T(tmp_alloc);
+        } else if constexpr (std::is_same<T, structstore::List>::value) {
+            new(ptr) T(mm_alloc);
         } else {
             new(ptr) T();
         }
@@ -164,9 +166,7 @@ public:
 
 template<>
 FieldAccess& FieldAccess::operator=<const char*>(const char* const& value) {
-    structstore::string* str = StlAllocator<structstore::string>(mm_alloc).allocate(1);
-    new(str) structstore::string(value, StlAllocator<char>(mm_alloc));
-    field.replace_data(str, mm_alloc);
+    get<structstore::string>() = value;
     return *this;
 }
 

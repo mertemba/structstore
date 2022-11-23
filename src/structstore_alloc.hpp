@@ -345,7 +345,7 @@ public:
         return static_cast<T*>(mm_alloc.allocate(n * sizeof(T)));
     }
 
-    void deallocate(T* p, std::size_t n) {
+    void deallocate(T* p, std::size_t) {
         mm_alloc.deallocate(p);
     }
 

@@ -10,6 +10,8 @@ namespace structstore {
 
 std::ostream& operator<<(std::ostream&, const StructStore&);
 
+std::ostream& operator<<(std::ostream&, const List&);
+
 template<typename T>
 void serialize_text(std::ostream& os, void* val) {
     os << *(T*) val;
@@ -43,6 +45,8 @@ YAML::Node to_yaml(const structstore::string& val) {
 
 YAML::Node to_yaml(const StructStore&);
 
+YAML::Node to_yaml(const List&);
+
 template<typename T>
 YAML::Node serialize_yaml(void* val) {
     return to_yaml(*(T*) val);
@@ -70,6 +74,9 @@ void serialize_text(std::ostream& os, FieldTypeValue type, void* data) {
         case FieldTypeValue::STRUCT:
             serialize_text<StructStore>(os, data);
             break;
+        case FieldTypeValue::LIST:
+            serialize_text<List>(os, data);
+            break;
         default:
             throw std::runtime_error("internal error: unknown field type");
     }
@@ -87,6 +94,8 @@ YAML::Node serialize_yaml(FieldTypeValue type, void* data) {
             return serialize_yaml<bool>(data);
         case FieldTypeValue::STRUCT:
             return serialize_yaml<StructStore>(data);
+        case FieldTypeValue::LIST:
+            return serialize_yaml<List>(data);
         default:
             throw std::runtime_error("internal error: unknown field type");
     }

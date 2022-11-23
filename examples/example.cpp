@@ -1,6 +1,7 @@
 #include <iostream>
 #include <structstore.hpp>
 #include <structstore_shared.hpp>
+#include <structstore_containers.hpp>
 
 namespace stst = structstore;
 
@@ -46,6 +47,20 @@ int main() {
     stst::StructStoreShared shsettings_store("/shsettings_store");
     Settings shsettings{*shsettings_store};
     std::cout << "semi-dynamic struct: " << *shsettings_store << std::endl;
+
+    stst::List& list = store["list"];
+    list.push_back(5);
+    list.push_back(42);
+    for (int& i: list) {
+        ++i;
+    }
+    stst::List& strlist = store["strlist"];
+    strlist.push_back((const char*) "foo");
+    for (stst::string& str: strlist) {
+        str += "bar";
+    }
+    std::cout << store << std::endl;
+    std::cout << to_yaml(store) << std::endl;
 
     return 0;
 }
