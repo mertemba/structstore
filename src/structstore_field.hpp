@@ -69,13 +69,13 @@ private:
     void* data;
     FieldTypeValue type;
 
-    void assert_nonempty() {
+    void assert_nonempty() const {
         if (data == nullptr || type == FieldTypeValue::EMPTY) {
             throw std::runtime_error("field is not yet initialized!");
         }
     }
 
-    void assert_empty() {
+    void assert_empty() const {
         if (data != nullptr || type != FieldTypeValue::EMPTY) {
             throw std::runtime_error("field is replaced/deleted while still initialized!");
         }
@@ -121,7 +121,7 @@ public:
     }
 
     template<typename T>
-    T& get() {
+    T& get() const {
         assert_nonempty();
         if (FieldType<T>::value != type) {
             throw std::runtime_error("field accessed with wrong type");

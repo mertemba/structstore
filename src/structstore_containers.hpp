@@ -9,10 +9,6 @@ class List {
     MiniMalloc& mm_alloc;
     structstore::vector<StructStoreField> data;
 
-    FieldAccess push_back() {
-        return {data.emplace_back(), mm_alloc};
-    }
-
 public:
     class Iterator {
         const List& list;
@@ -39,7 +35,23 @@ public:
         }
     };
 
-    List(MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), data(StlAllocator<StructStoreField>(mm_alloc)) {}
+    List() : mm_alloc(*(MiniMalloc*) nullptr), data(StlAllocator<StructStoreField>(mm_alloc)) {
+        throw std::runtime_error("List should not be constructed without an allocator");
+    }
+
+    explicit List(MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), data(StlAllocator<StructStoreField>(mm_alloc)) {}
+
+    List(const List&) = delete;
+
+    List(List&&) = delete;
+
+    List& operator=(const List&) = delete;
+
+    List& operator=(List&&) = delete;
+
+    FieldAccess push_back() {
+        return {data.emplace_back(), mm_alloc};
+    }
 
     template<typename T>
     void push_back(const T& value) {
@@ -64,6 +76,10 @@ public:
             os << field << ",";
         }
         return os << "]";
+    }
+
+    void clear() {
+        data.clear();
     }
 };
 

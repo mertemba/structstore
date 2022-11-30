@@ -6,18 +6,20 @@
 
 namespace structstore {
 
-static pybind11::object to_object(FieldAccess access) {
-    switch (access.get_type()) {
+static pybind11::object to_object(const StructStoreField& field) {
+    switch (field.get_type()) {
         case FieldTypeValue::INT:
-            return pybind11::int_(access.get<int>());
+            return pybind11::int_(field.get<int>());
         case FieldTypeValue::DOUBLE:
-            return pybind11::float_(access.get<double>());
+            return pybind11::float_(field.get<double>());
         case FieldTypeValue::STRING:
-            return pybind11::str(access.get<structstore::string>().c_str());
+            return pybind11::str(field.get<structstore::string>().c_str());
         case FieldTypeValue::BOOL:
-            return pybind11::bool_(access.get<bool>());
+            return pybind11::bool_(field.get<bool>());
         case FieldTypeValue::STRUCT:
-            return pybind11::cast(access.get<StructStore>(), pybind11::return_value_policy::reference);
+            return pybind11::cast(field.get<StructStore>(), pybind11::return_value_policy::reference);
+        case FieldTypeValue::LIST:
+            return pybind11::cast(field.get<List>(), pybind11::return_value_policy::reference);
         case FieldTypeValue::EMPTY:
             throw std::runtime_error("trying to read unset field");
         default:
@@ -25,15 +27,21 @@ static pybind11::object to_object(FieldAccess access) {
     }
 }
 
-static void from_object(FieldAccess access, const pybind11::object& value) {
+static void from_object(FieldAccess access, const pybind11::handle& value) {
     if (pybind11::isinstance<pybind11::bool_>(value)) {
-        access.get<bool>() = pybind11::bool_(value);
+        access.get<bool>() = value.cast<bool>();
     } else if (pybind11::isinstance<pybind11::int_>(value)) {
-        access.get<int>() = pybind11::int_(value);
+        access.get<int>() = value.cast<int>();
     } else if (pybind11::isinstance<pybind11::float_>(value)) {
-        access.get<double>() = pybind11::float_(value);
+        access.get<double>() = value.cast<double>();
     } else if (pybind11::isinstance<pybind11::str>(value)) {
         access.get<structstore::string>() = std::string(pybind11::str(value));
+    } else if (pybind11::isinstance<pybind11::list>(value)) {
+        List& list = access.get<List>();
+        list.clear();
+        for (const auto& val: value.cast<pybind11::list>()) {
+            from_object(list.push_back(), val);
+        }
     } else if (pybind11::hasattr(value, "__dict__")) {
         auto dict = pybind11::dict(value.attr("__dict__"));
         for (const auto& [key, val]: dict) {
@@ -52,14 +60,30 @@ static void from_object(FieldAccess access, const pybind11::object& value) {
     }
 }
 
+static pybind11::object to_list(const List& list);
+
+static pybind11::object to_object_recursive(const StructStoreField& field) {
+    if (field.get_type() == FieldTypeValue::STRUCT) {
+        return to_dict(field.get<StructStore>());
+    } else if (field.get_type() == FieldTypeValue::LIST) {
+        return to_list(field.get<List>());
+    } else {
+        return to_object(field);
+    }
+}
+
+static pybind11::object to_list(const List& list) {
+    auto pylist = pybind11::list();
+    for (const StructStoreField& field: list) {
+        pylist.append(to_object_recursive(field));
+    }
+    return pylist;
+}
+
 pybind11::object to_dict(StructStore& store) {
     auto dict = pybind11::dict();
     for (auto& [key, value]: store.fields) {
-        if (value.get_type() == FieldTypeValue::STRUCT) {
-            dict[key.str] = to_dict(value.get<StructStore>());
-        } else {
-            dict[key.str] = to_object({value, store.mm_alloc});
-        }
+        dict[key.str] = to_object_recursive(value);
     }
     return dict;
 }
@@ -73,7 +97,7 @@ void register_structstore_pybind(pybind11::module_& m) {
         if (field == nullptr) {
             throw pybind11::attribute_error();
         }
-        return to_object({*field, store.mm_alloc});
+        return to_object(*field);
     }, pybind11::return_value_policy::reference_internal);
     cls.def("__setattr__", [](StructStore& store, const std::string& name, pybind11::object value) {
         from_object(store[name.c_str()], value);
@@ -81,7 +105,7 @@ void register_structstore_pybind(pybind11::module_& m) {
     cls.def("to_yaml", [](StructStore& store) {
         return YAML::Dump(to_yaml(store));
     });
-    cls.def("to_str", [](StructStore& store) {
+    cls.def("__repr__", [](StructStore& store) {
         return (std::ostringstream() << store).str();
     });
     cls.def("to_dict", [](StructStore& store) {
@@ -92,6 +116,14 @@ void register_structstore_pybind(pybind11::module_& m) {
     shcls.def(pybind11::init<const std::string&>());
     shcls.def(pybind11::init<const std::string&, ssize_t>());
     shcls.def("get_store", &StructStoreShared::operator*, pybind11::return_value_policy::reference_internal);
+
+    auto list = pybind11::class_<List>(m, "StructStoreList");
+    list.def("__repr__", [](const List& list) {
+        return (std::ostringstream() << list).str();
+    });
+    list.def("to_list", [](const List& list) {
+        return to_list(list);
+    });
 }
 
 }

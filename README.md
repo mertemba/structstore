@@ -71,6 +71,7 @@ state.num = 5
 state.value = 3.14
 state.mystr = 'foo'
 state.flag = True
+state.lst = [1, 2, 3, 5, 8]
 print(state.to_dict())
 ```
 
@@ -88,9 +89,10 @@ class State:
     mystr: str
     flag: bool
     substate: Substate
+    lst: List[int]
 
 store = structstore.StructStore()
-store.state = State(5, 'foo', True, Substate(42))
+store.state = State(5, 'foo', True, Substate(42), [0, 1])
 print(store.to_dict())
 ```
 
@@ -113,7 +115,7 @@ std::cout << "settings struct: " << *shsettings_store << std::endl;
 ```python
 shmem = structstore.StructStoreShared("/shdata_store")
 shstore = shmem.get_store()
-shstore.state = State(5, 'foo', True, Substate(42))
+shstore.state = State(5, 'foo', True, Substate(42), [0, 1])
 print(shstore.to_dict())
 ```
 
@@ -127,7 +129,7 @@ mmap'ed by several processes.
 ## Limitations
 
 * The library currently only supports the following types: int, double, string,
-  bool, nested structures.
+  bool, list, nested structures.
 * The arena memory region currently has a fixed size, i.e. at some point,
   additional allocations will throw an exception.
 * Shared memory is mmap'ed to the same address in all processes (using

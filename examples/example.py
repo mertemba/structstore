@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import List
 
 from lib import structstore
 
@@ -15,6 +16,7 @@ class State:
     mystr: str
     flag: bool
     substate: Substate
+    lst: List[int]
 
 
 def __main__():
@@ -23,11 +25,12 @@ def __main__():
     state.value = 3.14
     state.mystr = 'foo'
     state.flag = True
+    state.lst = [1, 2, 3, 5, 8]
     print(state.to_dict())
 
     shmem = structstore.StructStoreShared("/dyn_shdata_store", 16384)
     shstore = shmem.get_store()
-    shstore.state = State(5, 3.14, 'foo', True, Substate(42))
+    shstore.state = State(5, 3.14, 'foo', True, Substate(42), [0, 1])
     print(shstore.to_dict())
 
     shmem2 = structstore.StructStoreShared("/dyn_settings")

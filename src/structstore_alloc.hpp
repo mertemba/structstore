@@ -31,7 +31,7 @@ class MiniMalloc {
     };
 
     // member variables
-    ptrdiff_type (* free_nodes)[SIZES_COUNT];
+    ptrdiff_type (* free_nodes)[SIZES_COUNT] = nullptr;
     size_type sizes[SIZES_COUNT];
 
 
@@ -293,6 +293,9 @@ public:
     size_t allocated;
 
     MiniMalloc(size_t size, void* buffer) : allocated{0} {
+        if (buffer == nullptr) {
+            return;
+        }
         init_mini_malloc(buffer, size);
     }
 
@@ -311,6 +314,9 @@ public:
     void dispose() {}
 
     void* allocate(size_t field_size) {
+        if (free_nodes == nullptr) {
+            return nullptr;
+        }
         void* ptr = mm_alloc(field_size);
         if (ptr == nullptr) {
             throw std::runtime_error("insufficient space in mm_alloc region");
