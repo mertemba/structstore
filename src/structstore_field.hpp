@@ -123,6 +123,9 @@ public:
     template<typename T>
     T& get() {
         assert_nonempty();
+        if (FieldType<T>::value != type) {
+            throw std::runtime_error("field accessed with wrong type");
+        }
         return *(T*) data;
     }
 

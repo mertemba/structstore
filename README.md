@@ -18,6 +18,14 @@ int main() {
     stst::StructStore store;
     int& num = store["num"];
     num = 5;
+    stst::List& list = store["list"];
+    list.push_back(5);
+    list.push_back(42);
+    for (int& i: list) {
+        ++i;
+    }
+    stst::List& strlist = store["strlist"];
+    strlist.push_back((const char*) "foo");
     std::cout << "store: " << store << std::endl;
     return 0;
 }
@@ -59,9 +67,10 @@ int main() {
 
 ```python
 state = structstore.StructStore()
-state.add_int('num')
-state.add_str('mystr')
-state.add_bool('flag')
+state.num = 5
+state.value = 3.14
+state.mystr = 'foo'
+state.flag = True
 print(state.to_dict())
 ```
 
@@ -81,8 +90,7 @@ class State:
     substate: Substate
 
 store = structstore.StructStore()
-state = State(5, 'foo', True, Substate(42))
-structstore_utils.construct_from_obj(store, state)
+store.state = State(5, 'foo', True, Substate(42))
 print(store.to_dict())
 ```
 
@@ -105,8 +113,7 @@ std::cout << "settings struct: " << *shsettings_store << std::endl;
 ```python
 shmem = structstore.StructStoreShared("/shdata_store")
 shstore = shmem.get_store()
-shstate = State(5, 'foo', True, Substate(42))
-structstore_utils.construct_from_obj(shstore, shstate)
+shstore.state = State(5, 'foo', True, Substate(42))
 print(shstore.to_dict())
 ```
 

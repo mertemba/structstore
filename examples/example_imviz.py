@@ -5,7 +5,6 @@ from dataclasses import dataclass
 import imviz as viz
 
 from lib import structstore
-from lib import structstore_utils
 
 
 @dataclass
@@ -26,15 +25,14 @@ class ExampleGui:
         viz.set_main_window_title('structstore example')
 
         self.state = structstore.StructStore()
-        self.state.add_int('num')
-        self.state.add_str('mystr')
-        self.state.add_bool('flag')
+        self.state.num = 5
+        self.state.mystr = 'foo'
+        self.state.flag = True
         print(self.state.to_yaml())
 
         self.shmem = structstore.StructStoreShared("/shdata_store", 16384)
         self.shstate = self.shmem.get_store()
-        shstate = State(5, 'foo', True, Substate(42))
-        structstore_utils.construct_from_obj(self.shstate, shstate)
+        self.shstate.state = State(5, 'foo', True, Substate(42))
         self.num_cnt = 0
 
         self.shmem2 = structstore.StructStoreShared("/shsettings_store")

@@ -72,11 +72,14 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const FieldAccess& self) {
         return os << self.field;
     }
+
+    [[nodiscard]] FieldTypeValue get_type() const {
+        return field.get_type();
+    }
 };
 
 class StructStore {
-    template<typename T>
-    friend pybind11::class_ <T> register_pystruct(pybind11::module_&, const char*);
+    friend void register_structstore_pybind(pybind11::module_&);
 
     friend class StructStoreShared;
 
@@ -143,6 +146,14 @@ public:
             slots.emplace_back(name_int.str);
         }
         return it->second;
+    }
+
+    StructStoreField* try_get_field(HashString name) {
+        auto it = fields.find(name);
+        if (it == fields.end()) {
+            return nullptr;
+        }
+        return &it->second;
     }
 
     template<typename T>
