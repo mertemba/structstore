@@ -43,7 +43,7 @@ class ExampleGui:
         start = timeit.default_timer()
         if viz.begin_window('State'):
             # viz.autogui(self.state)
-            viz.autogui(self.state.to_dict())
+            viz.autogui(self.state.deepcopy())
         viz.end_window()
         if viz.begin_window('SharedState'):
             viz.autogui(self.shstate)

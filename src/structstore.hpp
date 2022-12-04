@@ -136,7 +136,8 @@ public:
         return root;
     }
 
-    friend pybind11::object to_dict(StructStore& store);
+    template<bool recursive>
+    friend pybind11::object to_dict(const StructStore& store);
 
     StructStoreField& get_field(HashString name) {
         auto it = fields.find(name);

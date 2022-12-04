@@ -26,16 +26,16 @@ def __main__():
     state.mystr = 'foo'
     state.flag = True
     state.lst = [1, 2, 3, 5, 8]
-    print(state.to_dict())
+    print(state.deepcopy())
 
     shmem = structstore.StructStoreShared("/dyn_shdata_store", 16384)
     shstore = shmem.get_store()
     shstore.state = State(5, 3.14, 'foo', True, Substate(42), [0, 1])
-    print(shstore.to_dict())
+    print(shstore.deepcopy())
 
     shmem2 = structstore.StructStoreShared("/dyn_settings")
     settings = shmem2.get_store()
-    print(settings.to_dict())
+    print(settings.deepcopy())
 
 
 if __name__ == '__main__':
