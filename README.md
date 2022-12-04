@@ -72,7 +72,7 @@ state.value = 3.14
 state.mystr = 'foo'
 state.flag = True
 state.lst = [1, 2, 3, 5, 8]
-print(state.to_dict())
+print(state.deepcopy())
 ```
 
 In Python, dynamic structures can be automatically constructed from classes and
@@ -93,7 +93,7 @@ class State:
 
 store = structstore.StructStore()
 store.state = State(5, 'foo', True, Substate(42), [0, 1])
-print(store.to_dict())
+print(store.deepcopy())
 ```
 
 ### Shared structure in C++
@@ -116,7 +116,7 @@ std::cout << "settings struct: " << *shsettings_store << std::endl;
 shmem = structstore.StructStoreShared("/shdata_store")
 shstore = shmem.get_store()
 shstore.state = State(5, 'foo', True, Substate(42), [0, 1])
-print(shstore.to_dict())
+print(shstore.deepcopy())
 ```
 
 ## Implementation details

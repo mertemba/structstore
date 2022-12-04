@@ -48,7 +48,7 @@ class ExampleGui:
         if viz.begin_window('SharedState'):
             viz.autogui(self.shstate)
             if viz.button('Add number'):
-                self.shstate.add_int(f'num{self.num_cnt}')
+                setattr(self.shstate, f'num{self.num_cnt}', self.num_cnt)
                 self.num_cnt += 1
         viz.end_window()
         if viz.begin_window('SharedSettings'):
