@@ -22,7 +22,7 @@ struct object;
 namespace structstore {
 
 static constexpr size_t malloc_size = 1 << 16;
-static MiniMalloc static_alloc{malloc_size, malloc(malloc_size)};
+static MiniMalloc static_alloc{malloc_size, std::malloc(malloc_size)};
 
 class FieldAccess {
     StructStoreField& field;
@@ -85,6 +85,8 @@ class StructStore {
 
     friend class FieldAccess;
 
+    friend class List;
+
 protected:
     MiniMalloc& mm_alloc;
     StlAllocator<char> alloc;
@@ -100,11 +102,10 @@ private:
         return {buf, str.hash};
     }
 
-protected:
+public:
     explicit StructStore(MiniMalloc& mm_alloc)
             : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {}
 
-public:
     StructStore() : mm_alloc(static_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {}
 
     StructStore(const StructStore&) = delete;

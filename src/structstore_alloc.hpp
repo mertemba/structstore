@@ -5,6 +5,7 @@
 #include <scoped_allocator>
 #include <unordered_map>
 #include <cassert>
+#include <mutex>
 
 namespace structstore {
 
@@ -31,6 +32,7 @@ class MiniMalloc {
     };
 
     // member variables
+    std::mutex mutex;
     ptrdiff_type (* free_nodes)[SIZES_COUNT] = nullptr;
     size_type sizes[SIZES_COUNT];
 
@@ -173,11 +175,12 @@ class MiniMalloc {
     }
 
     void init_mini_malloc(void* buffer, size_t blocksize) {
+        byte* ptr = (byte*) buffer;
         // ensure 8-byte alignment
-        assert((ALLOC_NODE_SIZE % 8) == 0);
-        assert(sizeof(memnode) == 16);
+        static_assert((ALLOC_NODE_SIZE % 8) == 0);
+        static_assert(sizeof(memnode) == 16);
 
-        // init size array
+        // init block_node_size array
         for (uint32_t bits = 1; bits <= 64; ++bits) {
             uint64_t size = ((uint64_t) (pow(2.0, bits / 4.0) + 0.001)) * ALIGN;
             size_index_type idx = get_size_index_upper(size);
@@ -185,27 +188,28 @@ class MiniMalloc {
         }
 
         free_nodes = nullptr;
-        byte* ptr = (byte*) buffer;
-        size_type size = blocksize - ALLOC_NODE_SIZE - sizeof(memnode);
+        size_type block_node_size = blocksize - 2 * ALLOC_NODE_SIZE;
         // fill free_nodes array
-        size_t free_nodes_size = ((sizeof(*free_nodes) + sizeof(ptrdiff_type) + ALIGN - 1) / ALIGN + 1) * ALIGN;
-        size -= free_nodes_size;
+        size_t free_nodes_size = ((sizeof(*free_nodes) + sizeof(ptrdiff_type) + ALIGN - 1) / ALIGN) * ALIGN;
+        block_node_size -= free_nodes_size;
         free_nodes = (ptrdiff_type (*)[SIZES_COUNT]) ((ptrdiff_type*) ptr + 1);
         ptr += free_nodes_size;
         for (size_index_type size_index = -1; size_index < SIZES_COUNT; size_index++) {
             (*free_nodes)[size_index] = 0;
         }
+        assert(ptr >= (byte*) &(*free_nodes)[SIZES_COUNT]);
         // allocate first block
         auto* block_node = (memnode*) ptr;
         assert(block_node != nullptr);
         block_node->d_next_free_node = 0;
         block_node->prev_node_size = 0; // also sets to unallocated
         set_prev_free_node(block_node, get_free_nodes_head(SIZES_COUNT - 1));
-        block_node->size = size;
+        block_node->size = block_node_size;
         auto* last_node = (memnode*) (((byte*) block_node) + (block_node->size + ALLOC_NODE_SIZE));
         set_allocated(last_node);
         last_node->size = 0;
         set_next_free_node(get_free_nodes_head(SIZES_COUNT - 1), block_node);
+        assert((byte*) last_node + ALLOC_NODE_SIZE == (byte*) buffer + blocksize);
     }
 
     void* mm_alloc(size_t size) {
@@ -294,6 +298,7 @@ public:
     size_t allocated;
 
     MiniMalloc(size_t size, void* buffer) : allocated{0} {
+        std::unique_lock lock(mutex);
         if (buffer == nullptr) {
             return;
         }
@@ -315,6 +320,7 @@ public:
     void dispose() {}
 
     void* allocate(size_t field_size) {
+        std::unique_lock lock(mutex);
         if (free_nodes == nullptr) {
             return nullptr;
         }
@@ -327,6 +333,7 @@ public:
     }
 
     void deallocate(void* ptr) {
+        std::unique_lock lock(mutex);
         auto* node = (memnode*) (((byte*) ptr) - ALLOC_NODE_SIZE);
         allocated -= node->size;
         mm_free(ptr);
