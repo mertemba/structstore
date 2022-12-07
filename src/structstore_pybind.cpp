@@ -100,6 +100,7 @@ void register_structstore_pybind(pybind11::module_& m) {
     cls.def(pybind11::init<>());
     cls.def_readonly("__slots__", &StructStore::slots);
     cls.def("__getattr__", [](StructStore& store, const std::string& name) {
+        auto lock = store.read_lock();
         StructStoreField* field = store.try_get_field(HashString{name.c_str()});
         if (field == nullptr) {
             throw pybind11::attribute_error();
@@ -107,18 +108,23 @@ void register_structstore_pybind(pybind11::module_& m) {
         return to_object<false>(*field);
     }, pybind11::return_value_policy::reference_internal);
     cls.def("__setattr__", [](StructStore& store, const std::string& name, pybind11::object value) {
+        auto lock = store.write_lock();
         from_object(store[name.c_str()], value);
     });
     cls.def("to_yaml", [](StructStore& store) {
+        auto lock = store.read_lock();
         return YAML::Dump(to_yaml(store));
     });
     cls.def("__repr__", [](StructStore& store) {
+        auto lock = store.read_lock();
         return (std::ostringstream() << store).str();
     });
     cls.def("copy", [](StructStore& store) {
+        auto lock = store.read_lock();
         return to_dict<false>(store);
     });
     cls.def("deepcopy", [](StructStore& store) {
+        auto lock = store.read_lock();
         return to_dict<true>(store);
     });
 
@@ -129,12 +135,15 @@ void register_structstore_pybind(pybind11::module_& m) {
 
     auto list = pybind11::class_<List>(m, "StructStoreList");
     list.def("__repr__", [](const List& list) {
+        auto lock = list.read_lock();
         return (std::ostringstream() << list).str();
     });
     list.def("copy", [](const List& list) {
+        auto lock = list.read_lock();
         return to_list<false>(list);
     });
     list.def("deepcopy", [](const List& list) {
+        auto lock = list.read_lock();
         return to_list<true>(list);
     });
 }

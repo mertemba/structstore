@@ -8,6 +8,7 @@
 #include "serialization.hpp"
 #include "structstore_alloc.hpp"
 #include "structstore_field.hpp"
+#include "structstore_lock.hpp"
 #include "hashstring.hpp"
 
 namespace pybind11 {
@@ -90,6 +91,7 @@ class StructStore {
 protected:
     MiniMalloc& mm_alloc;
     StlAllocator<char> alloc;
+    mutable SpinMutex mutex;
 
 private:
     unordered_map<HashString, StructStoreField> fields;
@@ -174,6 +176,14 @@ public:
 
     FieldAccess operator[](const char* name) {
         return {get_field(HashString{name}), mm_alloc};
+    }
+
+    [[nodiscard]] auto write_lock() {
+        return ScopedLock(mutex);
+    }
+
+    [[nodiscard]] auto read_lock() const {
+        return ScopedLock(mutex);
     }
 };
 

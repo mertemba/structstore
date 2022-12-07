@@ -8,6 +8,7 @@ namespace structstore {
 class List {
     MiniMalloc& mm_alloc;
     structstore::vector<StructStoreField> data;
+    mutable SpinMutex mutex;
 
 public:
     class Iterator {
@@ -80,6 +81,14 @@ public:
 
     void clear() {
         data.clear();
+    }
+
+    [[nodiscard]] auto write_lock() {
+        return ScopedLock(mutex);
+    }
+
+    [[nodiscard]] auto read_lock() const {
+        return ScopedLock(mutex);
     }
 };
 

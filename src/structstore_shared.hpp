@@ -1,6 +1,7 @@
 #ifndef STRUCTSTORE_SHARED_HPP
 #define STRUCTSTORE_SHARED_HPP
 
+#include <atomic>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>

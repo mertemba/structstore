@@ -5,7 +5,7 @@
 #include <scoped_allocator>
 #include <unordered_map>
 #include <cassert>
-#include <mutex>
+#include "structstore_lock.hpp"
 
 namespace structstore {
 
@@ -32,7 +32,7 @@ class MiniMalloc {
     };
 
     // member variables
-    std::mutex mutex;
+    SpinMutex mutex;
     ptrdiff_type (* free_nodes)[SIZES_COUNT] = nullptr;
     size_type sizes[SIZES_COUNT];
 
@@ -298,7 +298,7 @@ public:
     size_t allocated;
 
     MiniMalloc(size_t size, void* buffer) : allocated{0} {
-        std::unique_lock lock(mutex);
+        ScopedLock lock{mutex};
         if (buffer == nullptr) {
             return;
         }
@@ -320,7 +320,7 @@ public:
     void dispose() {}
 
     void* allocate(size_t field_size) {
-        std::unique_lock lock(mutex);
+        ScopedLock lock{mutex};
         if (free_nodes == nullptr) {
             return nullptr;
         }
@@ -333,7 +333,7 @@ public:
     }
 
     void deallocate(void* ptr) {
-        std::unique_lock lock(mutex);
+        ScopedLock lock{mutex};
         auto* node = (memnode*) (((byte*) ptr) - ALLOC_NODE_SIZE);
         allocated -= node->size;
         mm_free(ptr);
