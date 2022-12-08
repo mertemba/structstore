@@ -3,6 +3,7 @@ import timeit
 from dataclasses import dataclass
 
 import imviz as viz
+import numpy as np
 
 from lib import structstore
 
@@ -33,6 +34,7 @@ class ExampleGui:
         self.shmem = structstore.StructStoreShared("/shdata_store", 16384)
         self.shstate = self.shmem.get_store()
         self.shstate.state = State(5, 'foo', True, Substate(42))
+        self.shstate.vec = np.array([[1.0, 2.0], [3.0, 4.0]])
         self.num_cnt = 0
 
         self.shmem2 = structstore.StructStoreShared("/shsettings_store")

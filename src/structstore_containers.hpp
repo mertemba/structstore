@@ -145,13 +145,7 @@ public:
     }
 
     Matrix& operator=(const Matrix& other) {
-        if (_data != nullptr) {
-            mm_alloc.deallocate(_data);
-        }
-        _rows = other._rows;
-        _cols = other._cols;
-        _data = (double*) mm_alloc.allocate(sizeof(double) * _rows * _cols);
-        std::memcpy(_data, other._data, sizeof(double) * _rows * _cols);
+        from(other._rows, other._cols, other._data);
         return *this;
     }
 
@@ -162,12 +156,14 @@ public:
     size_t cols() const { return _cols; }
 
     void from(size_t rows, size_t cols, double* data) {
-        if (_data != nullptr) {
-            mm_alloc.deallocate(_data);
+        if (_data == nullptr || rows != _rows || cols != _cols) {
+            if (_data != nullptr) {
+                mm_alloc.deallocate(_data);
+            }
+            _rows = rows;
+            _cols = cols;
+            _data = (double*) mm_alloc.allocate(sizeof(double) * _rows * _cols);
         }
-        _rows = rows;
-        _cols = cols;
-        _data = (double*) mm_alloc.allocate(sizeof(double) * _rows * _cols);
         std::memcpy(_data, data, sizeof(double) * _rows * _cols);
     }
 };

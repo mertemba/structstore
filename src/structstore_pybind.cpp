@@ -39,7 +39,7 @@ py::object to_object(const StructStoreField& field) {
                 return py::cast(field.get<List>(), py::return_value_policy::reference);
             }
         case FieldTypeValue::MATRIX:
-            return py::array(py::cast(field.get<Matrix>()));
+            return py::array(py::cast(field.get<Matrix>(), py::return_value_policy::reference));
         case FieldTypeValue::EMPTY:
             throw std::runtime_error("trying to read unset field");
         default:
