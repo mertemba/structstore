@@ -1,10 +1,7 @@
 # StructStore
 
-Header-only C++ library and Python bindings for introspectable structures,
-optionally shared between processes.
-
-This library does not use RTTI, CRTP or other types of reflection. Instead, it
-relies on user-provided function calls to register fields.
+Dynamically typed structured object storage to be shared between processes.
+Header-only C++ library and Python bindings.
 
 ## Usage examples
 
@@ -72,6 +69,8 @@ state.value = 3.14
 state.mystr = 'foo'
 state.flag = True
 state.lst = [1, 2, 3, 5, 8]
+import numpy as np
+state.vec = np.array([[1.0, 2.0], [3.0, 4.0]])
 print(state.deepcopy())
 ```
 
@@ -101,7 +100,7 @@ print(store.deepcopy())
 ```c++
 stst::StructStoreShared shdata_store("/shdata_store");
 std::cout << "shared data: " << *shdata_store << std::endl;
-shdata_store[H("num")] = 53;
+shdata_store[H("num")] = 53; // compile-time string hashing
 
 // usage with a struct as above:
 stst::StructStoreShared shsettings_store("/shsettings_store");
@@ -129,7 +128,7 @@ mmap'ed by several processes.
 ## Limitations
 
 * The library currently only supports the following types: int, double, string,
-  bool, list, nested structures.
+  bool, list, 2D NumPy arrays, nested structures.
 * The arena memory region currently has a fixed size, i.e. at some point,
   additional allocations will throw an exception.
 * Shared memory is mmap'ed to the same address in all processes (using
@@ -137,7 +136,7 @@ mmap'ed by several processes.
   reserved in a process.
 * Opening shared memory multiple times (e.g. in separate threads) from one
   process is currently not supported.
-* Locking a shared structure (or parts of it) is currently not supported.
+* Locking a shared structure (or parts of it) currently has only basic support.
 
 ## License
 

@@ -13,6 +13,8 @@ class StructStore;
 
 class List;
 
+class Matrix;
+
 enum class FieldTypeValue : uint8_t {
     EMPTY,
     INT,
@@ -21,6 +23,7 @@ enum class FieldTypeValue : uint8_t {
     BOOL,
     STRUCT,
     LIST,
+    MATRIX,
 };
 
 void serialize_text(std::ostream& os, FieldTypeValue type, void* data);
@@ -62,6 +65,11 @@ struct FieldType<T, std::enable_if_t<std::is_base_of_v<StructStore, T>>> {
 template<>
 struct FieldType<List> {
     static constexpr auto value = FieldTypeValue::LIST;
+};
+
+template<>
+struct FieldType<Matrix> {
+    static constexpr auto value = FieldTypeValue::MATRIX;
 };
 
 class StructStoreField {

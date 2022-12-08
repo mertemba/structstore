@@ -77,6 +77,9 @@ void serialize_text(std::ostream& os, FieldTypeValue type, void* data) {
         case FieldTypeValue::LIST:
             serialize_text<List>(os, data);
             break;
+        case FieldTypeValue::MATRIX:
+            throw std::runtime_error("text serialization of matrices is not supported yet");
+            break;
         default:
             throw std::runtime_error("internal error: unknown field type");
     }
@@ -96,6 +99,8 @@ YAML::Node serialize_yaml(FieldTypeValue type, void* data) {
             return serialize_yaml<StructStore>(data);
         case FieldTypeValue::LIST:
             return serialize_yaml<List>(data);
+        case FieldTypeValue::MATRIX:
+            throw std::runtime_error("YAML serialization of matrices is not supported yet");
         default:
             throw std::runtime_error("internal error: unknown field type");
     }

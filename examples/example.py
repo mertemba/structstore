@@ -26,6 +26,7 @@ def __main__():
     state.mystr = 'foo'
     state.flag = True
     state.lst = [1, 2, 3, 5, 8]
+    state.vec = np.array([[1.0, 2.0], [3.0, 4.0]])
     print(state.deepcopy())
 
     shmem = structstore.StructStoreShared("/dyn_shdata_store", 16384)

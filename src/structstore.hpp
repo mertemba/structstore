@@ -52,6 +52,8 @@ public:
             new(ptr) T(tmp_alloc);
         } else if constexpr (std::is_same<T, structstore::List>::value) {
             new(ptr) T(mm_alloc);
+        } else if constexpr (std::is_same<T, structstore::Matrix>::value) {
+            new(ptr) T(mm_alloc);
         } else {
             new(ptr) T();
         }

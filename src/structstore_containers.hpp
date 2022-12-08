@@ -105,6 +105,73 @@ YAML::Node to_yaml(const List& list) {
     return node;
 }
 
+class Matrix {
+    MiniMalloc& mm_alloc;
+    size_t _rows, _cols;
+    double* _data;
+
+public:
+    Matrix(MiniMalloc& mm_alloc) : Matrix(0, 0, mm_alloc) {}
+
+    Matrix(size_t rows, size_t cols, MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), _rows(rows), _cols(cols) {
+        if (rows == 0 || cols == 0) {
+            _data = nullptr;
+        } else {
+            _data = (double*) mm_alloc.allocate(sizeof(double) * rows * cols);
+        }
+    }
+
+    ~Matrix() {
+        if (_data != nullptr) {
+            mm_alloc.deallocate(_data);
+        }
+    }
+
+    Matrix(Matrix&&) = delete;
+
+    Matrix(const Matrix& other) : Matrix(0, 0, other.mm_alloc) {
+        *this = other;
+    }
+
+    Matrix& operator=(Matrix&& other) {
+        if (&mm_alloc == &other.mm_alloc) {
+            _data = other._data;
+        } else {
+            const Matrix& other_ = other;
+            *this = other_;
+        }
+        other._data = nullptr;
+        return *this;
+    }
+
+    Matrix& operator=(const Matrix& other) {
+        if (_data != nullptr) {
+            mm_alloc.deallocate(_data);
+        }
+        _rows = other._rows;
+        _cols = other._cols;
+        _data = (double*) mm_alloc.allocate(sizeof(double) * _rows * _cols);
+        std::memcpy(_data, other._data, sizeof(double) * _rows * _cols);
+        return *this;
+    }
+
+    double* data() { return _data; }
+
+    size_t rows() const { return _rows; }
+
+    size_t cols() const { return _cols; }
+
+    void from(size_t rows, size_t cols, double* data) {
+        if (_data != nullptr) {
+            mm_alloc.deallocate(_data);
+        }
+        _rows = rows;
+        _cols = cols;
+        _data = (double*) mm_alloc.allocate(sizeof(double) * _rows * _cols);
+        std::memcpy(_data, data, sizeof(double) * _rows * _cols);
+    }
+};
+
 }
 
 #endif
