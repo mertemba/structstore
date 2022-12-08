@@ -5,7 +5,8 @@ ext_modules = [
     Pybind11Extension(
         "structstore",
         ["src/structstore_pybind.cpp"],
-        extra_link_args=["-lrt"]
+        extra_link_args=["-lrt"],
+        extra_compile_args=['-std=c++17'],
     ),
 ]
 

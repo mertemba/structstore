@@ -132,7 +132,9 @@ void register_structstore_pybind(py::module_& m) {
     });
     cls.def("__repr__", [](StructStore& store) {
         auto lock = store.read_lock();
-        return (std::ostringstream() << store).str();
+        std::ostringstream str;
+        str << store;
+        return str.str();
     });
     cls.def("copy", [](StructStore& store) {
         auto lock = store.read_lock();
@@ -151,7 +153,9 @@ void register_structstore_pybind(py::module_& m) {
     auto list = py::class_<List>(m, "StructStoreList");
     list.def("__repr__", [](const List& list) {
         auto lock = list.read_lock();
-        return (std::ostringstream() << list).str();
+        std::ostringstream str;
+        str << list;
+        return str.str();
     });
     list.def("copy", [](const List& list) {
         auto lock = list.read_lock();
