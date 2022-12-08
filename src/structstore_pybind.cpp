@@ -41,7 +41,7 @@ py::object to_object(const StructStoreField& field) {
         case FieldTypeValue::MATRIX:
             return py::array(py::cast(field.get<Matrix>(), py::return_value_policy::reference));
         case FieldTypeValue::EMPTY:
-            throw std::runtime_error("trying to read unset field");
+            return py::none();
         default:
             throw std::runtime_error("this type cannot be stored in a StructStore");
     }
@@ -93,6 +93,8 @@ static void from_object(FieldAccess access, const py::handle& value) {
             std::string key_str = py::str(key);
             from_object(store[key_str.c_str()], py::getattr(value, key));
         }
+    } else if (py::isinstance<py::none>(value)) {
+        // do nothing
     } else {
         std::cerr << "unknown field type " << value.get_type() << std::endl;
         throw py::type_error("internal error: unknown field type");
