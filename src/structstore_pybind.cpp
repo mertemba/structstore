@@ -68,10 +68,17 @@ static void from_object(FieldAccess access, const py::handle& value) {
         if (info.format != py::format_descriptor<double>::format()) {
             throw std::runtime_error("Incompatible format: expected a double array!");
         }
-        if (info.ndim != 2) {
+        int rows, cols;
+        if (info.ndim == 1) {
+            rows = info.shape[0];
+            cols = 1;
+        } else if (info.ndim == 2) {
+            rows = info.shape[0];
+            cols = info.shape[1];
+        } else {
             throw std::runtime_error("Incompatible buffer dimension!");
         }
-        access.get<Matrix>().from(info.shape[0], info.shape[1], (double*) info.ptr);
+        access.get<Matrix>().from(rows, cols, (double*) info.ptr);
     } else if (py::hasattr(value, "__dict__")) {
         auto dict = py::dict(value.attr("__dict__"));
         auto& store = access.get<StructStore>();
