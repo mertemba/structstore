@@ -56,7 +56,7 @@ static void from_object(FieldAccess access, const py::handle& value) {
         access.get<double>() = value.cast<double>();
     } else if (py::isinstance<py::str>(value)) {
         access.get<structstore::string>() = std::string(py::str(value));
-    } else if (py::isinstance<py::list>(value)) {
+    } else if (py::isinstance<py::list>(value) || py::isinstance<py::tuple>(value)) {
         List& list = access.get<List>();
         list.clear();
         for (const auto& val: value.cast<py::list>()) {
