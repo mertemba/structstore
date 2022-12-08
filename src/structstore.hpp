@@ -120,6 +120,18 @@ public:
 
     StructStore& operator=(StructStore&&) = delete;
 
+    ~StructStore() {
+        clear();
+    }
+
+    void clear() {
+        for (auto& [key, value]: fields) {
+            value.clear(mm_alloc);
+        }
+        fields.clear();
+        slots.clear();
+    }
+
     size_t allocated_size() const {
         return mm_alloc.allocated;
     }

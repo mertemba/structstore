@@ -102,6 +102,20 @@ public:
 
     StructStoreField(const StructStoreField&) = delete;
 
+    ~StructStoreField() {
+        if (data) {
+            throw std::runtime_error("field was not cleaned up");
+        }
+    }
+
+    void clear(MiniMalloc& mm_alloc) {
+        if (data) {
+            mm_alloc.deallocate(data);
+            data = nullptr;
+        }
+        type = FieldTypeValue::EMPTY;
+    }
+
     template<typename T>
     void replace_data(T* new_data, MiniMalloc& mm_alloc) {
         if (data) {

@@ -42,6 +42,10 @@ public:
 
     explicit List(MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), data(StlAllocator<StructStoreField>(mm_alloc)) {}
 
+    ~List() {
+        clear();
+    }
+
     List(const List&) = delete;
 
     List(List&&) = delete;
@@ -80,6 +84,9 @@ public:
     }
 
     void clear() {
+        for (StructStoreField& field: data) {
+            field.clear(mm_alloc);
+        }
         data.clear();
     }
 
