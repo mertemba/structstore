@@ -1,6 +1,6 @@
 # StructStore
 
-Dynamically typed structured object storage to be shared between processes.
+Structured object storage, dynamically typed, to be shared between processes.
 Header-only C++ library and Python bindings.
 
 ## Usage examples

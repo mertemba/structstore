@@ -219,6 +219,7 @@ class MiniMalloc {
             size += ALIGN - size % ALIGN;
         }
         size_index_type size_index = get_size_index_upper(size);
+        size = sizes[size_index];
         memnode* node;
         // search for first free node
         do {
