@@ -116,11 +116,13 @@ class Matrix {
     MiniMalloc& mm_alloc;
     size_t _rows, _cols;
     double* _data;
+    bool _is_vector = false;
 
 public:
     Matrix(MiniMalloc& mm_alloc) : Matrix(0, 0, mm_alloc) {}
 
-    Matrix(size_t rows, size_t cols, MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), _rows(rows), _cols(cols) {
+    Matrix(size_t rows, size_t cols, MiniMalloc& mm_alloc, bool is_vector = false)
+            : mm_alloc(mm_alloc), _rows(rows), _cols(cols), _is_vector(is_vector) {
         if (rows == 0 || cols == 0) {
             _data = nullptr;
         } else {
@@ -152,7 +154,7 @@ public:
     }
 
     Matrix& operator=(const Matrix& other) {
-        from(other._rows, other._cols, other._data);
+        from(other._rows, other._cols, other._data, other._is_vector);
         return *this;
     }
 
@@ -162,13 +164,16 @@ public:
 
     size_t cols() const { return _cols; }
 
-    void from(size_t rows, size_t cols, double* data) {
+    bool is_vector() const { return _is_vector; }
+
+    void from(size_t rows, size_t cols, double* data, bool is_vector) {
         if (_data == nullptr || rows != _rows || cols != _cols) {
             if (_data != nullptr) {
                 mm_alloc.deallocate(_data);
             }
             _rows = rows;
             _cols = cols;
+            _is_vector = is_vector;
             _data = (double*) mm_alloc.allocate(sizeof(double) * _rows * _cols);
         }
         std::memcpy(_data, data, sizeof(double) * _rows * _cols);

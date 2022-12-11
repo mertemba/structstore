@@ -69,16 +69,18 @@ static void from_object(FieldAccess access, const py::handle& value) {
             throw std::runtime_error("Incompatible format: expected a double array!");
         }
         int rows, cols;
+        bool is_vector = false;
         if (info.ndim == 1) {
             rows = info.shape[0];
             cols = 1;
+            is_vector = true;
         } else if (info.ndim == 2) {
             rows = info.shape[0];
             cols = info.shape[1];
         } else {
             throw std::runtime_error("Incompatible buffer dimension!");
         }
-        access.get<Matrix>().from(rows, cols, (double*) info.ptr);
+        access.get<Matrix>().from(rows, cols, (double*) info.ptr, is_vector);
     } else if (py::hasattr(value, "__dict__")) {
         auto dict = py::dict(value.attr("__dict__"));
         auto& store = access.get<StructStore>();
@@ -177,6 +179,14 @@ void register_structstore_pybind(py::module_& m) {
 
     auto matrix = py::class_<Matrix>(m, "StructStoreMatrix", py::buffer_protocol());
     matrix.def_buffer([](Matrix& m) -> py::buffer_info {
+        if (m.is_vector()) {
+            return py::buffer_info(
+                    m.data(), sizeof(double),
+                    py::format_descriptor<double>::format(),
+                    1, {m.rows() * m.cols()},
+                    {sizeof(double)}
+            );
+        }
         return py::buffer_info(
                 m.data(), sizeof(double),
                 py::format_descriptor<double>::format(),
