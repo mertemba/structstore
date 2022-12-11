@@ -154,7 +154,7 @@ public:
     }
 
     template<bool recursive>
-    friend pybind11::object to_dict(const StructStore& store);
+    friend pybind11::object to_object(const StructStore& store);
 
     StructStoreField& get_field(HashString name) {
         auto it = fields.find(name);

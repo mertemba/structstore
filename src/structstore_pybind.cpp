@@ -9,11 +9,13 @@ namespace structstore {
 
 namespace py = pybind11;
 
+static py::object SimpleNamespace;
+
 template<bool recursive>
 py::object to_list(const List& list);
 
 template<bool recursive>
-py::object to_dict(const StructStore& store);
+py::object to_object(const StructStore& store);
 
 template<bool recursive>
 py::object to_object(const StructStoreField& field) {
@@ -28,7 +30,7 @@ py::object to_object(const StructStoreField& field) {
             return py::bool_(field.get<bool>());
         case FieldTypeValue::STRUCT:
             if constexpr (recursive) {
-                return to_dict<true>(field.get<StructStore>());
+                return to_object<true>(field.get<StructStore>());
             } else {
                 return py::cast(field.get<StructStore>(), py::return_value_policy::reference);
             }
@@ -113,15 +115,17 @@ py::object to_list(const List& list) {
 }
 
 template<bool recursive>
-py::object to_dict(const StructStore& store) {
-    auto dict = py::dict();
+py::object to_object(const StructStore& store) {
+    auto obj = SimpleNamespace();
     for (auto& [key, value]: store.fields) {
-        dict[key.str] = to_object<recursive>(value);
+        py::setattr(obj, key.str, to_object<recursive>(value));
     }
-    return dict;
+    return obj;
 }
 
 void register_structstore_pybind(py::module_& m) {
+    SimpleNamespace = py::module_::import("types").attr("SimpleNamespace");
+
     py::class_<StructStore> cls = py::class_<StructStore>{m, "StructStore"};
     cls.def(py::init<>());
     cls.def_readonly("__slots__", &StructStore::slots);
@@ -149,11 +153,11 @@ void register_structstore_pybind(py::module_& m) {
     });
     cls.def("copy", [](StructStore& store) {
         auto lock = store.read_lock();
-        return to_dict<false>(store);
+        return to_object<false>(store);
     });
     cls.def("deepcopy", [](StructStore& store) {
         auto lock = store.read_lock();
-        return to_dict<true>(store);
+        return to_object<true>(store);
     });
 
     auto shcls = py::class_<StructStoreShared>(m, "StructStoreShared");
