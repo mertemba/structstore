@@ -330,7 +330,10 @@ public:
         }
         void* ptr = mm_alloc(field_size);
         if (ptr == nullptr) {
-            throw std::runtime_error("insufficient space in mm_alloc region");
+            std::ostringstream str;
+            str << "insufficient space in mm_alloc region, currently allocated: " << allocated;
+            str << ", requested: " << field_size;
+            throw std::runtime_error(str.str().c_str());
         }
         allocated += field_size;
         return ptr;
