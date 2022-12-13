@@ -321,6 +321,9 @@ public:
     void dispose() {}
 
     void* allocate(size_t field_size) {
+        if (field_size == 0) {
+            field_size = ALIGN;
+        }
         ScopedLock lock{mutex};
         if (free_nodes == nullptr) {
             return nullptr;
