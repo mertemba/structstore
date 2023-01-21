@@ -303,7 +303,7 @@ public:
         if (buffer == nullptr) {
             return;
         }
-        init_mini_malloc(buffer, size);
+        init_mini_malloc((byte*) buffer, size);
     }
 
     MiniMalloc() = delete;

@@ -61,6 +61,10 @@ public:
         return field.get<T>();
     }
 
+    structstore::string& get_str() {
+        return get<structstore::string>();
+    }
+
     template<typename T>
     operator T&() {
         return get<T>();
@@ -90,7 +94,7 @@ class StructStore {
 
     friend class List;
 
-protected:
+public:
     MiniMalloc& mm_alloc;
     StlAllocator<char> alloc;
     mutable SpinMutex mutex;
@@ -205,6 +209,11 @@ template<>
 FieldAccess& FieldAccess::operator=<const char*>(const char* const& value) {
     get<structstore::string>() = value;
     return *this;
+}
+
+template<>
+FieldAccess& FieldAccess::operator=<std::string>(const std::string& value) {
+    return *this = value.c_str();
 }
 
 }

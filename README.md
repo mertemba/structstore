@@ -60,6 +60,9 @@ int main() {
 }
 ```
 
+Creating non-intrusive (de)serialization for existing structs is also possible,
+see file `examples/example2.cpp`.
+
 ### Python
 
 ```python
