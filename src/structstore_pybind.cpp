@@ -117,8 +117,8 @@ py::object to_list(const List& list) {
 template<bool recursive>
 py::object to_object(const StructStore& store) {
     auto obj = SimpleNamespace();
-    for (auto& [key, value]: store.fields) {
-        py::setattr(obj, key.str, to_object<recursive>(value));
+    for (const auto& name: store.slots) {
+        py::setattr(obj, name.str, to_object<recursive>(store.fields.at(name)));
     }
     return obj;
 }
@@ -128,7 +128,13 @@ void register_structstore_pybind(py::module_& m) {
 
     py::class_<StructStore> cls = py::class_<StructStore>{m, "StructStore"};
     cls.def(py::init<>());
-    cls.def_readonly("__slots__", &StructStore::slots);
+    cls.def_property_readonly("__slots__", [](StructStore& store) {
+        auto ret = py::list();
+        for (const auto& str: store.slots) {
+            ret.append(str.str);
+        }
+        return ret;
+    });
     cls.def("__getattr__", [](StructStore& store, const std::string& name) {
         auto lock = store.read_lock();
         StructStoreField* field = store.try_get_field(HashString{name.c_str()});

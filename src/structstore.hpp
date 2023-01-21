@@ -97,7 +97,7 @@ protected:
 
 private:
     unordered_map<HashString, StructStoreField> fields;
-    vector<const char*> slots;
+    vector<HashString> slots;
 
     HashString internal_string(HashString str) {
         size_t len = std::strlen(str.str);
@@ -138,8 +138,8 @@ public:
 
     friend std::ostream& operator<<(std::ostream& os, const StructStore& self) {
         os << "{";
-        for (const auto& [key, value]: self.fields) {
-            os << '"' << key.str << "\":" << value << ",";
+        for (const auto& name: self.slots) {
+            os << '"' << name.str << "\":" << self.fields.at(name) << ",";
         }
         os << "}";
         return os;
@@ -147,8 +147,8 @@ public:
 
     friend YAML::Node to_yaml(const StructStore& self) {
         YAML::Node root;
-        for (const auto& [key, value]: self.fields) {
-            root[key.str] = to_yaml(value);
+        for (const auto& name: self.slots) {
+            root[name.str] = to_yaml(self.fields.at(name));
         }
         return root;
     }
@@ -161,7 +161,7 @@ public:
         if (it == fields.end()) {
             HashString name_int = internal_string(name);
             it = fields.emplace(name_int, StructStoreField{}).first;
-            slots.emplace_back(name_int.str);
+            slots.emplace_back(name_int);
         }
         return it->second;
     }
