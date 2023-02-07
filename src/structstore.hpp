@@ -133,6 +133,9 @@ public:
             value.clear(mm_alloc);
         }
         fields.clear();
+        for (const HashString& str: slots) {
+            mm_alloc.deallocate((void*) str.str);
+        }
         slots.clear();
     }
 
