@@ -335,7 +335,8 @@ public:
             str << ", requested: " << field_size;
             throw std::runtime_error(str.str().c_str());
         }
-        allocated += field_size;
+        auto* node = (memnode*) (((byte*) ptr) - ALLOC_NODE_SIZE);
+        allocated += node->size;
         return ptr;
     }
 
