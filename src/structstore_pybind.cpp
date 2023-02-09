@@ -165,6 +165,12 @@ void register_structstore_pybind(py::module_& m) {
         auto lock = store.read_lock();
         return to_object<true>(store);
     });
+    cls.def("size", [](StructStore& store) {
+        return store.mm_alloc.get_size();
+    });
+    cls.def("allocated", [](StructStore& store) {
+        return store.mm_alloc.get_allocated();
+    });
 
     auto shcls = py::class_<StructStoreShared>(m, "StructStoreShared");
     shcls.def(py::init<const std::string&>());

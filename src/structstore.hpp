@@ -139,10 +139,6 @@ public:
         slots.clear();
     }
 
-    size_t allocated_size() const {
-        return mm_alloc.allocated;
-    }
-
     friend std::ostream& operator<<(std::ostream& os, const StructStore& self) {
         os << "{";
         for (const auto& name: self.slots) {

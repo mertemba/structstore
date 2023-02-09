@@ -35,6 +35,8 @@ class MiniMalloc {
     SpinMutex mutex;
     ptrdiff_type (* free_nodes)[SIZES_COUNT] = nullptr;
     size_type sizes[SIZES_COUNT];
+    const size_t blocksize;
+    size_t allocated;
 
 
     // member methods
@@ -174,7 +176,7 @@ class MiniMalloc {
         attach_free_nodes(node, old_first_free);
     }
 
-    void init_mini_malloc(void* buffer, size_t blocksize) {
+    void init_mini_malloc(void* buffer) {
         byte* ptr = (byte*) buffer;
         // ensure 8-byte alignment
         static_assert((ALLOC_NODE_SIZE % 8) == 0);
@@ -296,14 +298,12 @@ class MiniMalloc {
     }
 
 public:
-    size_t allocated;
-
-    MiniMalloc(size_t size, void* buffer) : allocated{0} {
+    MiniMalloc(size_t size, void* buffer) : blocksize(size), allocated{0} {
         ScopedLock lock{mutex};
         if (buffer == nullptr) {
             return;
         }
-        init_mini_malloc((byte*) buffer, size);
+        init_mini_malloc((byte*) buffer);
     }
 
     MiniMalloc() = delete;
@@ -344,6 +344,14 @@ public:
         auto* node = (memnode*) (((byte*) ptr) - ALLOC_NODE_SIZE);
         allocated -= node->size;
         mm_free(ptr);
+    }
+
+    size_t get_size() const {
+        return blocksize;
+    }
+
+    size_t get_allocated() const {
+        return allocated;
     }
 };
 
