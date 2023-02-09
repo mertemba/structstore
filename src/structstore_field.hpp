@@ -72,6 +72,12 @@ struct FieldType<Matrix> {
     static constexpr auto value = FieldTypeValue::MATRIX;
 };
 
+static void destruct(StructStore& store);
+
+static void destruct(List& store);
+
+static void destruct(Matrix& store);
+
 class StructStoreField {
 private:
     void* data;
@@ -110,6 +116,27 @@ public:
 
     void clear(MiniMalloc& mm_alloc) {
         if (data) {
+            switch (type) {
+                case FieldTypeValue::INT:
+                case FieldTypeValue::DOUBLE:
+                case FieldTypeValue::BOOL:
+                case FieldTypeValue::EMPTY:
+                    break;
+                case FieldTypeValue::STRING:
+                    get<structstore::string>().~string();
+                    break;
+                case FieldTypeValue::STRUCT:
+                    destruct(get<StructStore>());
+                    break;
+                case FieldTypeValue::LIST:
+                    destruct(get<List>());
+                    break;
+                case FieldTypeValue::MATRIX:
+                    destruct(get<Matrix>());
+                    break;
+                default:
+                    throw std::runtime_error("unknown type in StructStore");
+            }
             mm_alloc.deallocate(data);
             data = nullptr;
         }

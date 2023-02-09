@@ -215,6 +215,10 @@ FieldAccess& FieldAccess::operator=<std::string>(const std::string& value) {
     return *this = value.c_str();
 }
 
+static void destruct(StructStore& store) {
+    store.~StructStore();
+}
+
 }
 
 #endif

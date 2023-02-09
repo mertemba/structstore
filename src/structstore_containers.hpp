@@ -112,6 +112,10 @@ YAML::Node to_yaml(const List& list) {
     return node;
 }
 
+static void destruct(List& list) {
+    list.~List();
+}
+
 class Matrix {
     MiniMalloc& mm_alloc;
     size_t _rows, _cols;
@@ -179,6 +183,10 @@ public:
         std::memcpy(_data, data, sizeof(double) * _rows * _cols);
     }
 };
+
+static void destruct(Matrix& matrix) {
+    matrix.~Matrix();
+}
 
 }
 
