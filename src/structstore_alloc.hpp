@@ -4,6 +4,7 @@
 #include <type_traits>
 #include <scoped_allocator>
 #include <unordered_map>
+#include <cmath>
 #include <cassert>
 #include "structstore_lock.hpp"
 
@@ -184,7 +185,7 @@ class MiniMalloc {
 
         // init block_node_size array
         for (uint32_t bits = 1; bits <= 64; ++bits) {
-            uint64_t size = ((uint64_t) (pow(2.0, bits / 4.0) + 0.001)) * ALIGN;
+            uint64_t size = ((uint64_t) (std::pow(2.0, bits / 4.0) + 0.001)) * ALIGN;
             size_index_type idx = get_size_index_upper(size);
             sizes[idx] = size;
         }
