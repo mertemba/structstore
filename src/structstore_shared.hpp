@@ -100,7 +100,7 @@ public:
             close(shm_fd);
 
             // ... and finally recreate it
-            shm_fd = shm_open(shm_path.c_str(), O_CREAT | O_RDWR, 0600);
+            shm_fd = shm_open(shm_path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
 
             if (-1 == shm_fd) {
                 throw std::runtime_error("opening shared memory failed");
@@ -150,7 +150,6 @@ public:
 
     void mmap_existing_shm () {
 
-        size_t size = sizeof(SharedData) + bufsize;
         SharedData* original_ptr;
 
         ssize_t result = read(shm_fd, &original_ptr, sizeof(SharedData*));
@@ -158,6 +157,7 @@ public:
             throw std::runtime_error("reading original pointer failed");
         }
 
+        size_t size;
         result = read(shm_fd, &size, sizeof(size_t));
 
         if (result != sizeof(size_t)) {
@@ -256,8 +256,7 @@ public:
                 shm_ptr->ok.store(false);
             }
 
-            shm_ptr->usage_count -= 1;
-            usage_count = shm_ptr->usage_count;
+            usage_count = shm_ptr->usage_count -= 1;
 
             munmap(shm_ptr, shm_ptr->size);
             shm_ptr = nullptr;
