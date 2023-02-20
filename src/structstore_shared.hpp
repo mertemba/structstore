@@ -47,8 +47,6 @@ class StructStoreShared {
     std::string shm_path;
     int shm_fd;
     SharedData* shm_ptr;
-    size_t bufsize;
-    bool create;
     bool reinit;
 
 public:
@@ -61,8 +59,6 @@ public:
         : shm_path(shm_path),
           shm_fd{-1},
           shm_ptr{nullptr},
-          bufsize{bufsize},
-          create{create},
           reinit{reinit} {
 
         if (create) {
