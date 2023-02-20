@@ -144,6 +144,8 @@ public:
         }
     }
 
+private:
+
     void mmap_existing_shm () {
 
         SharedData* original_ptr;
@@ -186,6 +188,8 @@ public:
 
         ++shm_ptr->usage_count;
     }
+
+public:
 
     bool verify () {
 
