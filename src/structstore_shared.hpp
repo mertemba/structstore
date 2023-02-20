@@ -25,11 +25,11 @@ class StructStoreShared {
         std::atomic_int32_t usage_count;
         MiniMalloc mm_alloc;
         StructStore data;
-        std::atomic_bool ok;
+        std::atomic_bool invalidated;
 
         SharedData(size_t size, size_t bufsize, void* buffer)
                 : original_ptr{this}, size{size}, usage_count{1},
-                  mm_alloc{bufsize, buffer}, data{mm_alloc}, ok{true} {}
+                  mm_alloc{bufsize, buffer}, data{mm_alloc}, invalidated{false} {}
 
         SharedData() = delete;
 
@@ -84,7 +84,7 @@ public:
 
             // ... we open it and mark it as closed ...
             mmap_existing_shm();
-            shm_ptr->ok.store(false);
+            shm_ptr->invalidated.store(true);
             shm_ptr->usage_count -= 1;
 
             // ... then unmap it, ...
@@ -210,7 +210,7 @@ public:
                 }
             }
 
-            if (!shm_ptr->ok.load()) {
+            if (shm_ptr->invalidated.load()) {
                 munmap(shm_ptr, shm_ptr->size);
                 shm_ptr = nullptr;
 
@@ -249,7 +249,7 @@ public:
         if (shm_ptr != nullptr) {
 
             if (reinit) {
-                shm_ptr->ok.store(false);
+                shm_ptr->invalidated.store(true);
             }
 
             usage_count = shm_ptr->usage_count -= 1;
