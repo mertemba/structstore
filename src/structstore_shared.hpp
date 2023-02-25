@@ -47,23 +47,20 @@ class StructStoreShared {
     std::string shm_path;
     int shm_fd;
     SharedData* shm_ptr;
-    bool reinit;
+    bool owning;
 
 public:
 
     explicit StructStoreShared(
             const std::string& shm_path,
             size_t bufsize = 2048,
-            bool create = true,
-            bool reinit = false)
+            bool owning = false)
         : shm_path(shm_path),
           shm_fd{-1},
           shm_ptr{nullptr},
-          reinit{reinit} {
+          owning{owning} {
 
-        if (create) {
-            shm_fd = shm_open(shm_path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
-        }
+        shm_fd = shm_open(shm_path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
 
         bool created = shm_fd != -1;
 
@@ -78,7 +75,7 @@ public:
         struct stat shm_stat = {};
         fstat(shm_fd, &shm_stat);
 
-        if (reinit && shm_stat.st_size != 0) {
+        if (owning && shm_stat.st_size != 0) {
             // we found an opened memory segment with a non-zero size,
             // it's likely an old segment thus ...
 
@@ -108,7 +105,7 @@ public:
 
         size_t size = sizeof(SharedData) + bufsize;
 
-        if (created || reinit) {
+        if (created || owning) {
 
             // reserve new memory
 
@@ -191,43 +188,57 @@ private:
 
 public:
 
-    bool verify () {
+    bool valid () {
 
-        while (true) {
+        return !shm_ptr->invalidated.load();
+    }
 
-            if (shm_fd == -1) {
-                shm_fd = shm_open(shm_path.c_str(), O_RDWR, 0600);
+    void revalidate (bool block = true) {
 
-                if (-1 == shm_fd) {
-                    return false;
+        if (!shm_ptr->invalidated.load()) {
+            return;
+        }
+
+        // need to revalidate the shared memory segment
+
+        int new_shm_fd = -1;
+
+        do {
+            if (new_shm_fd == -1) {
+                new_shm_fd = shm_open(shm_path.c_str(), O_RDWR, 0600);
+                if (new_shm_fd == -1) {
+                    continue;
                 }
             }
 
-            if (shm_ptr == nullptr) {
-                struct stat shm_stat = {};
-                fstat(shm_fd, &shm_stat);
+            struct stat shm_stat = {};
+            fstat(shm_fd, &shm_stat);
 
-                if (shm_stat.st_mode == 0100660) {
-                    mmap_existing_shm();
-                } else {
-                    return false;
-                }
-            }
+            // checks if segment is ready
+            if (shm_stat.st_mode == 0100660) {
 
-            if (shm_ptr->invalidated.load()) {
+                // unmap as late as possible; in the non-blocking case
+                // this keeps the previously mapped memory accessible
+
                 munmap(shm_ptr, shm_ptr->size);
                 shm_ptr = nullptr;
 
                 close(shm_fd);
-                shm_fd = -1;
 
-                continue;
+                // open new segment
+
+                shm_fd = new_shm_fd;
+                mmap_existing_shm();
+
+                return;
             }
 
-            return true;
-        }
+            // some backoff time, while doing busy waiting
+            usleep(1000);
 
-        return true;
+        } while (block);
+
+        throw std::runtime_error("revalidated would block");
     }
 
     StructStore* operator->() {
@@ -248,21 +259,16 @@ public:
 
     ~StructStoreShared() {
 
-        size_t usage_count = 0;
-
-        if (shm_ptr != nullptr) {
-
-            if (reinit) {
-                shm_ptr->invalidated.store(true);
-            }
-
-            usage_count = shm_ptr->usage_count -= 1;
-
-            munmap(shm_ptr, shm_ptr->size);
-            shm_ptr = nullptr;
+        if (owning) {
+            shm_ptr->invalidated.store(true);
         }
 
-        if (shm_fd != -1 && (usage_count == 0 || reinit)) {
+        size_t usage_count = shm_ptr->usage_count -= 1;
+
+        munmap(shm_ptr, shm_ptr->size);
+        shm_ptr = nullptr;
+
+        if (usage_count == 0 || owning) {
             shm_unlink(shm_path.c_str());
             close(shm_fd);
         }

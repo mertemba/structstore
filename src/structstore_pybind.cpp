@@ -173,12 +173,15 @@ void register_structstore_pybind(py::module_& m) {
     });
 
     auto shcls = py::class_<StructStoreShared>(m, "StructStoreShared");
-    shcls.def(py::init<const std::string&, ssize_t, bool, bool>(),
+    shcls.def(py::init<const std::string&, ssize_t, bool>(),
               py::arg("path"),
               py::arg("size") = 2048,
-              py::arg("create") = true,
-              py::arg("reinit") = false);
-    shcls.def("verify", &StructStoreShared::verify);
+              py::arg("owning") = false);
+    shcls.def("valid", &StructStoreShared::valid);
+    shcls.def("revalidate", [](StructStoreShared& shs, bool block) {
+                shs.revalidate(block);
+              },
+              py::arg("block") = true);
     shcls.def("get_store", &StructStoreShared::operator*, py::return_value_policy::reference_internal);
 
     auto list = py::class_<List>(m, "StructStoreList");
