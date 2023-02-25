@@ -193,10 +193,10 @@ public:
         return !shm_ptr->invalidated.load();
     }
 
-    void revalidate (bool block = true) {
+    bool revalidate (bool block = true) {
 
         if (!shm_ptr->invalidated.load()) {
-            return;
+            return true;
         }
 
         // need to revalidate the shared memory segment
@@ -230,15 +230,17 @@ public:
                 shm_fd = new_shm_fd;
                 mmap_existing_shm();
 
-                return;
+                return true;
             }
 
-            // some backoff time, while doing busy waiting
-            usleep(1000);
+            // backoff time, while doing busy waiting
+            if (block) {
+                usleep(1000);
+            }
 
         } while (block);
 
-        throw std::runtime_error("revalidated would block");
+        return false;
     }
 
     StructStore* operator->() {

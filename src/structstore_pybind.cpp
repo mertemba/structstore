@@ -179,7 +179,15 @@ void register_structstore_pybind(py::module_& m) {
               py::arg("owning") = false);
     shcls.def("valid", &StructStoreShared::valid);
     shcls.def("revalidate", [](StructStoreShared& shs, bool block) {
-                shs.revalidate(block);
+                bool res = false;
+                do {
+                    // necessary to get out of the loop on interrupting signal
+                    if (PyErr_CheckSignals() != 0) {
+                        throw py::error_already_set();
+                    }
+                    res = shs.revalidate(false);
+                } while (res == false && block);
+                return res;
               },
               py::arg("block") = true);
     shcls.def("get_store", &StructStoreShared::operator*, py::return_value_policy::reference_internal);
