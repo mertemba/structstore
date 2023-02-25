@@ -86,8 +86,6 @@ public:
 };
 
 class StructStore {
-    friend void register_structstore_pybind(pybind11::module_&);
-
     friend class StructStoreShared;
 
     friend class FieldAccess;
@@ -201,6 +199,10 @@ public:
 
     [[nodiscard]] auto read_lock() const {
         return ScopedLock(mutex);
+    }
+
+    const vector<HashString>& get_slots() const {
+        return slots;
     }
 };
 

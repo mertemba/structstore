@@ -116,9 +116,8 @@ std::cout << "settings struct: " << *shsettings_store << std::endl;
 
 ```python
 shmem = structstore.StructStoreShared("/shdata_store")
-shstore = shmem.get_store()
-shstore.state = State(5, 'foo', True, Substate(42), [0, 1])
-print(shstore.deepcopy())
+shmem.state = State(5, 'foo', True, Substate(42), [0, 1])
+print(shmem.deepcopy())
 ```
 
 ## Implementation details

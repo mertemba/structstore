@@ -251,6 +251,10 @@ public:
         return shm_ptr->data;
     }
 
+    operator StructStore&() {
+        return shm_ptr->data;
+    }
+
     FieldAccess operator[](HashString name) {
         return shm_ptr->data[name];
     }
