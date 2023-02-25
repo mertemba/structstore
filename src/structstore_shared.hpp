@@ -44,61 +44,76 @@ class StructStoreShared {
         ~SharedData() = delete;
     };
 
-    std::string shm_path;
-    int shm_fd;
-    SharedData* shm_ptr;
+    std::string path;
+    int fd;
+    SharedData* ptr;
     bool owning;
+    bool persistent;
 
 public:
 
     explicit StructStoreShared(
-            const std::string& shm_path,
+            const std::string& path,
             size_t bufsize = 2048,
-            bool owning = false)
-        : shm_path(shm_path),
-          shm_fd{-1},
-          shm_ptr{nullptr},
-          owning{owning} {
+            bool owning = false,
+            bool persistent = false)
+        : path(path),
+          fd{-1},
+          ptr{nullptr},
+          owning{owning},
+          persistent{persistent} {
 
-        shm_fd = shm_open(shm_path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
-
-        bool created = shm_fd != -1;
-
-        if (!created) {
-            shm_fd = shm_open(shm_path.c_str(), O_RDWR, 0600);
+        if (persistent) {
+            fd = open(path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
+        } else {
+            fd = shm_open(path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
         }
 
-        if (-1 == shm_fd) {
+        bool created = fd != -1;
+
+        if (!created) {
+            if (persistent) {
+                fd = open(path.c_str(), O_RDWR, 0600);
+            } else {
+                fd = shm_open(path.c_str(), O_RDWR, 0600);
+            }
+        }
+
+        if (-1 == fd) {
             throw std::runtime_error("opening shared memory failed");
         }
 
-        struct stat shm_stat = {};
-        fstat(shm_fd, &shm_stat);
+        struct stat fd_state = {};
+        fstat(fd, &fd_state);
 
-        if (owning && shm_stat.st_size != 0) {
+        if (owning && fd_state.st_size != 0) {
             // we found an opened memory segment with a non-zero size,
             // it's likely an old segment thus ...
 
             // ... we open it and mark it as closed ...
-            mmap_existing_shm();
-            shm_ptr->invalidated.store(true);
-            shm_ptr->usage_count -= 1;
+            mmap_existing_fd();
+            ptr->invalidated.store(true);
+            ptr->usage_count -= 1;
 
             // ... then unmap it, ...
-            munmap(shm_ptr, shm_ptr->size);
-            shm_ptr = nullptr;
+            munmap(ptr, ptr->size);
+            ptr = nullptr;
 
             // ... then unlink it, ...
-            shm_unlink(shm_path.c_str());
-            close(shm_fd);
+            shm_unlink(path.c_str());
+            close(fd);
 
             // ... and finally recreate it
-            shm_fd = shm_open(shm_path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
+            if (persistent) {
+                fd = open(path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
+            } else {
+                fd = shm_open(path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
+            }
 
-            if (-1 == shm_fd) {
+            if (-1 == fd) {
                 throw std::runtime_error("opening shared memory failed");
             }
-        } else if (!created && shm_stat.st_mode != 0100660) {
+        } else if (!created && fd_state.st_mode != 0100660) {
             // shared memory is not ready for opening yet
             return;
         }
@@ -109,51 +124,51 @@ public:
 
             // reserve new memory
 
-            int result = ftruncate(shm_fd, size);
+            int result = ftruncate(fd, size);
             if (result < 0) {
                 throw std::runtime_error("reserving shared memory failed");
             }
 
             // share memory
 
-            shm_ptr = (SharedData*) mmap(
+            ptr = (SharedData*) mmap(
                     nullptr,
                     size,
                     PROT_READ | PROT_WRITE,
                     MAP_SHARED,
-                    shm_fd,
+                    fd,
                     0);
 
-            if (shm_ptr == MAP_FAILED) {
+            if (ptr == MAP_FAILED) {
                 throw std::runtime_error("mmap'ing new memory failed");
             }
 
             // initialize data
 
             static_assert((sizeof(SharedData) % 8) == 0);
-            new(shm_ptr) SharedData(size, bufsize, (char*) shm_ptr + sizeof(SharedData));
+            new(ptr) SharedData(size, bufsize, (char*) ptr + sizeof(SharedData));
 
             // marks the store as ready to be used
-            fchmod(shm_fd, 0660);
+            fchmod(fd, 0660);
 
         } else {
-            mmap_existing_shm();
+            mmap_existing_fd();
         }
     }
 
 private:
 
-    void mmap_existing_shm () {
+    void mmap_existing_fd () {
 
         SharedData* original_ptr;
 
-        ssize_t result = read(shm_fd, &original_ptr, sizeof(SharedData*));
+        ssize_t result = read(fd, &original_ptr, sizeof(SharedData*));
         if (result != sizeof(SharedData*)) {
             throw std::runtime_error("reading original pointer failed");
         }
 
         size_t size;
-        result = read(shm_fd, &size, sizeof(size_t));
+        result = read(fd, &size, sizeof(size_t));
 
         if (result != sizeof(size_t)) {
             throw std::runtime_error("reading original size failed");
@@ -163,8 +178,8 @@ private:
             throw std::runtime_error("original size is invalid");
         }
 
-        lseek(shm_fd, 0, SEEK_SET);
-        shm_ptr = (SharedData*) mmap(
+        lseek(fd, 0, SEEK_SET);
+        ptr = (SharedData*) mmap(
                 original_ptr,
                 size,
                 PROT_READ | PROT_WRITE,
@@ -172,63 +187,67 @@ private:
                 // to the same region of memory for all processes
                 // the memory allocator relies on that
                 MAP_SHARED | MAP_FIXED_NOREPLACE,
-                shm_fd,
+                fd,
                 0);
 
-        if (shm_ptr == MAP_FAILED || shm_ptr != original_ptr) {
+        if (ptr == MAP_FAILED || ptr != original_ptr) {
             throw std::runtime_error("mmap'ing existing memory failed");
         }
 
-        if (shm_ptr->original_ptr != original_ptr) {
+        if (ptr->original_ptr != original_ptr) {
             throw std::runtime_error("inconsistency detected");
         }
 
-        ++shm_ptr->usage_count;
+        ++ptr->usage_count;
     }
 
 public:
 
     bool valid () {
 
-        return !shm_ptr->invalidated.load();
+        return !ptr->invalidated.load();
     }
 
     bool revalidate (bool block = true) {
 
-        if (!shm_ptr->invalidated.load()) {
+        if (!ptr->invalidated.load()) {
             return true;
         }
 
         // need to revalidate the shared memory segment
 
-        int new_shm_fd = -1;
+        int new_fd = -1;
 
         do {
-            if (new_shm_fd == -1) {
-                new_shm_fd = shm_open(shm_path.c_str(), O_RDWR, 0600);
-                if (new_shm_fd == -1) {
+            if (new_fd == -1) {
+                if (persistent) {
+                    new_fd = open(path.c_str(), O_RDWR, 0600);
+                } else {
+                    new_fd = shm_open(path.c_str(), O_RDWR, 0600);
+                }
+                if (new_fd == -1) {
                     continue;
                 }
             }
 
-            struct stat shm_stat = {};
-            fstat(shm_fd, &shm_stat);
+            struct stat fd_stat = {};
+            fstat(fd, &fd_stat);
 
             // checks if segment is ready
-            if (shm_stat.st_mode == 0100660) {
+            if (fd_stat.st_mode == 0100660) {
 
                 // unmap as late as possible; in the non-blocking case
                 // this keeps the previously mapped memory accessible
 
-                munmap(shm_ptr, shm_ptr->size);
-                shm_ptr = nullptr;
+                munmap(ptr, ptr->size);
+                ptr = nullptr;
 
-                close(shm_fd);
+                close(fd);
 
                 // open new segment
 
-                shm_fd = new_shm_fd;
-                mmap_existing_shm();
+                fd = new_fd;
+                mmap_existing_fd();
 
                 return true;
             }
@@ -244,11 +263,11 @@ public:
     }
 
     StructStore* operator->() {
-        return &shm_ptr->data;
+        return &ptr->data;
     }
 
     StructStore& operator*() {
-        return shm_ptr->data;
+        return ptr->data;
     }
 
     explicit operator StructStore&() {
@@ -256,27 +275,29 @@ public:
     }
 
     FieldAccess operator[](HashString name) {
-        return shm_ptr->data[name];
+        return ptr->data[name];
     }
 
     FieldAccess operator[](const char* name) {
-        return shm_ptr->data[name];
+        return ptr->data[name];
     }
 
     ~StructStoreShared() {
 
         if (owning) {
-            shm_ptr->invalidated.store(true);
+            ptr->invalidated.store(true);
         }
 
-        size_t usage_count = shm_ptr->usage_count -= 1;
+        size_t usage_count = ptr->usage_count -= 1;
 
-        munmap(shm_ptr, shm_ptr->size);
-        shm_ptr = nullptr;
+        munmap(ptr, ptr->size);
+        ptr = nullptr;
 
         if (usage_count == 0 || owning) {
-            shm_unlink(shm_path.c_str());
-            close(shm_fd);
+            if (!persistent) {
+                shm_unlink(path.c_str());
+            }
+            close(fd);
         }
     }
 };

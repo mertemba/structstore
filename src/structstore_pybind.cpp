@@ -188,10 +188,11 @@ void register_structstore_pybind(py::module_& m) {
 
     auto shcls = py::class_<StructStoreShared>(m, "StructStoreShared");
     register_structstore_methods(shcls);
-    shcls.def(py::init<const std::string&, ssize_t, bool>(),
+    shcls.def(py::init<const std::string&, ssize_t, bool, bool>(),
               py::arg("path"),
               py::arg("size") = 2048,
-              py::arg("owning") = false);
+              py::arg("owning") = false,
+              py::arg("persistent") = false);
     shcls.def("valid", &StructStoreShared::valid);
     shcls.def("revalidate", [](StructStoreShared& shs, bool block) {
                 bool res = false;
