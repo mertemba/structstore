@@ -126,7 +126,7 @@ py::object to_object(const StructStore& store) {
 template<typename T>
 void register_structstore_methods(py::class_<T>& cls) {
     cls.def_property_readonly("__slots__", [](T& t) {
-        StructStore& store = t;
+        StructStore& store = static_cast<StructStore&>(t);
         auto ret = py::list();
         for (const auto& str: store.get_slots()) {
             ret.append(str.str);
@@ -134,7 +134,7 @@ void register_structstore_methods(py::class_<T>& cls) {
         return ret;
     });
     cls.def("__getattr__", [](T& t, const std::string& name) {
-        StructStore& store = t;
+        StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
         StructStoreField* field = store.try_get_field(HashString{name.c_str()});
         if (field == nullptr) {
@@ -143,38 +143,38 @@ void register_structstore_methods(py::class_<T>& cls) {
         return to_object<false>(*field);
     }, py::return_value_policy::reference_internal);
     cls.def("__setattr__", [](T& t, const std::string& name, py::object value) {
-        StructStore& store = t;
+        StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.write_lock();
         from_object(store[name.c_str()], value);
     });
     cls.def("to_yaml", [](T& t) {
-        StructStore& store = t;
+        StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
         return YAML::Dump(to_yaml(store));
     });
     cls.def("__repr__", [](T& t) {
-        StructStore& store = t;
+        StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
         std::ostringstream str;
         str << store;
         return str.str();
     });
     cls.def("copy", [](T& t) {
-        StructStore& store = t;
+        StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
         return to_object<false>(store);
     });
     cls.def("deepcopy", [](T& t) {
-        StructStore& store = t;
+        StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
         return to_object<true>(store);
     });
     cls.def("size", [](T& t) {
-        StructStore& store = t;
+        StructStore& store = static_cast<StructStore&>(t);
         return store.mm_alloc.get_size();
     });
     cls.def("allocated", [](T& t) {
-        StructStore& store = t;
+        StructStore& store = static_cast<StructStore&>(t);
         return store.mm_alloc.get_allocated();
     });
 }

@@ -251,7 +251,7 @@ public:
         return shm_ptr->data;
     }
 
-    operator StructStore&() {
+    explicit operator StructStore&() {
         return shm_ptr->data;
     }
 
