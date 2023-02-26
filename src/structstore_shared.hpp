@@ -100,7 +100,11 @@ public:
             ptr = nullptr;
 
             // ... then unlink it, ...
-            shm_unlink(path.c_str());
+            if (persistent) {
+                unlink(path.c_str());
+            } else {
+                shm_unlink(path.c_str());
+            }
             close(fd);
 
             // ... and finally recreate it
