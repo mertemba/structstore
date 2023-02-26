@@ -275,7 +275,7 @@ public:
     }
 
     explicit operator StructStore&() {
-        return shm_ptr->data;
+        return ptr->data;
     }
 
     FieldAccess operator[](HashString name) {
