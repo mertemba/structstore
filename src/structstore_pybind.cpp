@@ -205,7 +205,6 @@ void register_structstore_pybind(py::module_& m) {
                 return res;
               },
               py::arg("block") = true);
-    shcls.def("get_store", &StructStoreShared::operator*, py::return_value_policy::reference_internal);
 
     auto list = py::class_<List>(m, "StructStoreList");
     list.def("__repr__", [](const List& list) {

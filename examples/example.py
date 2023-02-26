@@ -37,8 +37,7 @@ def __main__():
     print(shmem.deepcopy())
 
     shmem2 = structstore.StructStoreShared("/dyn_settings")
-    settings = shmem2.get_store()
-    print(settings.deepcopy())
+    print(shmem2.deepcopy())
 
 
 if __name__ == '__main__':
