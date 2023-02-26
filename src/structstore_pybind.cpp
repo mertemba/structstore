@@ -123,19 +123,18 @@ py::object to_object(const StructStore& store) {
     return obj;
 }
 
-void register_structstore_pybind(py::module_& m) {
-    SimpleNamespace = py::module_::import("types").attr("SimpleNamespace");
-
-    py::class_<StructStore> cls = py::class_<StructStore>{m, "StructStore"};
-    cls.def(py::init<>());
-    cls.def_property_readonly("__slots__", [](StructStore& store) {
+template<typename T>
+void register_structstore_methods(py::class_<T>& cls) {
+    cls.def_property_readonly("__slots__", [](T& t) {
+        StructStore& store = static_cast<StructStore&>(t);
         auto ret = py::list();
-        for (const auto& str: store.slots) {
+        for (const auto& str: store.get_slots()) {
             ret.append(str.str);
         }
         return ret;
     });
-    cls.def("__getattr__", [](StructStore& store, const std::string& name) {
+    cls.def("__getattr__", [](T& t, const std::string& name) {
+        StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
         StructStoreField* field = store.try_get_field(HashString{name.c_str()});
         if (field == nullptr) {
@@ -143,36 +142,52 @@ void register_structstore_pybind(py::module_& m) {
         }
         return to_object<false>(*field);
     }, py::return_value_policy::reference_internal);
-    cls.def("__setattr__", [](StructStore& store, const std::string& name, py::object value) {
+    cls.def("__setattr__", [](T& t, const std::string& name, py::object value) {
+        StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.write_lock();
         from_object(store[name.c_str()], value);
     });
-    cls.def("to_yaml", [](StructStore& store) {
+    cls.def("to_yaml", [](T& t) {
+        StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
         return YAML::Dump(to_yaml(store));
     });
-    cls.def("__repr__", [](StructStore& store) {
+    cls.def("__repr__", [](T& t) {
+        StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
         std::ostringstream str;
         str << store;
         return str.str();
     });
-    cls.def("copy", [](StructStore& store) {
+    cls.def("copy", [](T& t) {
+        StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
         return to_object<false>(store);
     });
-    cls.def("deepcopy", [](StructStore& store) {
+    cls.def("deepcopy", [](T& t) {
+        StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
         return to_object<true>(store);
     });
-    cls.def("size", [](StructStore& store) {
+    cls.def("size", [](T& t) {
+        StructStore& store = static_cast<StructStore&>(t);
         return store.mm_alloc.get_size();
     });
-    cls.def("allocated", [](StructStore& store) {
+    cls.def("allocated", [](T& t) {
+        StructStore& store = static_cast<StructStore&>(t);
         return store.mm_alloc.get_allocated();
     });
+}
+
+void register_structstore_pybind(py::module_& m) {
+    SimpleNamespace = py::module_::import("types").attr("SimpleNamespace");
+
+    py::class_<StructStore> cls = py::class_<StructStore>{m, "StructStore"};
+    cls.def(py::init<>());
+    register_structstore_methods(cls);
 
     auto shcls = py::class_<StructStoreShared>(m, "StructStoreShared");
+    register_structstore_methods(shcls);
     shcls.def(py::init<const std::string&, ssize_t, bool>(),
               py::arg("path"),
               py::arg("size") = 2048,
@@ -190,7 +205,6 @@ void register_structstore_pybind(py::module_& m) {
                 return res;
               },
               py::arg("block") = true);
-    shcls.def("get_store", &StructStoreShared::operator*, py::return_value_policy::reference_internal);
 
     auto list = py::class_<List>(m, "StructStoreList");
     list.def("__repr__", [](const List& list) {

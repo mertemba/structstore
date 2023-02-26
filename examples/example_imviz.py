@@ -32,13 +32,11 @@ class ExampleGui:
         print(self.state.to_yaml())
 
         self.shmem = structstore.StructStoreShared("/shdata_store", 16384)
-        self.shstate = self.shmem.get_store()
-        self.shstate.state = State(5, 'foo', True, Substate(42))
-        self.shstate.vec = np.array([[1.0, 2.0], [3.0, 4.0]])
+        self.shmem.state = State(5, 'foo', True, Substate(42))
+        self.shmem.vec = np.array([[1.0, 2.0], [3.0, 4.0]])
         self.num_cnt = 0
 
         self.shmem2 = structstore.StructStoreShared("/shsettings_store")
-        self.shsettings = self.shmem2.get_store()
 
 
     def update_gui(self):
@@ -48,13 +46,13 @@ class ExampleGui:
             viz.autogui(self.state.deepcopy())
         viz.end_window()
         if viz.begin_window('SharedState'):
-            viz.autogui(self.shstate)
+            viz.autogui(self.shmem)
             if viz.button('Add number'):
-                setattr(self.shstate, f'num{self.num_cnt}', self.num_cnt)
+                setattr(self.shmem, f'num{self.num_cnt}', self.num_cnt)
                 self.num_cnt += 1
         viz.end_window()
         if viz.begin_window('SharedSettings'):
-            viz.autogui(self.shsettings)
+            viz.autogui(self.shmem2)
         viz.end_window()
         end = timeit.default_timer()
         if random.random() < 0.01:
