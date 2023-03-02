@@ -9,6 +9,12 @@
 
 namespace structstore {
 
+enum CleanupMode {
+    NEVER,
+    IF_LAST,
+    ON_CLOSE
+};
+
 class StructStoreShared {
 
     StructStoreShared(const StructStoreShared&) = delete;
@@ -47,23 +53,26 @@ class StructStoreShared {
     std::string path;
     int fd;
     SharedData* ptr;
-    bool owning;
-    bool persistent;
+    bool reinit;
+    bool use_file;
+    CleanupMode cleanup;
 
 public:
 
     explicit StructStoreShared(
             const std::string& path,
             size_t bufsize = 2048,
-            bool owning = false,
-            bool persistent = false)
+            bool reinit = false,
+            bool use_file = false,
+            CleanupMode cleanup = IF_LAST)
         : path(path),
           fd{-1},
           ptr{nullptr},
-          owning{owning},
-          persistent{persistent} {
+          reinit{reinit},
+          use_file{use_file},
+          cleanup{cleanup}{
 
-        if (persistent) {
+        if (use_file) {
             fd = open(path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
         } else {
             fd = shm_open(path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
@@ -72,7 +81,7 @@ public:
         bool created = fd != -1;
 
         if (!created) {
-            if (persistent) {
+            if (use_file) {
                 fd = open(path.c_str(), O_RDWR, 0600);
             } else {
                 fd = shm_open(path.c_str(), O_RDWR, 0600);
@@ -86,7 +95,7 @@ public:
         struct stat fd_state = {};
         fstat(fd, &fd_state);
 
-        if (owning && fd_state.st_size != 0) {
+        if (reinit && fd_state.st_size != 0) {
             // we found an opened memory segment with a non-zero size,
             // it's likely an old segment thus ...
 
@@ -100,7 +109,7 @@ public:
             ptr = nullptr;
 
             // ... then unlink it, ...
-            if (persistent) {
+            if (use_file) {
                 unlink(path.c_str());
             } else {
                 shm_unlink(path.c_str());
@@ -108,7 +117,7 @@ public:
             close(fd);
 
             // ... and finally recreate it
-            if (persistent) {
+            if (use_file) {
                 fd = open(path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
             } else {
                 fd = shm_open(path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
@@ -124,7 +133,7 @@ public:
 
         size_t size = sizeof(SharedData) + bufsize;
 
-        if (created || owning) {
+        if (created || reinit) {
 
             // reserve new memory
 
@@ -224,7 +233,7 @@ public:
 
         do {
             if (new_fd == -1) {
-                if (persistent) {
+                if (use_file) {
                     new_fd = open(path.c_str(), O_RDWR, 0600);
                 } else {
                     new_fd = shm_open(path.c_str(), O_RDWR, 0600);
@@ -288,21 +297,23 @@ public:
 
     ~StructStoreShared() {
 
-        if (owning) {
+        if ((--ptr->usage_count == 0 && cleanup == IF_LAST) || cleanup == ON_CLOSE) {
+
             ptr->invalidated.store(true);
-        }
 
-        size_t usage_count = ptr->usage_count -= 1;
+            munmap(ptr, ptr->size);
 
-        munmap(ptr, ptr->size);
-        ptr = nullptr;
-
-        if (usage_count == 0 || owning) {
-            if (!persistent) {
+            if (use_file) {
+                unlink(path.c_str());
+            } else {
                 shm_unlink(path.c_str());
             }
-            close(fd);
+
+        } else {
+            munmap(ptr, ptr->size);
         }
+
+        close(fd);
     }
 };
 
