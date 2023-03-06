@@ -242,7 +242,7 @@ public:
             }
 
             struct stat fd_stat = {};
-            fstat(fd, &fd_stat);
+            fstat(new_fd, &fd_stat);
 
             // checks if segment is ready
             if (fd_stat.st_mode == 0100660) {
