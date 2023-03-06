@@ -52,7 +52,7 @@ class StructStoreShared {
 
     std::string path;
     int fd;
-    SharedData* ptr;
+    SharedData* sh_data_ptr;
     bool reinit;
     bool use_file;
     CleanupMode cleanup;
@@ -67,7 +67,7 @@ public:
             CleanupMode cleanup = IF_LAST)
         : path(path),
           fd{-1},
-          ptr{nullptr},
+          sh_data_ptr{nullptr},
           reinit{reinit},
           use_file{use_file},
           cleanup{cleanup}{
@@ -101,12 +101,12 @@ public:
 
             // ... we open it and mark it as closed ...
             mmap_existing_fd();
-            ptr->invalidated.store(true);
-            ptr->usage_count -= 1;
+            sh_data_ptr->invalidated.store(true);
+            sh_data_ptr->usage_count -= 1;
 
             // ... then unmap it, ...
-            munmap(ptr, ptr->size);
-            ptr = nullptr;
+            munmap(sh_data_ptr, sh_data_ptr->size);
+            sh_data_ptr = nullptr;
 
             // ... then unlink it, ...
             if (use_file) {
@@ -144,7 +144,7 @@ public:
 
             // share memory
 
-            ptr = (SharedData*) mmap(
+            sh_data_ptr = (SharedData*) mmap(
                     nullptr,
                     size,
                     PROT_READ | PROT_WRITE,
@@ -152,14 +152,14 @@ public:
                     fd,
                     0);
 
-            if (ptr == MAP_FAILED) {
+            if (sh_data_ptr == MAP_FAILED) {
                 throw std::runtime_error("mmap'ing new memory failed");
             }
 
             // initialize data
 
             static_assert((sizeof(SharedData) % 8) == 0);
-            new(ptr) SharedData(size, bufsize, (char*) ptr + sizeof(SharedData));
+            new(sh_data_ptr) SharedData(size, bufsize, (char*) sh_data_ptr + sizeof(SharedData));
 
             // marks the store as ready to be used
             fchmod(fd, 0660);
@@ -192,7 +192,7 @@ private:
         }
 
         lseek(fd, 0, SEEK_SET);
-        ptr = (SharedData*) mmap(
+        sh_data_ptr = (SharedData*) mmap(
                 original_ptr,
                 size,
                 PROT_READ | PROT_WRITE,
@@ -203,27 +203,27 @@ private:
                 fd,
                 0);
 
-        if (ptr == MAP_FAILED || ptr != original_ptr) {
+        if (sh_data_ptr == MAP_FAILED || sh_data_ptr != original_ptr) {
             throw std::runtime_error("mmap'ing existing memory failed");
         }
 
-        if (ptr->original_ptr != original_ptr) {
+        if (sh_data_ptr->original_ptr != original_ptr) {
             throw std::runtime_error("inconsistency detected");
         }
 
-        ++ptr->usage_count;
+        ++sh_data_ptr->usage_count;
     }
 
 public:
 
     bool valid () {
 
-        return !ptr->invalidated.load();
+        return !sh_data_ptr->invalidated.load();
     }
 
     bool revalidate (bool block = true) {
 
-        if (!ptr->invalidated.load()) {
+        if (!sh_data_ptr->invalidated.load()) {
             return true;
         }
 
@@ -252,8 +252,8 @@ public:
                 // unmap as late as possible; in the non-blocking case
                 // this keeps the previously mapped memory accessible
 
-                munmap(ptr, ptr->size);
-                ptr = nullptr;
+                munmap(sh_data_ptr, sh_data_ptr->size);
+                sh_data_ptr = nullptr;
 
                 close(fd);
 
@@ -276,32 +276,32 @@ public:
     }
 
     StructStore* operator->() {
-        return &ptr->data;
+        return &sh_data_ptr->data;
     }
 
     StructStore& operator*() {
-        return ptr->data;
+        return sh_data_ptr->data;
     }
 
     explicit operator StructStore&() {
-        return ptr->data;
+        return sh_data_ptr->data;
     }
 
     FieldAccess operator[](HashString name) {
-        return ptr->data[name];
+        return sh_data_ptr->data[name];
     }
 
     FieldAccess operator[](const char* name) {
-        return ptr->data[name];
+        return sh_data_ptr->data[name];
     }
 
     ~StructStoreShared() {
 
-        if ((--ptr->usage_count == 0 && cleanup == IF_LAST) || cleanup == ALWAYS) {
+        if ((--sh_data_ptr->usage_count == 0 && cleanup == IF_LAST) || cleanup == ALWAYS) {
 
-            ptr->invalidated.store(true);
+            sh_data_ptr->invalidated.store(true);
 
-            munmap(ptr, ptr->size);
+            munmap(sh_data_ptr, sh_data_ptr->size);
 
             if (use_file) {
                 unlink(path.c_str());
@@ -310,7 +310,7 @@ public:
             }
 
         } else {
-            munmap(ptr, ptr->size);
+            munmap(sh_data_ptr, sh_data_ptr->size);
         }
 
         close(fd);
