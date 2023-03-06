@@ -189,7 +189,7 @@ void register_structstore_pybind(py::module_& m) {
     py::enum_<CleanupMode>(m, "CleanupMode")
         .value("NEVER", NEVER)
         .value("IF_LAST", IF_LAST)
-        .value("ON_CLOSE", ON_CLOSE)
+        .value("ALWAYS", ALWAYS)
         .export_values();
 
     auto shcls = py::class_<StructStoreShared>(m, "StructStoreShared");

@@ -12,7 +12,7 @@ namespace structstore {
 enum CleanupMode {
     NEVER,
     IF_LAST,
-    ON_CLOSE
+    ALWAYS
 };
 
 class StructStoreShared {
@@ -297,7 +297,7 @@ public:
 
     ~StructStoreShared() {
 
-        if ((--ptr->usage_count == 0 && cleanup == IF_LAST) || cleanup == ON_CLOSE) {
+        if ((--ptr->usage_count == 0 && cleanup == IF_LAST) || cleanup == ALWAYS) {
 
             ptr->invalidated.store(true);
 
