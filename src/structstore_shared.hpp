@@ -53,7 +53,6 @@ class StructStoreShared {
     std::string path;
     int fd;
     SharedData* sh_data_ptr;
-    bool reinit;
     bool use_file;
     CleanupMode cleanup;
 
@@ -68,7 +67,6 @@ public:
         : path(path),
           fd{-1},
           sh_data_ptr{nullptr},
-          reinit{reinit},
           use_file{use_file},
           cleanup{cleanup}{
 
