@@ -186,12 +186,20 @@ void register_structstore_pybind(py::module_& m) {
     cls.def(py::init<>());
     register_structstore_methods(cls);
 
+    py::enum_<CleanupMode>(m, "CleanupMode")
+        .value("NEVER", NEVER)
+        .value("IF_LAST", IF_LAST)
+        .value("ALWAYS", ALWAYS)
+        .export_values();
+
     auto shcls = py::class_<StructStoreShared>(m, "StructStoreShared");
     register_structstore_methods(shcls);
-    shcls.def(py::init<const std::string&, ssize_t, bool>(),
+    shcls.def(py::init<const std::string&, ssize_t, bool, bool, CleanupMode>(),
               py::arg("path"),
               py::arg("size") = 2048,
-              py::arg("owning") = false);
+              py::arg("reinit") = false,
+              py::arg("use_file") = false,
+              py::arg("cleanup") = IF_LAST);
     shcls.def("valid", &StructStoreShared::valid);
     shcls.def("revalidate", [](StructStoreShared& shs, bool block) {
                 bool res = false;
