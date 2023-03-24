@@ -147,7 +147,7 @@ public:
     }
 
     friend YAML::Node to_yaml(const StructStore& self) {
-        YAML::Node root;
+        YAML::Node root(YAML::NodeType::Map);
         for (const auto& name: self.slots) {
             root[name.str] = to_yaml(self.fields.at(name));
         }
