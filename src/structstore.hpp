@@ -83,6 +83,10 @@ public:
     [[nodiscard]] FieldTypeValue get_type() const {
         return field.get_type();
     }
+
+    void clear() {
+        field.clear(mm_alloc);
+    }
 };
 
 class StructStore {
@@ -147,7 +151,7 @@ public:
     }
 
     friend YAML::Node to_yaml(const StructStore& self) {
-        YAML::Node root;
+        YAML::Node root(YAML::NodeType::Map);
         for (const auto& name: self.slots) {
             root[name.str] = to_yaml(self.fields.at(name));
         }
