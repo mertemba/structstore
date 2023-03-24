@@ -83,6 +83,10 @@ public:
     [[nodiscard]] FieldTypeValue get_type() const {
         return field.get_type();
     }
+
+    void clear() {
+        field.clear(mm_alloc);
+    }
 };
 
 class StructStore {

@@ -50,6 +50,7 @@ py::object to_object(const StructStoreField& field) {
 }
 
 static void from_object(FieldAccess access, const py::handle& value, const std::string& field_name) {
+    access.clear();
     if (py::isinstance<py::bool_>(value)) {
         access.get<bool>() = value.cast<bool>();
     } else if (py::isinstance<py::int_>(value)) {
@@ -60,7 +61,6 @@ static void from_object(FieldAccess access, const py::handle& value, const std::
         access.get<structstore::string>() = std::string(py::str(value));
     } else if (py::isinstance<py::list>(value) || py::isinstance<py::tuple>(value)) {
         List& list = access.get<List>();
-        list.clear();
         int i = 0;
         for (const auto& val: value.cast<py::list>()) {
             from_object(list.push_back(), val, std::to_string(i));
