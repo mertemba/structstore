@@ -49,7 +49,7 @@ py::object to_object(const StructStoreField& field) {
     }
 }
 
-static void from_object(FieldAccess access, const py::handle& value) {
+static void from_object(FieldAccess access, const py::handle& value, const std::string& field_name) {
     if (py::isinstance<py::bool_>(value)) {
         access.get<bool>() = value.cast<bool>();
     } else if (py::isinstance<py::int_>(value)) {
@@ -61,8 +61,10 @@ static void from_object(FieldAccess access, const py::handle& value) {
     } else if (py::isinstance<py::list>(value) || py::isinstance<py::tuple>(value)) {
         List& list = access.get<List>();
         list.clear();
+        int i = 0;
         for (const auto& val: value.cast<py::list>()) {
-            from_object(list.push_back(), val);
+            from_object(list.push_back(), val, std::to_string(i));
+            ++i;
         }
     } else if (py::isinstance<py::array>(value)) {
         auto array = value.cast<py::array>();
@@ -88,20 +90,21 @@ static void from_object(FieldAccess access, const py::handle& value) {
         auto& store = access.get<StructStore>();
         for (const auto& [key, val]: dict) {
             std::string key_str = py::str(key);
-            from_object(store[key_str.c_str()], dict[key]);
+            from_object(store[key_str.c_str()], dict[key], py::str(key));
         }
     } else if (py::hasattr(value, "__slots__")) {
         auto slots = py::list(value.attr("__slots__"));
         auto& store = access.get<StructStore>();
         for (const auto& key: slots) {
             std::string key_str = py::str(key);
-            from_object(store[key_str.c_str()], py::getattr(value, key));
+            from_object(store[key_str.c_str()], py::getattr(value, key), py::str(key));
         }
     } else if (py::isinstance<py::none>(value)) {
         // do nothing
     } else {
-        std::cerr << "unknown field type " << value.get_type() << std::endl;
-        throw py::type_error("internal error: unknown field type");
+        std::ostringstream msg;
+        msg << "field '" << field_name << "' has unsupported type '" << py::str(value.get_type()) << "'";
+        throw py::type_error(msg.str());
     }
 }
 
@@ -145,7 +148,7 @@ void register_structstore_methods(py::class_<T>& cls) {
     cls.def("__setattr__", [](T& t, const std::string& name, py::object value) {
         StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.write_lock();
-        from_object(store[name.c_str()], value);
+        from_object(store[name.c_str()], value, name);
     });
     cls.def("to_yaml", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
