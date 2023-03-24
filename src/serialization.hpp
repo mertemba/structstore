@@ -59,6 +59,9 @@ enum class FieldTypeValue : uint8_t;
 
 void serialize_text(std::ostream& os, FieldTypeValue type, void* data) {
     switch (type) {
+        case FieldTypeValue::EMPTY:
+            os << "<empty>";
+            break;
         case FieldTypeValue::INT:
             serialize_text<int>(os, data);
             break;
@@ -87,6 +90,8 @@ void serialize_text(std::ostream& os, FieldTypeValue type, void* data) {
 
 YAML::Node serialize_yaml(FieldTypeValue type, void* data) {
     switch (type) {
+        case FieldTypeValue::EMPTY:
+            return YAML::Node(YAML::Null);
         case FieldTypeValue::INT:
             return serialize_yaml<int>(data);
         case FieldTypeValue::DOUBLE:
