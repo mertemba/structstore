@@ -105,7 +105,7 @@ void List::push_back<const char*>(const char* const& value) {
 }
 
 YAML::Node to_yaml(const List& list) {
-    auto node = YAML::Node();
+    auto node = YAML::Node(YAML::NodeType::Sequence);
     for (const StructStoreField& field: list) {
         node.push_back(to_yaml(field));
     }
