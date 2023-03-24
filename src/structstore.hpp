@@ -76,6 +76,10 @@ public:
         return *this;
     }
 
+    StructStoreField& get_field () {
+        return field;
+    }
+
     friend std::ostream& operator<<(std::ostream& os, const FieldAccess& self) {
         return os << self.field;
     }

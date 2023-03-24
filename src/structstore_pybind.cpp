@@ -224,6 +224,18 @@ void register_structstore_pybind(py::module_& m) {
         str << list;
         return str.str();
     });
+    list.def("__len__", [](List& list) {
+        auto lock = list.read_lock();
+        return list.size();
+    });
+    list.def("__setitem__", [](List& list, size_t index, py::handle& value) {
+        auto lock = list.write_lock();
+        from_object(list[index], value, std::to_string(index));
+    });
+    list.def("__getitem__", [](List& list, size_t index) {
+        auto lock = list.read_lock();
+        return to_object<false>(list[index].get_field());
+    });
     list.def("copy", [](const List& list) {
         auto lock = list.read_lock();
         return to_list<false>(list);

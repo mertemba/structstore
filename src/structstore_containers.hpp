@@ -83,6 +83,10 @@ public:
         return os << "]";
     }
 
+    size_t size() {
+        return data.size();
+    }
+
     void clear() {
         for (StructStoreField& field: data) {
             field.clear(mm_alloc);
