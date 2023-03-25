@@ -63,6 +63,10 @@ public:
         data.emplace_back(StlAllocator<T>(mm_alloc).allocate(1)) = value;
     }
 
+    FieldAccess insert(size_t index) {
+        return {*data.emplace(data.begin() + index), mm_alloc};
+    }
+
     FieldAccess operator[](size_t idx) {
         return {data[idx], mm_alloc};
     }
@@ -85,6 +89,14 @@ public:
 
     size_t size() {
         return data.size();
+    }
+
+    void erase(size_t index) {
+        data[index].clear(mm_alloc);
+        for (size_t i = index; i < data.size() - 1; ++i) {
+            data[i] = std::move(data[i+1]);
+        }
+        data.pop_back();
     }
 
     void clear() {

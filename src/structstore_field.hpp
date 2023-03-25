@@ -152,7 +152,13 @@ public:
         type = FieldType<T>::value;
     }
 
-    StructStoreField& operator=(StructStoreField&&) = delete;
+    StructStoreField& operator=(StructStoreField&& other) {
+        data = other.data;
+        type = other.type;
+        other.data = nullptr;
+        other.type = FieldTypeValue::EMPTY;
+        return *this;
+    }
 
     StructStoreField& operator=(const StructStoreField&) = delete;
 
