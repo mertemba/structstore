@@ -172,6 +172,16 @@ void register_structstore_methods(py::class_<T>& cls) {
         auto lock = store.read_lock();
         return to_object<true>(store);
     });
+    cls.def("__copy__", [](T& t, py::handle&) {
+        StructStore& store = static_cast<StructStore&>(t);
+        auto lock = store.read_lock();
+        return to_object<false>(store);
+    });
+    cls.def("__deepcopy__", [](T& t, py::handle&) {
+        StructStore& store = static_cast<StructStore&>(t);
+        auto lock = store.read_lock();
+        return to_object<true>(store);
+    });
     cls.def("size", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
         return store.mm_alloc.get_size();
@@ -224,11 +234,42 @@ void register_structstore_pybind(py::module_& m) {
         str << list;
         return str.str();
     });
+    list.def("__len__", [](List& list) {
+        auto lock = list.read_lock();
+        return list.size();
+    });
+    list.def("insert", [](List& list, size_t index, py::handle& value) {
+        auto lock = list.write_lock();
+        FieldAccess access = list.insert(index);
+        from_object(access, value, std::to_string(index));
+    });
+    list.def("pop", [](List& list, size_t index) {
+        auto lock = list.write_lock();
+        const auto& res = to_object<true>(list[index].get_field());
+        list.erase(index);
+        return res;
+    });
+    list.def("__setitem__", [](List& list, size_t index, py::handle& value) {
+        auto lock = list.write_lock();
+        from_object(list[index], value, std::to_string(index));
+    });
+    list.def("__getitem__", [](List& list, size_t index) {
+        auto lock = list.read_lock();
+        return to_object<false>(list[index].get_field());
+    });
     list.def("copy", [](const List& list) {
         auto lock = list.read_lock();
         return to_list<false>(list);
     });
     list.def("deepcopy", [](const List& list) {
+        auto lock = list.read_lock();
+        return to_list<true>(list);
+    });
+    list.def("__copy__", [](const List& list, py::handle&) {
+        auto lock = list.read_lock();
+        return to_list<false>(list);
+    });
+    list.def("__deepcopy__", [](const List& list, py::handle&) {
         auto lock = list.read_lock();
         return to_list<true>(list);
     });

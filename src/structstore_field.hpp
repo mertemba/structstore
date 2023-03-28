@@ -152,7 +152,11 @@ public:
         type = FieldType<T>::value;
     }
 
-    StructStoreField& operator=(StructStoreField&&) = delete;
+    StructStoreField& operator=(StructStoreField&& other) {
+        std::swap(data, other.data);
+        std::swap(type, other.type);
+        return *this;
+    }
 
     StructStoreField& operator=(const StructStoreField&) = delete;
 
