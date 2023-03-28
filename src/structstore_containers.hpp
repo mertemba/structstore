@@ -93,10 +93,7 @@ public:
 
     void erase(size_t index) {
         data[index].clear(mm_alloc);
-        for (size_t i = index; i < data.size() - 1; ++i) {
-            data[i] = std::move(data[i+1]);
-        }
-        data.pop_back();
+        data.erase(data.begin() + index);
     }
 
     void clear() {

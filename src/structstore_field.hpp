@@ -153,10 +153,8 @@ public:
     }
 
     StructStoreField& operator=(StructStoreField&& other) {
-        data = other.data;
-        type = other.type;
-        other.data = nullptr;
-        other.type = FieldTypeValue::EMPTY;
+        std::swap(data, other.data);
+        std::swap(type, other.type);
         return *this;
     }
 
