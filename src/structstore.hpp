@@ -76,7 +76,7 @@ public:
         return *this;
     }
 
-    StructStoreField& get_field () {
+    StructStoreField& get_field() {
         return field;
     }
 
