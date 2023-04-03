@@ -50,6 +50,18 @@ py::object to_object(const StructStoreField& field) {
 }
 
 static void from_object(FieldAccess access, const py::handle& value, const std::string& field_name) {
+    if (py::isinstance<List>(value)
+            && access.get_type() == FieldTypeValue::LIST) {
+        if (value.cast<List&>() == access.get<List>()) {
+            return;
+        }
+    }
+    if (py::isinstance<StructStore>(value)
+            && access.get_type() == FieldTypeValue::STRUCT) {
+        if (value.cast<StructStore&>() == access.get<StructStore>()) {
+            return;
+        }
+    }
     access.clear();
     if (py::isinstance<py::bool_>(value)) {
         access.get<bool>() = value.cast<bool>();
@@ -59,7 +71,9 @@ static void from_object(FieldAccess access, const py::handle& value, const std::
         access.get<double>() = value.cast<double>();
     } else if (py::isinstance<py::str>(value)) {
         access.get<structstore::string>() = std::string(py::str(value));
-    } else if (py::isinstance<py::list>(value) || py::isinstance<py::tuple>(value)) {
+    } else if (py::isinstance<py::list>(value)
+            || py::isinstance<py::tuple>(value)
+            || py::isinstance<List>(value)) {
         List& list = access.get<List>();
         int i = 0;
         for (const auto& val: value.cast<py::list>()) {
@@ -162,6 +176,9 @@ void register_structstore_methods(py::class_<T>& cls) {
         str << store;
         return str.str();
     });
+    cls.def("__eq__", [](T& t, T& o) {
+        return static_cast<StructStore&>(t) == static_cast<StructStore&>(o);
+    });
     cls.def("copy", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
@@ -243,11 +260,32 @@ void register_structstore_pybind(py::module_& m) {
         FieldAccess access = list.insert(index);
         from_object(access, value, std::to_string(index));
     });
+    list.def("extend", [](List& list, py::handle& value) {
+        auto lock = list.write_lock();
+        for (const auto& val : value.cast<py::list>()) {
+            from_object(list.push_back(), val, std::to_string(list.size() - 1));
+        }
+    });
+    list.def("append", [](List& list, py::handle& value) {
+        auto lock = list.write_lock();
+        from_object(list.push_back(), value, std::to_string(list.size() - 1));
+    });
     list.def("pop", [](List& list, size_t index) {
         auto lock = list.write_lock();
         const auto& res = to_object<true>(list[index].get_field());
         list.erase(index);
         return res;
+    });
+    list.def("__add__", [](List& list, py::handle& value) {
+        auto lock = list.read_lock();
+        return to_list<false>(list) + value.cast<py::list>();
+    });
+    list.def("__iadd__", [](List& list, py::handle& value) {
+        auto lock = list.write_lock();
+        for (const auto& val : value.cast<py::list>()) {
+            from_object(list.push_back(), val, std::to_string(list.size() - 1));
+        }
+        return to_list<false>(list);
     });
     list.def("__setitem__", [](List& list, size_t index, py::handle& value) {
         auto lock = list.write_lock();
@@ -256,6 +294,17 @@ void register_structstore_pybind(py::module_& m) {
     list.def("__getitem__", [](List& list, size_t index) {
         auto lock = list.read_lock();
         return to_object<false>(list[index].get_field());
+    });
+    list.def("__delitem__", [](List& list, size_t index) {
+        auto lock = list.write_lock();
+        list.erase(index);
+    });
+    list.def("__iter__", [](List& list) {
+        auto lock = list.read_lock();
+        return pybind11::make_iterator(list.begin(), list.end());
+    }, py::keep_alive<0, 1>());
+    list.def("__eq__", [](List& l, List& o) {
+        return l == o;
     });
     list.def("copy", [](const List& list) {
         auto lock = list.read_lock();
@@ -293,6 +342,19 @@ void register_structstore_pybind(py::module_& m) {
     });
 }
 
+}
+
+// required to make __iter__ method work
+namespace pybind11 {
+    namespace detail {
+        template <> struct type_caster<structstore::StructStoreField> {
+        public:
+            PYBIND11_TYPE_CASTER(structstore::StructStoreField, const_name("StructStoreField"));
+            static handle cast(structstore::StructStoreField& src, return_value_policy, handle) {
+                return structstore::to_object<false>(src).release();
+            }
+        };
+    }
 }
 
 PYBIND11_MODULE(structstore, m) {

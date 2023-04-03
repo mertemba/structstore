@@ -214,6 +214,10 @@ public:
     }
 };
 
+bool operator== (const StructStore& s1, const StructStore& s2) {
+    return &s1 == &s2;
+}
+
 template<>
 FieldAccess& FieldAccess::operator=<const char*>(const char* const& value) {
     get<structstore::string>() = value;
