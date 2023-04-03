@@ -6,9 +6,12 @@
 namespace structstore {
 
 class SpinMutex {
-    std::atomic_flag flag = ATOMIC_FLAG_INIT;
+    std::atomic_int flag{0};
+    int lock_level = 0;
 
 public:
+    inline static int pid = 1;
+
     SpinMutex() = default;
 
     SpinMutex(SpinMutex&&) = delete;
@@ -20,15 +23,22 @@ public:
     SpinMutex& operator=(const SpinMutex&) = delete;
 
     void lock() {
-        while (flag.test_and_set(std::memory_order_acquire)) {
-#if defined(__cpp_lib_atomic_flag_test)
-            while (flag.test(std::memory_order_relaxed));
-#endif
+        int v = flag.load(std::memory_order_relaxed);
+        if (v == pid) {
+            lock_level++;
+            return;
         }
+        v = 0;
+        while (!flag.compare_exchange_strong(v, pid, std::memory_order_acquire)) {
+            while ((v = flag.load(std::memory_order_relaxed)) != 0) { }
+        }
+        lock_level++;
     }
 
     void unlock() {
-        flag.clear(std::memory_order_release);
+        if ((lock_level -= 1) == 0) {
+            flag.store(0, std::memory_order_release);
+        }
     }
 };
 

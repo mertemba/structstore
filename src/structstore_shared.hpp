@@ -67,6 +67,8 @@ public:
           use_file{use_file},
           cleanup{cleanup}{
 
+        SpinMutex::pid = getpid();
+
         if (use_file) {
             fd = open(path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
         } else {

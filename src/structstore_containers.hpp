@@ -87,6 +87,10 @@ public:
         return os << "]";
     }
 
+    SpinMutex& get_mutex() {
+        return mutex;
+    }
+
     size_t size() {
         return data.size();
     }
