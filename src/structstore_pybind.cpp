@@ -52,13 +52,13 @@ py::object to_object(const StructStoreField& field) {
 static void from_object(FieldAccess access, const py::handle& value, const std::string& field_name) {
     if (py::isinstance<List>(value)
             && access.get_type() == FieldTypeValue::LIST) {
-        if (value.cast<List&>() == access.get<List>()) {
+        if (&value.cast<List&>() == &access.get<List>()) {
             return;
         }
     }
     if (py::isinstance<StructStore>(value)
             && access.get_type() == FieldTypeValue::STRUCT) {
-        if (value.cast<StructStore&>() == access.get<StructStore>()) {
+        if (&value.cast<StructStore&>() == &access.get<StructStore>()) {
             return;
         }
     }
