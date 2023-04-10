@@ -112,10 +112,6 @@ public:
     }
 };
 
-bool operator==(const List& l1, const List& l2) {
-    return &l1 == &l2;
-}
-
 template<>
 void List::push_back<const char*>(const char* const& value) {
     push_back().get<structstore::string>() = value;

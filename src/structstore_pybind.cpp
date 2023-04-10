@@ -176,9 +176,6 @@ void register_structstore_methods(py::class_<T>& cls) {
         str << store;
         return str.str();
     });
-    cls.def("__eq__", [](T& t, T& o) {
-        return static_cast<StructStore&>(t) == static_cast<StructStore&>(o);
-    });
     cls.def("copy", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
@@ -304,9 +301,6 @@ void register_structstore_pybind(py::module_& m) {
         auto lock = list.read_lock();
         return pybind11::make_iterator(list.begin(), list.end());
     }, py::keep_alive<0, 1>());
-    list.def("__eq__", [](List& l, List& o) {
-        return l == o;
-    });
     list.def("copy", [](const List& list) {
         auto lock = list.read_lock();
         return to_list<false>(list);
