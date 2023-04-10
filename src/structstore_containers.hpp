@@ -112,7 +112,7 @@ public:
     }
 };
 
-bool operator== (const List& l1, const List& l2) {
+bool operator==(const List& l1, const List& l2) {
     return &l1 == &l2;
 }
 

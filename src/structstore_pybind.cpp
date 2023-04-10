@@ -263,7 +263,8 @@ void register_structstore_pybind(py::module_& m) {
     list.def("extend", [](List& list, py::handle& value) {
         auto lock = list.write_lock();
         for (const auto& val : value.cast<py::list>()) {
-            from_object(list.push_back(), val, std::to_string(list.size() - 1));
+            std::string field_name = std::to_string(list.size());
+            from_object(list.push_back(), val, field_name);
         }
     });
     list.def("append", [](List& list, py::handle& value) {
