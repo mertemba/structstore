@@ -204,6 +204,11 @@ void register_structstore_methods(py::class_<T>& cls) {
         StructStore& store = static_cast<StructStore&>(t);
         return store.mm_alloc.get_allocated();
     });
+    cls.def("clear", [](T& t) {
+        StructStore& store = static_cast<StructStore&>(t);
+        auto lock = store.write_lock();
+        store.clear();
+    });
 }
 
 void register_structstore_pybind(py::module_& m) {
@@ -316,6 +321,10 @@ void register_structstore_pybind(py::module_& m) {
     list.def("__deepcopy__", [](const List& list, py::handle&) {
         auto lock = list.read_lock();
         return to_list<true>(list);
+    });
+    list.def("clear", [](List& list) {
+        auto lock = list.write_lock();
+        list.clear();
     });
 
     auto matrix = py::class_<Matrix>(m, "StructStoreMatrix", py::buffer_protocol());
