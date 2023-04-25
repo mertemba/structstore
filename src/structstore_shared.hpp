@@ -19,11 +19,7 @@ class StructStoreShared {
 
     StructStoreShared(const StructStoreShared&) = delete;
 
-    StructStoreShared(StructStoreShared&&) = delete;
-
     StructStoreShared& operator=(const StructStoreShared&) = delete;
-
-    StructStoreShared& operator=(StructStoreShared&&) = delete;
 
     struct SharedData {
         SharedData* original_ptr;
@@ -63,7 +59,8 @@ public:
             size_t bufsize = 2048,
             bool reinit = false,
             bool use_file = false,
-            CleanupMode cleanup = IF_LAST)
+            CleanupMode cleanup = IF_LAST,
+            void* target_addr = nullptr)
         : path(path),
           fd{-1},
           sh_data_ptr{nullptr},
@@ -143,7 +140,7 @@ public:
             // share memory
 
             sh_data_ptr = (SharedData*) mmap(
-                    nullptr,
+                    target_addr,
                     size,
                     PROT_READ | PROT_WRITE,
                     MAP_SHARED,
@@ -153,10 +150,14 @@ public:
             if (sh_data_ptr == MAP_FAILED) {
                 throw std::runtime_error("mmap'ing new memory failed");
             }
+            if (target_addr != nullptr && sh_data_ptr != target_addr) {
+                throw std::runtime_error("mmap'ing new memory to requested address failed");
+            }
 
             // initialize data
 
             static_assert((sizeof(SharedData) % 8) == 0);
+            std::memset(sh_data_ptr, 0, size);
             new(sh_data_ptr) SharedData(size, bufsize, (char*) sh_data_ptr + sizeof(SharedData));
 
             // marks the store as ready to be used
@@ -167,9 +168,32 @@ public:
         }
     }
 
+    StructStoreShared(StructStoreShared&& other) {
+        path = std::move(other.path);
+        fd = other.fd;
+        sh_data_ptr = other.sh_data_ptr;
+        use_file = other.use_file;
+        cleanup = other.cleanup;
+        other.fd = -1;
+        other.sh_data_ptr = nullptr;
+        other.cleanup = NEVER;
+    }
+
+    StructStoreShared& operator=(StructStoreShared&& other) {
+        path = std::move(other.path);
+        fd = other.fd;
+        sh_data_ptr = other.sh_data_ptr;
+        use_file = other.use_file;
+        cleanup = other.cleanup;
+        other.fd = -1;
+        other.sh_data_ptr = nullptr;
+        other.cleanup = NEVER;
+        return *this;
+    }
+
 private:
 
-    void mmap_existing_fd () {
+    void mmap_existing_fd() {
 
         SharedData* original_ptr;
 
@@ -214,12 +238,12 @@ private:
 
 public:
 
-    bool valid () {
+    bool valid() {
 
         return !sh_data_ptr->invalidated.load();
     }
 
-    bool revalidate (bool block = true) {
+    bool revalidate(bool block = true) {
 
         if (!sh_data_ptr->invalidated.load()) {
             return true;
@@ -294,6 +318,9 @@ public:
     }
 
     ~StructStoreShared() {
+        if (sh_data_ptr == nullptr) {
+            return;
+        }
 
         if ((--sh_data_ptr->usage_count == 0 && cleanup == IF_LAST) || cleanup == ALWAYS) {
 
@@ -313,8 +340,33 @@ public:
 
         close(fd);
     }
+
+    const void* addr() const {
+        return sh_data_ptr;
+    }
+
+    size_t size() const {
+        return sh_data_ptr->size;
+    }
+
+    void to_buffer(void* buffer, size_t bufsize) const {
+        if (bufsize < sh_data_ptr->size) {
+            throw std::runtime_error("target buffer too small");
+        }
+        std::memcpy(buffer, sh_data_ptr, sh_data_ptr->size);
+    }
+
+    void from_buffer(void* buffer, size_t bufsize) {
+        if (bufsize < ((SharedData*) buffer)->size) {
+            throw std::runtime_error("source buffer too small");
+        }
+        if (((SharedData*) buffer)->original_ptr != sh_data_ptr) {
+            throw std::runtime_error("target address mismatch; please reopen with correct target address");
+        }
+        std::memcpy(sh_data_ptr, buffer, ((SharedData*) buffer)->size);
+    }
 };
 
-}
+}  // namespace structstore
 
 #endif
