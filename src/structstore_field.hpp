@@ -145,9 +145,7 @@ public:
 
     template<typename T>
     void replace_data(T* new_data, MiniMalloc& mm_alloc) {
-        if (data) {
-            mm_alloc.deallocate(data);
-        }
+        clear(mm_alloc);
         data = new_data;
         type = FieldType<T>::value;
     }

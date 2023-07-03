@@ -32,16 +32,16 @@ py::object to_object(const StructStoreField& field) {
             if constexpr (recursive) {
                 return to_object<true>(field.get<StructStore>());
             } else {
-                return py::cast(field.get<StructStore>(), py::return_value_policy::reference);
+                return py::cast(AllocWrapper<StructStore>(field.get<StructStore>()));
             }
         case FieldTypeValue::LIST:
             if constexpr (recursive) {
                 return to_list<true>(field.get<List>());
             } else {
-                return py::cast(field.get<List>(), py::return_value_policy::reference);
+                return py::cast(AllocWrapper<List>(field.get<List>()));
             }
         case FieldTypeValue::MATRIX:
-            return py::array(py::cast(field.get<Matrix>(), py::return_value_policy::reference));
+            return py::array(py::cast(AllocWrapper<Matrix>(field.get<Matrix>())));
         case FieldTypeValue::EMPTY:
             return py::none();
         default:
@@ -50,15 +50,15 @@ py::object to_object(const StructStoreField& field) {
 }
 
 static void from_object(FieldAccess access, const py::handle& value, const std::string& field_name) {
-    if (py::isinstance<List>(value)
+    if (py::isinstance<AllocWrapper<List>>(value)
             && access.get_type() == FieldTypeValue::LIST) {
-        if (&value.cast<List&>() == &access.get<List>()) {
+        if (&value.cast<AllocWrapper<List>&>().ptr == &access.get<List>()) {
             return;
         }
     }
-    if (py::isinstance<StructStore>(value)
+    if (py::isinstance<AllocWrapper<StructStore>>(value)
             && access.get_type() == FieldTypeValue::STRUCT) {
-        if (&value.cast<StructStore&>() == &access.get<StructStore>()) {
+        if (&value.cast<AllocWrapper<StructStore>&>().ptr == &access.get<StructStore>()) {
             return;
         }
     }
@@ -73,7 +73,7 @@ static void from_object(FieldAccess access, const py::handle& value, const std::
         access.get<structstore::string>() = std::string(py::str(value));
     } else if (py::isinstance<py::list>(value)
             || py::isinstance<py::tuple>(value)
-            || py::isinstance<List>(value)) {
+            || py::isinstance<AllocWrapper<List>>(value)) {
         List& list = access.get<List>();
         int i = 0;
         for (const auto& val: value.cast<py::list>()) {
@@ -214,8 +214,7 @@ void register_structstore_methods(py::class_<T>& cls) {
 void register_structstore_pybind(py::module_& m) {
     SimpleNamespace = py::module_::import("types").attr("SimpleNamespace");
 
-    py::class_<StructStore> cls = py::class_<StructStore>{m, "StructStore"};
-    cls.def(py::init<>());
+    py::class_<AllocWrapper<StructStore>> cls = py::class_<AllocWrapper<StructStore>>{m, "StructStore"};
     register_structstore_methods(cls);
 
     py::enum_<CleanupMode>(m, "CleanupMode")
@@ -246,85 +245,85 @@ void register_structstore_pybind(py::module_& m) {
               },
               py::arg("block") = true);
 
-    auto list = py::class_<List>(m, "StructStoreList");
-    list.def("__repr__", [](const List& list) {
-        auto lock = list.read_lock();
+    auto list = py::class_<AllocWrapper<List>>(m, "StructStoreList");
+    list.def("__repr__", [](AllocWrapper<List>& list) {
+        auto lock = list->read_lock();
         std::ostringstream str;
-        str << list;
+        str << list.ptr;
         return str.str();
     });
-    list.def("__len__", [](List& list) {
-        auto lock = list.read_lock();
-        return list.size();
+    list.def("__len__", [](AllocWrapper<List>& list) {
+        auto lock = list->read_lock();
+        return list->size();
     });
-    list.def("insert", [](List& list, size_t index, py::handle& value) {
-        auto lock = list.write_lock();
-        FieldAccess access = list.insert(index);
+    list.def("insert", [](AllocWrapper<List>& list, size_t index, py::handle& value) {
+        auto lock = list->write_lock();
+        FieldAccess access = list->insert(index);
         from_object(access, value, std::to_string(index));
     });
-    list.def("extend", [](List& list, py::handle& value) {
-        auto lock = list.write_lock();
+    list.def("extend", [](AllocWrapper<List>& list, py::handle& value) {
+        auto lock = list->write_lock();
         for (const auto& val : value.cast<py::list>()) {
-            std::string field_name = std::to_string(list.size());
-            from_object(list.push_back(), val, field_name);
+            std::string field_name = std::to_string(list->size());
+            from_object(list->push_back(), val, field_name);
         }
     });
-    list.def("append", [](List& list, py::handle& value) {
-        auto lock = list.write_lock();
-        from_object(list.push_back(), value, std::to_string(list.size() - 1));
+    list.def("append", [](AllocWrapper<List>& list, py::handle& value) {
+        auto lock = list->write_lock();
+        from_object(list->push_back(), value, std::to_string(list->size() - 1));
     });
-    list.def("pop", [](List& list, size_t index) {
-        auto lock = list.write_lock();
-        const auto& res = to_object<true>(list[index].get_field());
-        list.erase(index);
+    list.def("pop", [](AllocWrapper<List>& list, size_t index) {
+        auto lock = list->write_lock();
+        const auto& res = to_object<true>(list.ptr[index].get_field());
+        list->erase(index);
         return res;
     });
-    list.def("__add__", [](List& list, py::handle& value) {
-        auto lock = list.read_lock();
-        return to_list<false>(list) + value.cast<py::list>();
+    list.def("__add__", [](AllocWrapper<List>& list, py::handle& value) {
+        auto lock = list->read_lock();
+        return to_list<false>(list.ptr) + value.cast<py::list>();
     });
-    list.def("__iadd__", [](List& list, py::handle& value) {
-        auto lock = list.write_lock();
+    list.def("__iadd__", [](AllocWrapper<List>& list, py::handle& value) {
+        auto lock = list->write_lock();
         for (const auto& val : value.cast<py::list>()) {
-            from_object(list.push_back(), val, std::to_string(list.size() - 1));
+            from_object(list->push_back(), val, std::to_string(list->size() - 1));
         }
-        return to_list<false>(list);
+        return to_list<false>(list.ptr);
     });
-    list.def("__setitem__", [](List& list, size_t index, py::handle& value) {
-        auto lock = list.write_lock();
-        from_object(list[index], value, std::to_string(index));
+    list.def("__setitem__", [](AllocWrapper<List>& list, size_t index, py::handle& value) {
+        auto lock = list->write_lock();
+        from_object(list.ptr[index], value, std::to_string(index));
     });
-    list.def("__getitem__", [](List& list, size_t index) {
-        auto lock = list.read_lock();
-        return to_object<false>(list[index].get_field());
+    list.def("__getitem__", [](AllocWrapper<List>& list, size_t index) {
+        auto lock = list->read_lock();
+        return to_object<false>(list.ptr[index].get_field());
     });
-    list.def("__delitem__", [](List& list, size_t index) {
-        auto lock = list.write_lock();
-        list.erase(index);
+    list.def("__delitem__", [](AllocWrapper<List>& list, size_t index) {
+        auto lock = list->write_lock();
+        list->erase(index);
     });
-    list.def("__iter__", [](List& list) {
-        auto lock = list.read_lock();
-        return pybind11::make_iterator(list.begin(), list.end());
+    list.def("__iter__", [](AllocWrapper<List>& list) {
+        auto lock = list->read_lock();
+        return pybind11::make_iterator(list->begin(), list->end());
     }, py::keep_alive<0, 1>());
-    list.def("copy", [](const List& list) {
-        auto lock = list.read_lock();
-        return to_list<false>(list);
+    list.def("copy", [](AllocWrapper<List>& list) {
+        auto lock = list->read_lock();
+        return to_list<false>(list.ptr);
     });
-    list.def("deepcopy", [](const List& list) {
-        auto lock = list.read_lock();
-        return to_list<true>(list);
+    list.def("deepcopy", [](AllocWrapper<List>& list) {
+        auto lock = list->read_lock();
+        return to_list<true>(list.ptr);
     });
-    list.def("__copy__", [](const List& list, py::handle&) {
-        auto lock = list.read_lock();
-        return to_list<false>(list);
+    list.def("__copy__", [](AllocWrapper<List>& list, py::handle&) {
+        auto lock = list->read_lock();
+        return to_list<false>(list.ptr);
     });
-    list.def("__deepcopy__", [](const List& list, py::handle&) {
-        auto lock = list.read_lock();
-        return to_list<true>(list);
+    list.def("__deepcopy__", [](AllocWrapper<List>& list, py::handle&) {
+        auto lock = list->read_lock();
+        return to_list<true>(list.ptr);
     });
-    list.def("clear", [](List& list) {
-        auto lock = list.write_lock();
-        list.clear();
+    list.def("clear", [](AllocWrapper<List>& list) {
+        auto lock = list->write_lock();
+        list->clear();
     });
 
     auto matrix = py::class_<Matrix>(m, "StructStoreMatrix", py::buffer_protocol());

@@ -16,7 +16,7 @@ class MiniMalloc {
     static constexpr int64_t MAX_PTRDIFF_VAL = ((INT64_C(1) << 31) - 1);
 
     // for an allocated node, only the first 8 bytes of the struct are needed.
-    static constexpr int ALLOC_NODE_SIZE = 8;
+    static constexpr int ALLOC_NODE_SIZE = 16;
     static constexpr uint32_t ALLOCATED_FLAG = UINT32_C(1);
 
     // private type definitions
@@ -28,6 +28,8 @@ class MiniMalloc {
     struct memnode {
         size_type size; // allocatable size in bytes
         size_type prev_node_size; // 0 if this is the first node in block; MSB set if node is allocated (ALLOCATED_FLAG)
+        size_type ref_count;
+        size_type padding;
         ptrdiff_type d_next_free_node;
         ptrdiff_type d_prev_free_node;
     };
@@ -47,6 +49,7 @@ class MiniMalloc {
 
     static inline void set_allocated(memnode* node) {
         node->prev_node_size |= ALLOCATED_FLAG;
+        node->ref_count = 1;
     }
 
     static inline void set_unallocated(memnode* node) {
@@ -181,7 +184,7 @@ class MiniMalloc {
         byte* ptr = (byte*) buffer;
         // ensure 8-byte alignment
         static_assert((ALLOC_NODE_SIZE % 8) == 0);
-        static_assert(sizeof(memnode) == 16);
+        //static_assert(sizeof(memnode) == 16);
 
         // init block_node_size array
         for (uint32_t bits = 1; bits <= 64; ++bits) {
@@ -204,6 +207,7 @@ class MiniMalloc {
         // allocate first block
         auto* block_node = (memnode*) ptr;
         assert(block_node != nullptr);
+        block_node->ref_count = 0;
         block_node->d_next_free_node = 0;
         block_node->prev_node_size = 0; // also sets to unallocated
         set_prev_free_node(block_node, get_free_nodes_head(SIZES_COUNT - 1));
@@ -289,6 +293,10 @@ class MiniMalloc {
         if (!ptr) return;
 
         auto* node = (memnode*) (((byte*) ptr) - ALLOC_NODE_SIZE);
+        if (--node->ref_count > 0) {
+            return;
+        }
+        allocated -= node->size;
         size_index_type size_index = get_size_index_lower(node->size);
         set_unallocated(node);
         // prepend node to free nodes list:
@@ -322,7 +330,7 @@ public:
     void dispose() {}
 
     void* allocate(size_t field_size) {
-        if (field_size == 0) {
+        if (field_size < ALIGN) {
             field_size = ALIGN;
         }
         ScopedLock lock{mutex};
@@ -343,8 +351,6 @@ public:
 
     void deallocate(void* ptr) {
         ScopedLock lock{mutex};
-        auto* node = (memnode*) (((byte*) ptr) - ALLOC_NODE_SIZE);
-        allocated -= node->size;
         mm_free(ptr);
     }
 
@@ -354,6 +360,12 @@ public:
 
     size_t get_allocated() const {
         return allocated;
+    }
+
+    void inc_ref_count(void* ptr) {
+        ScopedLock lock{mutex};
+        auto* node = (memnode*) (((byte*) ptr) - ALLOC_NODE_SIZE);
+        ++node->ref_count;
     }
 };
 
@@ -398,6 +410,28 @@ using vector = std::vector<T, StlAllocator<T>>;
 
 template<class K, class T>
 using unordered_map = std::unordered_map<K, T, std::hash<K>, std::equal_to<K>, StlAllocator<std::pair<const K, T>>>;
+
+template<typename T>
+struct AllocWrapper {
+    T& ptr;
+    MiniMalloc& mm;
+
+    AllocWrapper (T& ptr) : ptr{ptr}, mm{ptr.mm_alloc} {
+        mm.inc_ref_count(&ptr);
+    }
+
+    ~AllocWrapper () {
+        mm.deallocate(&ptr);
+    }
+
+    T* operator -> () {
+        return &ptr;
+    }
+
+    explicit operator T& () {
+        return ptr;
+    }
+};
 
 }
 

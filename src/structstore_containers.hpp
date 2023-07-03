@@ -6,11 +6,12 @@
 namespace structstore {
 
 class List {
-    MiniMalloc& mm_alloc;
     structstore::vector<StructStoreField> data;
     mutable SpinMutex mutex;
 
 public:
+    MiniMalloc& mm_alloc;
+
     class Iterator {
         const List& list;
         size_t idx;
@@ -130,12 +131,13 @@ static void destruct(List& list) {
 }
 
 class Matrix {
-    MiniMalloc& mm_alloc;
     size_t _rows, _cols;
     double* _data;
     bool _is_vector = false;
 
 public:
+    MiniMalloc& mm_alloc;
+
     Matrix(MiniMalloc& mm_alloc) : Matrix(0, 0, mm_alloc) {}
 
     Matrix(size_t rows, size_t cols, MiniMalloc& mm_alloc, bool is_vector = false)
