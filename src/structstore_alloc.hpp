@@ -15,8 +15,12 @@ class MiniMalloc {
     static constexpr int SIZES_COUNT = 59;
     static constexpr int64_t MAX_PTRDIFF_VAL = ((INT64_C(1) << 31) - 1);
 
+    static constexpr uint64_t SIZE_BITS = 24;
+    static constexpr uint64_t MAX_ALLOC_SIZE = ((1ull << SIZE_BITS) - 1);
+    static constexpr uint64_t MAX_REFCOUNT = ((1ull << 16) - 1);
+
     // for an allocated node, only the first 8 bytes of the struct are needed.
-    static constexpr int ALLOC_NODE_SIZE = 16;
+    static constexpr int ALLOC_NODE_SIZE = 8;
     static constexpr uint32_t ALLOCATED_FLAG = UINT32_C(1);
 
     // private type definitions
@@ -25,11 +29,10 @@ class MiniMalloc {
     typedef int16_t size_index_type;
     typedef int32_t ptrdiff_type;
 
-    struct memnode {
-        size_type size; // allocatable size in bytes
-        size_type prev_node_size; // 0 if this is the first node in block; MSB set if node is allocated (ALLOCATED_FLAG)
-        size_type ref_count;
-        size_type padding;
+    struct __attribute__((__packed__)) memnode {
+        size_type size: SIZE_BITS; // allocatable size in bytes
+        size_type prev_node_size: SIZE_BITS; // 0 if this is the first node in block; MSB set if node is allocated (ALLOCATED_FLAG)
+        uint16_t refcount;
         ptrdiff_type d_next_free_node;
         ptrdiff_type d_prev_free_node;
     };
@@ -49,7 +52,7 @@ class MiniMalloc {
 
     static inline void set_allocated(memnode* node) {
         node->prev_node_size |= ALLOCATED_FLAG;
-        node->ref_count = 1;
+        node->refcount = 1;
     }
 
     static inline void set_unallocated(memnode* node) {
@@ -141,7 +144,7 @@ class MiniMalloc {
     }
 
     memnode* get_free_nodes_head(size_index_type size_index) {
-        return (memnode*) ((size_type*) &((*free_nodes)[size_index]) - 2);
+        return (memnode*) ((byte*) &((*free_nodes)[size_index]) - ALLOC_NODE_SIZE);
     }
 
     memnode* get_free_nodes_first(size_index_type size_index) {
@@ -207,7 +210,6 @@ class MiniMalloc {
         // allocate first block
         auto* block_node = (memnode*) ptr;
         assert(block_node != nullptr);
-        block_node->ref_count = 0;
         block_node->d_next_free_node = 0;
         block_node->prev_node_size = 0; // also sets to unallocated
         set_prev_free_node(block_node, get_free_nodes_head(SIZES_COUNT - 1));
@@ -221,6 +223,7 @@ class MiniMalloc {
 
     void* mm_alloc(size_t size) {
         if (size == 0) return nullptr;
+        if (size > MAX_ALLOC_SIZE) return nullptr;
 
         if (size % ALIGN) {
             size += ALIGN - size % ALIGN;
@@ -293,7 +296,7 @@ class MiniMalloc {
         if (!ptr) return;
 
         auto* node = (memnode*) (((byte*) ptr) - ALLOC_NODE_SIZE);
-        if (--node->ref_count > 0) {
+        if (--node->refcount > 0) {
             return;
         }
         allocated -= node->size;
@@ -304,6 +307,14 @@ class MiniMalloc {
 
         join_with_next(node);
         join_with_next(get_prev_node(node));
+    }
+
+    void mm_inc_ref(void* ptr) {
+        assert(ptr);
+        memnode* node = (memnode*) (((byte*) ptr) - ALLOC_NODE_SIZE);
+        assert(node->refcount > 0);
+        assert(node->refcount < MAX_REFCOUNT);
+        ++node->refcount;
     }
 
 public:
@@ -364,8 +375,7 @@ public:
 
     void inc_ref_count(void* ptr) {
         ScopedLock lock{mutex};
-        auto* node = (memnode*) (((byte*) ptr) - ALLOC_NODE_SIZE);
-        ++node->ref_count;
+        mm_inc_ref(ptr);
     }
 };
 
