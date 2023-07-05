@@ -62,25 +62,37 @@ static void from_object(FieldAccess access, const py::handle& value, const std::
             return;
         }
     }
-    access.clear();
+    if (py::isinstance<Matrix>(value)
+            && access.get_type() == FieldTypeValue::MATRIX) {
+        if (&value.cast<Matrix&>() == &access.get<Matrix>()) {
+            return;
+        }
+    }
     if (py::isinstance<py::bool_>(value)) {
+        access.set_type<bool>();
         access.get<bool>() = value.cast<bool>();
     } else if (py::isinstance<py::int_>(value)) {
+        access.set_type<int>();
         access.get<int>() = value.cast<int>();
     } else if (py::isinstance<py::float_>(value)) {
+        access.set_type<double>();
         access.get<double>() = value.cast<double>();
     } else if (py::isinstance<py::str>(value)) {
+        access.set_type<structstore::string>();
         access.get<structstore::string>() = std::string(py::str(value));
     } else if (py::isinstance<py::list>(value)
             || py::isinstance<py::tuple>(value)
             || py::isinstance<List>(value)) {
+        access.set_type<List>();
         List& list = access.get<List>();
+        list.clear();
         int i = 0;
         for (const auto& val: value.cast<py::list>()) {
             from_object(list.push_back(), val, std::to_string(i));
             ++i;
         }
     } else if (py::isinstance<py::array>(value)) {
+        access.set_type<Matrix>();
         auto array = value.cast<py::array>();
         py::buffer_info info = array.request();
         if (info.format != py::format_descriptor<double>::format()) {
@@ -100,21 +112,25 @@ static void from_object(FieldAccess access, const py::handle& value, const std::
         }
         access.get<Matrix>().from(rows, cols, (double*) info.ptr, is_vector);
     } else if (py::hasattr(value, "__dict__")) {
+        access.set_type<StructStore>();
         auto dict = py::dict(value.attr("__dict__"));
-        auto& store = access.get<StructStore>();
+        StructStore& store = access.get<StructStore>();
+        store.clear();
         for (const auto& [key, val]: dict) {
             std::string key_str = py::str(key);
             from_object(store[key_str.c_str()], dict[key], py::str(key));
         }
     } else if (py::hasattr(value, "__slots__")) {
+        access.set_type<StructStore>();
         auto slots = py::list(value.attr("__slots__"));
-        auto& store = access.get<StructStore>();
+        StructStore& store = access.get<StructStore>();
+        store.clear();
         for (const auto& key: slots) {
             std::string key_str = py::str(key);
             from_object(store[key_str.c_str()], py::getattr(value, key), py::str(key));
         }
     } else if (py::isinstance<py::none>(value)) {
-        // do nothing
+        access.clear();
     } else {
         std::ostringstream msg;
         msg << "field '" << field_name << "' has unsupported type '" << py::str(value.get_type()) << "'";

@@ -91,6 +91,14 @@ public:
     void clear() {
         field.clear(mm_alloc);
     }
+
+    template<typename T>
+    void set_type() {
+        if (field.get_type() != FieldType<T>::value) {
+            clear();
+            get<T>();
+        }
+    }
 };
 
 class StructStore {
