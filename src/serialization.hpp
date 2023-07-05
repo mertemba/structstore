@@ -81,7 +81,7 @@ void serialize_text(std::ostream& os, FieldTypeValue type, void* data) {
             serialize_text<List>(os, data);
             break;
         case FieldTypeValue::MATRIX:
-            throw std::runtime_error("text serialization of matrices is not supported yet");
+            serialize_text<Matrix>(os, data);
             break;
         default:
             throw std::runtime_error("internal error: unknown field type");

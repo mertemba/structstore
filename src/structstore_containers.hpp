@@ -195,6 +195,14 @@ public:
         }
         std::memcpy(_data, data, sizeof(double) * _rows * _cols);
     }
+
+    friend std::ostream& operator<<(std::ostream& os, const Matrix& self) {
+        os << "[";
+        for (int i = 0; i < self._rows * self._cols; ++i) {
+            os << self._data[i] << ",";
+        }
+        return os << "]";
+    }
 };
 
 static void destruct(Matrix& matrix) {
