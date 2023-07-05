@@ -184,6 +184,13 @@ public:
     bool is_vector() const { return _is_vector; }
 
     void from(size_t rows, size_t cols, double* data, bool is_vector) {
+        if (data == _data) {
+            if (rows != _rows || cols != _cols) {
+                throw std::runtime_error("setting matrix data to same pointer but different size");
+            }
+            _is_vector = is_vector;
+            return;
+        }
         if (_data == nullptr || rows != _rows || cols != _cols) {
             if (_data != nullptr) {
                 mm_alloc.deallocate(_data);
