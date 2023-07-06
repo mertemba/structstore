@@ -247,6 +247,8 @@ public:
 
     bool revalidate(bool block = true) {
 
+        SpinMutex::pid = getpid();
+
         if (!sh_data_ptr->invalidated.load()) {
             return true;
         }
