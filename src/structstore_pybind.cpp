@@ -235,32 +235,46 @@ void register_structstore_pybind(py::module_& m) {
     register_structstore_methods(cls);
 
     py::enum_<CleanupMode>(m, "CleanupMode")
-        .value("NEVER", NEVER)
-        .value("IF_LAST", IF_LAST)
-        .value("ALWAYS", ALWAYS)
-        .export_values();
+            .value("NEVER", NEVER)
+            .value("IF_LAST", IF_LAST)
+            .value("ALWAYS", ALWAYS)
+            .export_values();
 
     auto shcls = py::class_<StructStoreShared>(m, "StructStoreShared");
     register_structstore_methods(shcls);
-    shcls.def(py::init<const std::string&, ssize_t, bool, bool, CleanupMode>(),
+    shcls.def(py::init([](const std::string& path, size_t size, bool reinit, bool use_file, CleanupMode cleanup,
+                          uintptr_t target_addr) {
+                  return StructStoreShared{path, size, reinit, use_file, cleanup, (void*) target_addr};
+              }),
               py::arg("path"),
               py::arg("size") = 2048,
               py::arg("reinit") = false,
               py::arg("use_file") = false,
-              py::arg("cleanup") = IF_LAST);
+              py::arg("cleanup") = IF_LAST,
+              py::arg("target_addr") = 0);
     shcls.def("valid", &StructStoreShared::valid);
     shcls.def("revalidate", [](StructStoreShared& shs, bool block) {
-                bool res = false;
-                do {
-                    // necessary to get out of the loop on interrupting signal
-                    if (PyErr_CheckSignals() != 0) {
-                        throw py::error_already_set();
-                    }
-                    res = shs.revalidate(false);
-                } while (res == false && block);
-                return res;
+                  bool res = false;
+                  do {
+                      // necessary to get out of the loop on interrupting signal
+                      if (PyErr_CheckSignals() != 0) {
+                          throw py::error_already_set();
+                      }
+                      res = shs.revalidate(false);
+                  } while (res == false && block);
+                  return res;
               },
               py::arg("block") = true);
+    shcls.def("addr", [](StructStoreShared& shs) {
+        return uintptr_t(shs.addr());
+    });
+    shcls.def("to_bytes", [](StructStoreShared& shs) {
+        return py::bytes((const char*) shs.addr(), shs.size());
+    });
+    shcls.def("from_bytes", [](StructStoreShared& shs, py::bytes buffer) {
+        std::string str = buffer;
+        shs.from_buffer(str.data(), str.size());
+    });
 
     auto list = py::class_<List>(m, "StructStoreList");
     list.def("__repr__", [](const List& list) {
