@@ -213,7 +213,7 @@ class MiniMalloc {
         set_allocated(last_node);
         last_node->size = 0;
         set_next_free_node(get_free_nodes_head(SIZES_COUNT - 1), block_node);
-        trim(block_node);
+        set_zero(block_node);
         assert((byte*) last_node + ALLOC_NODE_SIZE == (byte*) buffer + blocksize);
     }
 
@@ -285,7 +285,7 @@ class MiniMalloc {
         // prepend node to free nodes list:
         size_index_type size_index = get_size_index_lower(node->size);
         prepend_free_node(node, size_index);
-        trim(node);
+        set_zero(node);
     }
 
     void mm_free(void* ptr) {
@@ -296,13 +296,14 @@ class MiniMalloc {
         set_unallocated(node);
         // prepend node to free nodes list:
         prepend_free_node(node, size_index);
-        trim(node);
+        set_zero(node);
 
         join_with_next(node);
         join_with_next(get_prev_node(node));
     }
 
-    void trim(memnode* node) {
+    void set_zero(memnode* node) {
+        // fill unused memory regions with zeros to enable better compression
         std::memset(((byte*) node) + sizeof(memnode), 0, node->size - (sizeof(memnode) - ALLOC_NODE_SIZE));
     }
 
