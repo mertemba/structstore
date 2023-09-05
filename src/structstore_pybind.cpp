@@ -40,8 +40,17 @@ py::object to_object(const StructStoreField& field) {
             } else {
                 return py::cast(field.get<List>(), py::return_value_policy::reference);
             }
-        case FieldTypeValue::MATRIX:
-            return py::array(py::cast(field.get<Matrix>(), py::return_value_policy::reference));
+        case FieldTypeValue::MATRIX: {
+            Matrix& m = field.get<Matrix>();
+            if constexpr (recursive) {
+                // copies array
+                return py::array_t<double>({m.rows(), m.cols()}, m.data());
+            } else {
+                // add empty capsule to avoid copy
+                // memory lifetime is managed by structstore field
+                return py::array_t<double>({m.rows(), m.cols()}, m.data(), py::capsule([](){}));
+            }
+        }
         case FieldTypeValue::EMPTY:
             return py::none();
         default:
