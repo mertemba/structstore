@@ -1,4 +1,5 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include "structstore.hpp"
@@ -42,14 +43,18 @@ py::object to_object(const StructStoreField& field) {
             }
         case FieldTypeValue::MATRIX: {
             Matrix& m = field.get<Matrix>();
-            if constexpr (recursive) {
-                // copies array
-                return py::array_t<double>({m.rows(), m.cols()}, m.data());
+            // in the recursive case use empty capsule to avoid copy
+            // then memory lifetime is managed by structstore field
+            auto parent = recursive ? py::handle() : py::capsule([](){}).release();
+
+            py::array::ShapeContainer shape;
+            if (m.is_vector()) {
+                shape = {m.rows() * m.cols()};
             } else {
-                // add empty capsule to avoid copy
-                // memory lifetime is managed by structstore field
-                return py::array_t<double>({m.rows(), m.cols()}, m.data(), py::capsule([](){}));
+                shape = {m.rows(), m.cols()};
             }
+
+            return py::array_t<double>(shape, m.data(), parent);
         }
         case FieldTypeValue::EMPTY:
             return py::none();
@@ -411,24 +416,6 @@ void register_structstore_pybind(py::module_& m) {
     list.def("clear", [](List& list) {
         auto lock = list.write_lock();
         list.clear();
-    });
-
-    auto matrix = py::class_<Matrix>(m, "StructStoreMatrix", py::buffer_protocol());
-    matrix.def_buffer([](Matrix& m) -> py::buffer_info {
-        if (m.is_vector()) {
-            return py::buffer_info(
-                    m.data(), sizeof(double),
-                    py::format_descriptor<double>::format(),
-                    1, {m.rows() * m.cols()},
-                    {sizeof(double)}
-            );
-        }
-        return py::buffer_info(
-                m.data(), sizeof(double),
-                py::format_descriptor<double>::format(),
-                2, {m.rows(), m.cols()},
-                {sizeof(double) * m.cols(), sizeof(double)}
-        );
     });
 }
 
