@@ -40,8 +40,21 @@ py::object to_object(const StructStoreField& field) {
             } else {
                 return py::cast(field.get<List>(), py::return_value_policy::reference);
             }
-        case FieldTypeValue::MATRIX:
-            return py::array(py::cast(field.get<Matrix>(), py::return_value_policy::reference));
+        case FieldTypeValue::MATRIX: {
+            Matrix& m = field.get<Matrix>();
+            // in the recursive case use empty capsule to avoid copy
+            // then memory lifetime is managed by structstore field
+            auto parent = recursive ? py::handle() : py::capsule([](){}).release();
+
+            py::array::ShapeContainer shape;
+            if (m.is_vector()) {
+                shape = {m.rows() * m.cols()};
+            } else {
+                shape = {m.rows(), m.cols()};
+            }
+
+            return py::array_t<double>(shape, m.data(), parent);
+        }
         case FieldTypeValue::EMPTY:
             return py::none();
         default:
@@ -402,24 +415,6 @@ void register_structstore_pybind(py::module_& m) {
     list.def("clear", [](List& list) {
         auto lock = list.write_lock();
         list.clear();
-    });
-
-    auto matrix = py::class_<Matrix>(m, "StructStoreMatrix", py::buffer_protocol());
-    matrix.def_buffer([](Matrix& m) -> py::buffer_info {
-        if (m.is_vector()) {
-            return py::buffer_info(
-                    m.data(), sizeof(double),
-                    py::format_descriptor<double>::format(),
-                    1, {m.rows() * m.cols()},
-                    {sizeof(double)}
-            );
-        }
-        return py::buffer_info(
-                m.data(), sizeof(double),
-                py::format_descriptor<double>::format(),
-                2, {m.rows(), m.cols()},
-                {sizeof(double) * m.cols(), sizeof(double)}
-        );
     });
 }
 
