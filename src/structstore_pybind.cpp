@@ -156,6 +156,39 @@ py::object to_object(const StructStore& store) {
     return obj;
 }
 
+class SpinLockContextManager {
+
+    SpinMutex* mutex;
+    bool locked;
+
+public:
+
+    explicit SpinLockContextManager (SpinMutex* mutex)
+        : mutex{mutex}, locked{true} { }
+
+    SpinLockContextManager (SpinLockContextManager&& other)
+        : mutex{other.mutex}, locked{other.locked} {
+        other.locked = false;
+    }
+
+    SpinLockContextManager(const SpinLockContextManager&) = delete;
+    SpinLockContextManager& operator=(SpinLockContextManager&& other) = delete;
+    SpinLockContextManager& operator=(const SpinLockContextManager&) = delete;
+
+    void exit (py::handle&, py::handle&, py::handle&) {
+        if (locked) {
+            locked = false;
+            mutex->unlock();
+        }
+    }
+
+    ~SpinLockContextManager () {
+        if (locked) {
+            mutex->unlock();
+        }
+    }
+};
+
 template<typename T>
 void register_structstore_methods(py::class_<T>& cls) {
     cls.def_property_readonly("__slots__", [](T& t) {
@@ -180,6 +213,11 @@ void register_structstore_methods(py::class_<T>& cls) {
         auto lock = store.write_lock();
         from_object(store[name.c_str()], value, name);
     });
+    cls.def("lock", [](T& t) {
+        StructStore& store = static_cast<StructStore&>(t);
+        store.get_mutex().lock();
+        return SpinLockContextManager(&store.get_mutex());
+    }, py::return_value_policy::move);
     cls.def("to_yaml", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
@@ -228,7 +266,12 @@ void register_structstore_methods(py::class_<T>& cls) {
 }
 
 void register_structstore_pybind(py::module_& m) {
+
     SimpleNamespace = py::module_::import("types").attr("SimpleNamespace");
+
+    py::class_<SpinLockContextManager>(m, "SpinLockContextManager")
+        .def("__enter__", [](SpinLockContextManager& cm){})
+        .def("__exit__", &SpinLockContextManager::exit);
 
     py::class_<StructStore> cls = py::class_<StructStore>{m, "StructStore"};
     cls.def(py::init<>());
@@ -283,6 +326,10 @@ void register_structstore_pybind(py::module_& m) {
         str << list;
         return str.str();
     });
+    list.def("lock", [](List& list) {
+        list.get_mutex().lock();
+        return SpinLockContextManager(&list.get_mutex());
+    }, py::return_value_policy::move);
     list.def("__len__", [](List& list) {
         auto lock = list.read_lock();
         return list.size();

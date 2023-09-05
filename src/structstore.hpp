@@ -209,6 +209,10 @@ public:
         return {get_field(HashString{name}), mm_alloc};
     }
 
+    SpinMutex& get_mutex() {
+        return mutex;
+    }
+
     [[nodiscard]] auto write_lock() {
         return ScopedLock(mutex);
     }
