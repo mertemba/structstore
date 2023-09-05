@@ -3,7 +3,6 @@
 
 #include <atomic>
 #include <fcntl.h>
-#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 
@@ -67,8 +66,6 @@ public:
           use_file{use_file},
           cleanup{cleanup}{
 
-        SpinMutex::pid = getpid();
-
         if (use_file) {
             fd = open(path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600);
         } else {
@@ -125,7 +122,7 @@ public:
             }
         } else if (!created && fd_state.st_mode != 0100660) {
             // shared memory is not ready for opening yet
-            return;
+            throw std::runtime_error("shared memory not initialized yet");
         }
 
         size_t size = sizeof(SharedData) + bufsize;
@@ -242,14 +239,12 @@ public:
 
     bool valid() {
 
-        return !sh_data_ptr->invalidated.load();
+        return sh_data_ptr != nullptr && !sh_data_ptr->invalidated.load();
     }
 
     bool revalidate(bool block = true) {
 
-        SpinMutex::pid = getpid();
-
-        if (!sh_data_ptr->invalidated.load()) {
+        if (valid()) {
             return true;
         }
 
@@ -298,6 +293,12 @@ public:
 
         } while (block);
 
+        // ensures that new_fd is closed
+        // necessary in non-blocking mode if segment is not ready yet
+        if (new_fd != -1) {
+            close(new_fd);
+        }
+
         return false;
     }
 
@@ -326,22 +327,19 @@ public:
             return;
         }
 
-        if ((--sh_data_ptr->usage_count == 0 && cleanup == IF_LAST) || cleanup == ALWAYS) {
-
-            sh_data_ptr->invalidated.store(true);
-
-            munmap(sh_data_ptr, sh_data_ptr->size);
-
-            if (use_file) {
-                unlink(path.c_str());
-            } else {
-                shm_unlink(path.c_str());
+        if (((--sh_data_ptr->usage_count == 0 && cleanup == IF_LAST) || cleanup == ALWAYS)) {
+            bool expected = false;
+            // if cleanup == ALWAYS this ensure that unlink is done exactly once
+            if (sh_data_ptr->invalidated.compare_exchange_strong(expected, true, std::memory_order_acquire)) {
+                if (use_file) {
+                    unlink(path.c_str());
+                } else {
+                    shm_unlink(path.c_str());
+                }
             }
-
-        } else {
-            munmap(sh_data_ptr, sh_data_ptr->size);
         }
 
+        munmap(sh_data_ptr, sh_data_ptr->size);
         close(fd);
     }
 

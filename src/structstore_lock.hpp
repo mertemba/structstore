@@ -2,6 +2,7 @@
 #define STRUCTSTORE_LOCK_HPP
 
 #include <atomic>
+#include <unistd.h>
 
 namespace structstore {
 
@@ -9,8 +10,10 @@ class SpinMutex {
     std::atomic_int flag{0};
     int lock_level = 0;
 
+    // too many keywords
+    inline static thread_local const int tid = gettid();
+
 public:
-    inline static int pid = 1;
 
     SpinMutex() = default;
 
@@ -24,12 +27,12 @@ public:
 
     void lock() {
         int v = flag.load(std::memory_order_relaxed);
-        if (v == pid) {
+        if (v == tid) {
             lock_level++;
             return;
         }
         v = 0;
-        while (!flag.compare_exchange_strong(v, pid, std::memory_order_acquire)) {
+        while (!flag.compare_exchange_strong(v, tid, std::memory_order_acquire)) {
             while ((v = flag.load(std::memory_order_relaxed)) != 0) { }
         }
         lock_level++;
