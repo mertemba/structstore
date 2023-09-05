@@ -123,7 +123,7 @@ class MiniMalloc {
             return size - 1;
         }
         if (size > (1ull << 16)) {
-            return 58;
+            return SIZES_COUNT - 1;
         }
         size *= size;
         size *= size;
@@ -224,7 +224,9 @@ class MiniMalloc {
             size += ALIGN - size % ALIGN;
         }
         size_index_type size_index = get_size_index_upper(size);
-        size = sizes[size_index];
+        if (size_index < SIZES_COUNT - 1) {
+            size = sizes[size_index];
+        }
         memnode* node;
         // search for first free node
         do {
@@ -235,6 +237,15 @@ class MiniMalloc {
             return nullptr;
         }
         assert(node->size > 0);
+        if (size_index == SIZES_COUNT - 1) {
+            // linearly search all big nodes for a big enough one
+            while (node != nullptr && node->size < size) {
+                node = get_next_free_node(node);
+            }
+            if (node == nullptr) {
+                return nullptr;
+            }
+        }
         if (node->size < size) {
             // not enough memory left
             return nullptr;
@@ -336,7 +347,7 @@ public:
         }
         ScopedLock lock{mutex};
         if (free_nodes == nullptr) {
-            return nullptr;
+            throw std::runtime_error("internal allocator error: free_nodes not initialized");
         }
         void* ptr = mm_alloc(field_size);
         if (ptr == nullptr) {
