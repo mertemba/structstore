@@ -106,7 +106,7 @@ static void from_object(FieldAccess access, const py::handle& value, const std::
         }
     } else if (py::isinstance<py::array>(value)) {
         access.set_type<Matrix>();
-        auto array = value.cast<py::array>();
+        auto array = py::array_t<double, py::array::c_style | py::array::forcecast>::ensure(value);
         py::buffer_info info = array.request();
         if (info.format != py::format_descriptor<double>::format()) {
             throw std::runtime_error("Incompatible format: expected a double array!");
