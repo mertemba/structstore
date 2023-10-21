@@ -4,20 +4,3 @@ requires = [
     "pybind11>=2.10.0"
 ]
 build-backend = "setuptools.build_meta"
-
-[project]
-name = "structstore"
-version = "0.0.1"
-authors = [
-  { name="Max Mertens", email="max.mail@dameweb.de" },
-]
-description="Structured object storage, dynamically typed, to be shared between processes"
-readme = "README.md"
-requires-python = ">=3.6"
-classifiers = [
-    "Programming Language :: Python :: 3",
-]
-
-[project.urls]
-"Homepage" = "https://github.com/jellysheep/structstore"
-"Bug Tracker" = "https://github.com/jellysheep/structstore/issues"
