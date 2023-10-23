@@ -142,6 +142,22 @@ static void from_object(FieldAccess access, const py::handle& value, const std::
             std::string key_str = py::str(key);
             from_object(store[key_str.c_str()], py::getattr(value, key), py::str(key));
         }
+    } else if (py::isinstance<py::dict>(value)) {
+        access.set_type<StructStore>();
+        py::dict dict = py::cast<py::dict>(value);
+        StructStore& store = access.get<StructStore>();
+        store.clear();
+        for (auto& [key, val]: dict) {
+            if (!py::isinstance<py::str>(key)) {
+                std::ostringstream msg;
+                msg << "Key '" << py::str(key)
+                    << "' has unsupported type '" << py::str(key.get_type())
+                    << "'! Only string keys are supported.";
+                throw py::type_error(msg.str());
+            }
+            std::string key_str = py::str(key);
+            from_object(store[key_str.c_str()], dict[key], key_str);
+        }
     } else if (py::isinstance<py::none>(value)) {
         access.clear();
     } else {
@@ -212,7 +228,7 @@ void register_structstore_methods(py::class_<T>& cls) {
         }
         return ret;
     });
-    cls.def("__getattr__", [](T& t, const std::string& name) {
+    auto get_field = [](T& t, const std::string& name) {
         StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
         StructStoreField* field = store.try_get_field(HashString{name.c_str()});
@@ -220,12 +236,16 @@ void register_structstore_methods(py::class_<T>& cls) {
             throw py::attribute_error();
         }
         return to_object<false>(*field);
-    }, py::return_value_policy::reference_internal);
-    cls.def("__setattr__", [](T& t, const std::string& name, py::object value) {
+    };
+    auto set_field = [](T& t, const std::string& name, py::object value) {
         StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.write_lock();
         from_object(store[name.c_str()], value, name);
-    });
+    };
+    cls.def("__getattr__", get_field, py::return_value_policy::reference_internal);
+    cls.def("__setattr__", set_field);
+    cls.def("__getitem__", get_field, py::return_value_policy::reference_internal);
+    cls.def("__setitem__", set_field);
     cls.def("lock", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
         store.get_mutex().lock();
