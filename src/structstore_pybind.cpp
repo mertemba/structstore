@@ -156,7 +156,7 @@ static void from_object(FieldAccess access, const py::handle& value, const std::
                 throw py::type_error(msg.str());
             }
             std::string key_str = py::str(key);
-            from_object(store[key_str.c_str()], dict[key], py::str(key));
+            from_object(store[key_str.c_str()], dict[key], key_str);
         }
     } else if (py::isinstance<py::none>(value)) {
         access.clear();
