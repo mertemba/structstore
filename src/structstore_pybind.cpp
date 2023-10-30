@@ -328,6 +328,11 @@ void register_structstore_pybind(py::module_& m) {
               py::arg("use_file") = false,
               py::arg("cleanup") = IF_LAST,
               py::arg("target_addr") = 0);
+    shcls.def(py::init([](int fd, bool init) {
+                  return StructStoreShared{fd, init};
+              }),
+              py::arg("fd"),
+              py::arg("init"));
     shcls.def("valid", &StructStoreShared::valid);
     shcls.def("revalidate", [](StructStoreShared& shs, bool block) {
                   bool res = false;
