@@ -167,6 +167,48 @@ public:
         }
     }
 
+    explicit StructStoreShared(int fd, bool init)
+            : path{},
+              fd{-1},
+              sh_data_ptr{nullptr},
+              use_file{false},
+              cleanup{NEVER} {
+
+        struct stat fd_state = {};
+        fstat(fd, &fd_state);
+        size_t size = fd_state.st_size;
+
+        if (size == 0) {
+            throw std::runtime_error("fstat on fd failed");
+        }
+
+        size_t bufsize = size - sizeof(SharedData);
+
+        if (init) {
+            // map new memory
+            sh_data_ptr = (SharedData*) mmap(
+                    nullptr,
+                    size,
+                    PROT_READ | PROT_WRITE,
+                    MAP_SHARED,
+                    fd,
+                    0);
+
+            if (sh_data_ptr == MAP_FAILED) {
+                throw std::runtime_error("mmap'ing new memory failed");
+            }
+
+            // initialize data
+            static_assert((sizeof(SharedData) % 8) == 0);
+            std::memset(sh_data_ptr, 0, size);
+            new(sh_data_ptr) SharedData(size, bufsize, (char*) sh_data_ptr + sizeof(SharedData));
+        } else {
+            this->fd = fd;
+            mmap_existing_fd();
+            this->fd = -1;
+        }
+    }
+
     StructStoreShared(StructStoreShared&& other) {
         path = std::move(other.path);
         fd = other.fd;
@@ -340,7 +382,9 @@ public:
         }
 
         munmap(sh_data_ptr, sh_data_ptr->size);
-        close(fd);
+        if (fd >= 0) {
+            close(fd);
+        }
     }
 
     const void* addr() const {
