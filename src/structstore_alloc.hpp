@@ -289,6 +289,9 @@ class MiniMalloc {
         attach_free_nodes(get_prev_free_node(node), get_next_free_node(node));
         // remove next_node from nodes lists:
         attach_free_nodes(get_prev_free_node(next_node), get_next_free_node(next_node));
+        // fill header of next_node with zeros to enable better compression:
+        std::memset(((byte*) next_node), 0, sizeof(memnode));
+
         next_node = get_next_node(node);
         if (next_node != nullptr) {
             set_prev_node_size(next_node, node->size);
@@ -296,7 +299,6 @@ class MiniMalloc {
         // prepend node to free nodes list:
         size_index_type size_index = get_size_index_lower(node->size);
         prepend_free_node(node, size_index);
-        set_zero(node);
     }
 
     void mm_free(void* ptr) {
