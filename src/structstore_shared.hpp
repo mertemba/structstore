@@ -5,8 +5,11 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <random>
 
 namespace structstore {
+
+static std::random_device rnd_dev;
 
 enum CleanupMode {
     NEVER,
@@ -138,11 +141,17 @@ public:
 
             // share memory
 
+            if (target_addr == nullptr) {
+                // choose a random address in 48 bit space to avoid collisions
+                std::mt19937 rng(rnd_dev());
+                std::uniform_int_distribution<std::mt19937::result_type> dist(1, 1 << 30);
+                target_addr = (void*) (((uint64_t) dist(rng)) << (47 - 30));
+            }
             sh_data_ptr = (SharedData*) mmap(
                     target_addr,
                     size,
                     PROT_READ | PROT_WRITE,
-                    MAP_SHARED,
+                    MAP_SHARED | MAP_FIXED_NOREPLACE,
                     fd,
                     0);
 
@@ -185,17 +194,24 @@ public:
         size_t bufsize = size - sizeof(SharedData);
 
         if (init) {
+            // choose a random address in 48 bit space to avoid collisions
+            std::mt19937 rng(rnd_dev());
+            std::uniform_int_distribution<std::mt19937::result_type> dist(1, 1 << 30);
+            void* target_addr = (void*) (((uint64_t) dist(rng)) << (47 - 30));
             // map new memory
             sh_data_ptr = (SharedData*) mmap(
-                    nullptr,
+                    target_addr,
                     size,
                     PROT_READ | PROT_WRITE,
-                    MAP_SHARED,
+                    MAP_SHARED | MAP_FIXED_NOREPLACE,
                     fd,
                     0);
 
             if (sh_data_ptr == MAP_FAILED) {
                 throw std::runtime_error("mmap'ing new memory failed");
+            }
+            if (sh_data_ptr != target_addr) {
+                throw std::runtime_error("mmap'ing new memory to requested address failed");
             }
 
             // initialize data
