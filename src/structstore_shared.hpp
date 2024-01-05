@@ -334,9 +334,15 @@ private:
 
 public:
 
-    bool valid() {
+    bool valid() const {
 
         return sh_data_ptr != nullptr && !sh_data_ptr->invalidated.load();
+    }
+
+    void assert_valid() const {
+        if (!valid()) {
+            throw std::runtime_error("StructStoreShared instance is invalid");
+        }
     }
 
     bool revalidate(bool block = true) {
@@ -392,26 +398,35 @@ public:
     }
 
     StructStore* operator->() {
+        assert_valid();
         return &sh_data_ptr->data;
     }
 
     StructStore& operator*() {
+        assert_valid();
         return sh_data_ptr->data;
     }
 
     explicit operator StructStore&() {
+        assert_valid();
         return sh_data_ptr->data;
     }
 
     FieldAccess operator[](HashString name) {
+        assert_valid();
         return sh_data_ptr->data[name];
     }
 
     FieldAccess operator[](const char* name) {
+        assert_valid();
         return sh_data_ptr->data[name];
     }
 
     ~StructStoreShared() {
+        close();
+    }
+
+    void close() {
         if (sh_data_ptr == nullptr) {
             return;
         }
@@ -429,17 +444,21 @@ public:
         }
 
         munmap(sh_data_ptr, sh_data_ptr->size);
+        sh_data_ptr = nullptr;
     }
 
     const void* addr() const {
+        assert_valid();
         return sh_data_ptr;
     }
 
     size_t size() const {
+        assert_valid();
         return sh_data_ptr->size;
     }
 
     void to_buffer(void* buffer, size_t bufsize) const {
+        assert_valid();
         if (bufsize < sh_data_ptr->size) {
             throw std::runtime_error("target buffer too small");
         }
@@ -447,6 +466,7 @@ public:
     }
 
     void from_buffer(void* buffer, size_t bufsize) {
+        assert_valid();
         if (bufsize < ((SharedData*) buffer)->size) {
             throw std::runtime_error("source buffer too small");
         }

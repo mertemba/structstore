@@ -356,6 +356,7 @@ void register_structstore_pybind(py::module_& m) {
         std::string str = buffer;
         shs.from_buffer(str.data(), str.size());
     });
+    shcls.def("close", &StructStoreShared::close);
 
     auto list = py::class_<List>(m, "StructStoreList");
     list.def("__repr__", [](const List& list) {
