@@ -340,7 +340,7 @@ public:
     }
 
     void assert_valid() const {
-        if (!valid()) {
+        if (sh_data_ptr == nullptr) {
             throw std::runtime_error("StructStoreShared instance is invalid");
         }
     }
