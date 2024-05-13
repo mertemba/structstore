@@ -1,175 +1,173 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/numpy.h>
-#include "structstore.hpp"
-#include "structstore_shared.hpp"
-#include "structstore_containers.hpp"
+#include <nanobind/nanobind.h>
+#include <nanobind/ndarray.h>
+#include <nanobind/make_iterator.h>
+#include <nanobind/stl/string.h>
+#include "structstore/structstore.hpp"
 
 namespace structstore {
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
-static py::object SimpleNamespace;
-
-template<bool recursive>
-py::object to_list(const List& list);
+static nb::object SimpleNamespace;
 
 template<bool recursive>
-py::object to_object(const StructStore& store);
+nb::object to_list(const List& list);
 
 template<bool recursive>
-py::object to_object(const StructStoreField& field) {
+nb::object to_object(const StructStoreField& field) {
     switch (field.get_type()) {
         case FieldTypeValue::INT:
-            return py::int_(field.get<int>());
+            return nb::int_(field.get<int>());
         case FieldTypeValue::DOUBLE:
-            return py::float_(field.get<double>());
+            return nb::float_(field.get<double>());
         case FieldTypeValue::STRING:
-            return py::str(field.get<structstore::string>().c_str());
+            return nb::str(field.get<structstore::string>().c_str());
         case FieldTypeValue::BOOL:
-            return py::bool_(field.get<bool>());
+            return nb::bool_(field.get<bool>());
         case FieldTypeValue::STRUCT:
             if constexpr (recursive) {
                 return to_object<true>(field.get<StructStore>());
             } else {
-                return py::cast(field.get<StructStore>(), py::return_value_policy::reference);
+                return nb::cast(field.get<StructStore>(), nb::rv_policy::reference);
             }
         case FieldTypeValue::LIST:
             if constexpr (recursive) {
                 return to_list<true>(field.get<List>());
             } else {
-                return py::cast(field.get<List>(), py::return_value_policy::reference);
+                return nb::cast(field.get<List>(), nb::rv_policy::reference);
             }
         case FieldTypeValue::MATRIX: {
             Matrix& m = field.get<Matrix>();
-            // in the recursive case use empty capsule to avoid copy
+            // todo: in the recursive case use empty capsule to avoid copy?
             // then memory lifetime is managed by structstore field
-            auto parent = recursive ? py::handle() : py::capsule([](){}).release();
+            // auto parent = recursive ? nb::handle() : nb::capsule([]() {}).release();
+            auto parent = nb::handle();
 
-            py::array::ShapeContainer shape;
+            int ndim;
+            size_t shape[2];
             if (m.is_vector()) {
-                shape = {m.rows() * m.cols()};
+                ndim = 1;
+                shape[0] = m.rows() * m.cols();
             } else {
-                shape = {m.rows(), m.cols()};
+                ndim = 2;
+                shape[0] = m.rows();
+                shape[1] = m.cols();
             }
 
-            return py::array_t<double>(shape, m.data(), parent);
+            return nb::cast(nb::ndarray<nb::numpy, double>(m.data(), ndim, shape, parent));
         }
         case FieldTypeValue::EMPTY:
-            return py::none();
+            return nb::none();
         default:
             throw std::runtime_error("this type cannot be stored in a StructStore");
     }
 }
 
-static void from_object(FieldAccess access, const py::handle& value, const std::string& field_name) {
-    if (py::isinstance<List>(value)
+static void from_object(FieldAccess access, const nb::handle& value, const std::string& field_name) {
+    if (nb::isinstance<List>(value)
             && access.get_type() == FieldTypeValue::LIST) {
-        if (&value.cast<List&>() == &access.get<List>()) {
+        if (&nb::cast<List&>(value) == &access.get<List>()) {
             return;
         }
     }
-    if (py::isinstance<StructStore>(value)
+    if (nb::isinstance<StructStore>(value)
             && access.get_type() == FieldTypeValue::STRUCT) {
-        if (&value.cast<StructStore&>() == &access.get<StructStore>()) {
+        if (&nb::cast<StructStore&>(value) == &access.get<StructStore>()) {
             return;
         }
     }
-    if (py::isinstance<Matrix>(value)
+    if (nb::isinstance<Matrix>(value)
             && access.get_type() == FieldTypeValue::MATRIX) {
-        if (&value.cast<Matrix&>() == &access.get<Matrix>()) {
+        if (&nb::cast<Matrix&>(value) == &access.get<Matrix>()) {
             return;
         }
     }
-    if (py::isinstance<py::bool_>(value)) {
+    if (nb::isinstance<nb::bool_>(value)) {
         access.set_type<bool>();
-        access.get<bool>() = value.cast<bool>();
-    } else if (py::isinstance<py::int_>(value)) {
+        access.get<bool>() = nb::cast<bool>(value);
+    } else if (nb::isinstance<nb::int_>(value)) {
         access.set_type<int>();
-        access.get<int>() = value.cast<int>();
-    } else if (py::isinstance<py::float_>(value)) {
+        access.get<int>() = nb::cast<int>(value);
+    } else if (nb::isinstance<nb::float_>(value)) {
         access.set_type<double>();
-        access.get<double>() = value.cast<double>();
-    } else if (py::isinstance<py::str>(value)) {
+        access.get<double>() = nb::cast<double>(value);
+    } else if (nb::isinstance<nb::str>(value)) {
         access.set_type<structstore::string>();
-        access.get<structstore::string>() = std::string(py::str(value));
-    } else if (py::isinstance<py::list>(value)
-            || py::isinstance<py::tuple>(value)
-            || py::isinstance<List>(value)) {
+        access.get<structstore::string>() = nb::cast<std::string>(value);
+    } else if (nb::isinstance<nb::list>(value)
+               || nb::isinstance<nb::tuple>(value)
+               || nb::isinstance<List>(value)) {
         access.set_type<List>();
         List& list = access.get<List>();
         list.clear();
         int i = 0;
-        for (const auto& val: value.cast<py::list>()) {
+        for (const auto& val: nb::cast<nb::list>(value)) {
             from_object(list.push_back(), val, std::to_string(i));
             ++i;
         }
-    } else if (py::isinstance<py::array>(value)) {
+    } else if (nb::isinstance<nb::ndarray<nb::numpy, double>>(value)) {
         access.set_type<Matrix>();
-        auto array = py::array_t<double, py::array::c_style | py::array::forcecast>::ensure(value);
-        py::buffer_info info = array.request();
-        if (info.format != py::format_descriptor<double>::format()) {
-            throw std::runtime_error("Incompatible format: expected a double array!");
-        }
-        int rows, cols;
+        auto array = nb::cast<nb::ndarray<nb::numpy, double>>(value);
+        size_t rows, cols;
         bool is_vector = false;
-        if (info.ndim == 1) {
-            rows = info.shape[0];
+        if (array.ndim() == 1) {
+            rows = array.shape(0);
             cols = 1;
             is_vector = true;
-        } else if (info.ndim == 2) {
-            rows = info.shape[0];
-            cols = info.shape[1];
+        } else if (array.ndim() == 2) {
+            rows = array.shape(0);
+            cols = array.shape(1);
         } else {
             throw std::runtime_error("Incompatible buffer dimension!");
         }
-        access.get<Matrix>().from(rows, cols, (double*) info.ptr, is_vector);
-    } else if (py::hasattr(value, "__dict__")) {
+        access.get<Matrix>().from(rows, cols, array.data(), is_vector);
+    } else if (nb::hasattr(value, "__dict__")) {
         access.set_type<StructStore>();
-        auto dict = py::dict(value.attr("__dict__"));
+        auto dict = nb::dict(value.attr("__dict__"));
         StructStore& store = access.get<StructStore>();
         store.clear();
         for (const auto& [key, val]: dict) {
-            std::string key_str = py::str(key);
-            from_object(store[key_str.c_str()], dict[key], py::str(key));
+            std::string key_str = nb::cast<std::string>(key);
+            from_object(store[key_str.c_str()], dict[key], key_str);
         }
-    } else if (py::hasattr(value, "__slots__")) {
+    } else if (nb::hasattr(value, "__slots__")) {
         access.set_type<StructStore>();
-        auto slots = py::list(value.attr("__slots__"));
+        auto slots = nb::list(value.attr("__slots__"));
         StructStore& store = access.get<StructStore>();
         store.clear();
         for (const auto& key: slots) {
-            std::string key_str = py::str(key);
-            from_object(store[key_str.c_str()], py::getattr(value, key), py::str(key));
+            std::string key_str = nb::cast<std::string>(key);
+            from_object(store[key_str.c_str()], nb::getattr(value, key), key_str);
         }
-    } else if (py::isinstance<py::dict>(value)) {
+    } else if (nb::isinstance<nb::dict>(value)) {
         access.set_type<StructStore>();
-        py::dict dict = py::cast<py::dict>(value);
+        nb::dict dict = nb::cast<nb::dict>(value);
         StructStore& store = access.get<StructStore>();
         store.clear();
-        for (auto& [key, val]: dict) {
-            if (!py::isinstance<py::str>(key)) {
+        for (const auto& [key, val]: dict) {
+            if (!nb::isinstance<nb::str>(key)) {
                 std::ostringstream msg;
-                msg << "Key '" << py::str(key)
-                    << "' has unsupported type '" << py::str(key.get_type())
+                msg << "Key '" << nb::cast<std::string>(nb::str(key))
+                    << "' has unsupported type '" << nb::cast<std::string>(nb::str(key.type()))
                     << "'! Only string keys are supported.";
-                throw py::type_error(msg.str());
+                throw nb::type_error(msg.str().c_str());
             }
-            std::string key_str = py::str(key);
+            std::string key_str = nb::cast<std::string>(key);
             from_object(store[key_str.c_str()], dict[key], key_str);
         }
-    } else if (py::isinstance<py::none>(value)) {
+    } else if (value.is_none()) {
         access.clear();
     } else {
         std::ostringstream msg;
-        msg << "field '" << field_name << "' has unsupported type '" << py::str(value.get_type()) << "'";
-        throw py::type_error(msg.str());
+        msg << "field '" << field_name << "' has unsupported type '" << nb::cast<std::string>(nb::str(value.type()))
+            << "'";
+        throw nb::type_error(msg.str().c_str());
     }
 }
 
 template<bool recursive>
-py::object to_list(const List& list) {
-    auto pylist = py::list();
+nb::object to_list(const List& list) {
+    auto pylist = nb::list();
     for (const StructStoreField& field: list) {
         pylist.append(to_object<recursive>(field));
     }
@@ -177,10 +175,10 @@ py::object to_list(const List& list) {
 }
 
 template<bool recursive>
-py::object to_object(const StructStore& store) {
+nb::object to_object(const StructStore& store) {
     auto obj = SimpleNamespace();
     for (const auto& name: store.slots) {
-        py::setattr(obj, name.str, to_object<recursive>(store.fields.at(name)));
+        nb::setattr(obj, name.str, to_object<recursive>(store.fields.at(name)));
     }
     return obj;
 }
@@ -195,8 +193,8 @@ public:
     explicit SpinLockContextManager (SpinMutex* mutex)
         : mutex{mutex}, locked{true} { }
 
-    SpinLockContextManager (SpinLockContextManager&& other)
-        : mutex{other.mutex}, locked{other.locked} {
+    SpinLockContextManager(SpinLockContextManager&& other) noexcept
+            : mutex{other.mutex}, locked{other.locked} {
         other.locked = false;
     }
 
@@ -204,7 +202,7 @@ public:
     SpinLockContextManager& operator=(SpinLockContextManager&& other) = delete;
     SpinLockContextManager& operator=(const SpinLockContextManager&) = delete;
 
-    void exit (py::handle&, py::handle&, py::handle&) {
+    void exit(nb::handle&, nb::handle&, nb::handle&) {
         if (locked) {
             locked = false;
             mutex->unlock();
@@ -219,10 +217,10 @@ public:
 };
 
 template<typename T>
-void register_structstore_methods(py::class_<T>& cls) {
-    cls.def_property_readonly("__slots__", [](T& t) {
+void register_structstore_methods(nb::class_<T>& cls) {
+    cls.def_prop_ro("__slots__", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
-        auto ret = py::list();
+        auto ret = nb::list();
         for (const auto& str: store.get_slots()) {
             ret.append(str.str);
         }
@@ -233,24 +231,24 @@ void register_structstore_methods(py::class_<T>& cls) {
         auto lock = store.read_lock();
         StructStoreField* field = store.try_get_field(HashString{name.c_str()});
         if (field == nullptr) {
-            throw py::attribute_error();
+            throw nb::attribute_error();
         }
         return to_object<false>(*field);
     };
-    auto set_field = [](T& t, const std::string& name, py::object value) {
+    auto set_field = [](T& t, const std::string& name, const nb::object& value) {
         StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.write_lock();
         from_object(store[name.c_str()], value, name);
     };
-    cls.def("__getattr__", get_field, py::return_value_policy::reference_internal);
+    cls.def("__getattr__", get_field, nb::rv_policy::reference_internal);
     cls.def("__setattr__", set_field);
-    cls.def("__getitem__", get_field, py::return_value_policy::reference_internal);
+    cls.def("__getitem__", get_field, nb::rv_policy::reference_internal);
     cls.def("__setitem__", set_field);
     cls.def("lock", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
         store.get_mutex().lock();
         return SpinLockContextManager(&store.get_mutex());
-    }, py::return_value_policy::move);
+    }, nb::rv_policy::move);
     cls.def("to_yaml", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
@@ -278,7 +276,7 @@ void register_structstore_methods(py::class_<T>& cls) {
         auto lock = store.read_lock();
         return to_object<false>(store);
     });
-    cls.def("__deepcopy__", [](T& t, py::handle&) {
+    cls.def("__deepcopy__", [](T& t, nb::handle&) {
         StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
         return to_object<true>(store);
@@ -298,67 +296,68 @@ void register_structstore_methods(py::class_<T>& cls) {
     });
 }
 
-void register_structstore_pybind(py::module_& m) {
+NB_MODULE(MODULE_NAME, m) {
+    m.attr("__version__") = VERSION_INFO;
 
-    SimpleNamespace = py::module_::import("types").attr("SimpleNamespace");
+    SimpleNamespace = nb::module_::import_("types").attr("SimpleNamespace");
 
-    py::class_<SpinLockContextManager>(m, "SpinLockContextManager")
-        .def("__enter__", [](SpinLockContextManager& cm){})
+    nb::class_<SpinLockContextManager>(m, "SpinLockContextManager")
+            .def("__enter__", [](SpinLockContextManager&) {})
         .def("__exit__", &SpinLockContextManager::exit);
 
-    py::class_<StructStore> cls = py::class_<StructStore>{m, "StructStore"};
-    cls.def(py::init<>());
+    nb::class_<StructStore> cls = nb::class_<StructStore>{m, "StructStore"};
+    cls.def(nb::init<>());
     register_structstore_methods(cls);
 
-    py::enum_<CleanupMode>(m, "CleanupMode")
+    nb::enum_<CleanupMode>(m, "CleanupMode")
             .value("NEVER", NEVER)
             .value("IF_LAST", IF_LAST)
             .value("ALWAYS", ALWAYS)
             .export_values();
 
-    auto shcls = py::class_<StructStoreShared>(m, "StructStoreShared");
+    auto shcls = nb::class_<StructStoreShared>(m, "StructStoreShared");
     register_structstore_methods(shcls);
-    shcls.def(py::init([](const std::string& path, size_t size, bool reinit, bool use_file, CleanupMode cleanup,
-                          uintptr_t target_addr) {
-                  return StructStoreShared{path, size, reinit, use_file, cleanup, (void*) target_addr};
-              }),
-              py::arg("path"),
-              py::arg("size") = 2048,
-              py::arg("reinit") = false,
-              py::arg("use_file") = false,
-              py::arg("cleanup") = IF_LAST,
-              py::arg("target_addr") = 0);
-    shcls.def(py::init([](int fd, bool init) {
-                  return StructStoreShared{fd, init};
-              }),
-              py::arg("fd"),
-              py::arg("init"));
+    shcls.def("__init__",
+              [](StructStoreShared* s, const std::string& path, size_t size, bool reinit, bool use_file,
+                 CleanupMode cleanup, uintptr_t target_addr) {
+                  new(s) StructStoreShared{path, size, reinit, use_file, cleanup, (void*) target_addr};
+              },
+              nb::arg("path"),
+              nb::arg("size") = 2048,
+              nb::arg("reinit") = false,
+              nb::arg("use_file") = false,
+              nb::arg("cleanup") = IF_LAST,
+              nb::arg("target_addr") = 0);
+    shcls.def("__init__", [](StructStoreShared* s, int fd, bool init) {
+                  new(s) StructStoreShared{fd, init};
+              },
+              nb::arg("fd"),
+              nb::arg("init"));
     shcls.def("valid", &StructStoreShared::valid);
     shcls.def("revalidate", [](StructStoreShared& shs, bool block) {
                   bool res = false;
                   do {
                       // necessary to get out of the loop on interrupting signal
                       if (PyErr_CheckSignals() != 0) {
-                          throw py::error_already_set();
+                          throw nb::python_error();
                       }
                       res = shs.revalidate(false);
                   } while (res == false && block);
                   return res;
               },
-              py::arg("block") = true);
+              nb::arg("block") = true);
     shcls.def("addr", [](StructStoreShared& shs) {
         return uintptr_t(shs.addr());
     });
     shcls.def("to_bytes", [](StructStoreShared& shs) {
-        return py::bytes((const char*) shs.addr(), shs.size());
+        return nb::bytes((const char*) shs.addr(), shs.size());
     });
-    shcls.def("from_bytes", [](StructStoreShared& shs, py::bytes buffer) {
-        std::string str = buffer;
-        shs.from_buffer(str.data(), str.size());
+    shcls.def("from_bytes", [](StructStoreShared& shs, const nb::bytes& buffer) {
+        shs.from_buffer((void*) buffer.c_str(), buffer.size());
     });
     shcls.def("close", &StructStoreShared::close);
 
-    auto list = py::class_<List>(m, "StructStoreList");
+    auto list = nb::class_<List>(m, "StructStoreList");
     list.def("__repr__", [](const List& list) {
         auto lock = list.read_lock();
         std::ostringstream str;
@@ -368,24 +367,24 @@ void register_structstore_pybind(py::module_& m) {
     list.def("lock", [](List& list) {
         list.get_mutex().lock();
         return SpinLockContextManager(&list.get_mutex());
-    }, py::return_value_policy::move);
+    }, nb::rv_policy::move);
     list.def("__len__", [](List& list) {
         auto lock = list.read_lock();
         return list.size();
     });
-    list.def("insert", [](List& list, size_t index, py::handle& value) {
+    list.def("insert", [](List& list, size_t index, nb::handle& value) {
         auto lock = list.write_lock();
         FieldAccess access = list.insert(index);
         from_object(access, value, std::to_string(index));
     });
-    list.def("extend", [](List& list, py::handle& value) {
+    list.def("extend", [](List& list, nb::handle& value) {
         auto lock = list.write_lock();
-        for (const auto& val : value.cast<py::list>()) {
+        for (const auto& val: nb::cast<nb::list>(value)) {
             std::string field_name = std::to_string(list.size());
             from_object(list.push_back(), val, field_name);
         }
     });
-    list.def("append", [](List& list, py::handle& value) {
+    list.def("append", [](List& list, nb::handle& value) {
         auto lock = list.write_lock();
         from_object(list.push_back(), value, std::to_string(list.size() - 1));
     });
@@ -395,18 +394,18 @@ void register_structstore_pybind(py::module_& m) {
         list.erase(index);
         return res;
     });
-    list.def("__add__", [](List& list, py::handle& value) {
+    list.def("__add__", [](List& list, nb::handle& value) {
         auto lock = list.read_lock();
-        return to_list<false>(list) + value.cast<py::list>();
+        return to_list<false>(list) + nb::cast<nb::list>(value);
     });
-    list.def("__iadd__", [](List& list, py::handle& value) {
+    list.def("__iadd__", [](List& list, nb::handle& value) {
         auto lock = list.write_lock();
-        for (const auto& val : value.cast<py::list>()) {
+        for (const auto& val: nb::cast<nb::list>(value)) {
             from_object(list.push_back(), val, std::to_string(list.size() - 1));
         }
         return to_list<false>(list);
     });
-    list.def("__setitem__", [](List& list, size_t index, py::handle& value) {
+    list.def("__setitem__", [](List& list, size_t index, nb::handle& value) {
         auto lock = list.write_lock();
         from_object(list[index], value, std::to_string(index));
     });
@@ -420,8 +419,8 @@ void register_structstore_pybind(py::module_& m) {
     });
     list.def("__iter__", [](List& list) {
         auto lock = list.read_lock();
-        return pybind11::make_iterator(list.begin(), list.end());
-    }, py::keep_alive<0, 1>());
+        return nb::make_iterator(nb::type<List>(), "list_iter", list.begin(), list.end());
+    }, nb::keep_alive<0, 1>());
     list.def("copy", [](const List& list) {
         auto lock = list.read_lock();
         return to_list<false>(list);
@@ -434,7 +433,7 @@ void register_structstore_pybind(py::module_& m) {
         auto lock = list.read_lock();
         return to_list<false>(list);
     });
-    list.def("__deepcopy__", [](const List& list, py::handle&) {
+    list.def("__deepcopy__", [](const List& list, nb::handle&) {
         auto lock = list.read_lock();
         return to_list<true>(list);
     });
@@ -447,18 +446,14 @@ void register_structstore_pybind(py::module_& m) {
 }
 
 // required to make __iter__ method work
-namespace pybind11 {
-    namespace detail {
-        template <> struct type_caster<structstore::StructStoreField> {
-        public:
-            PYBIND11_TYPE_CASTER(structstore::StructStoreField, const_name("StructStoreField"));
-            static handle cast(structstore::StructStoreField& src, return_value_policy, handle) {
-                return structstore::to_object<false>(src).release();
-            }
-        };
-    }
-}
+namespace nanobind::detail {
+template<>
+struct type_caster<structstore::StructStoreField> {
+public:
+    NB_TYPE_CASTER(structstore::StructStoreField, const_name("StructStoreField"))
 
-PYBIND11_MODULE(structstore, m) {
-    structstore::register_structstore_pybind(m);
+    static handle from_cpp(structstore::StructStoreField& src, rv_policy, cleanup_list*) {
+        return structstore::to_object<false>(src).release();
+    }
+};
 }

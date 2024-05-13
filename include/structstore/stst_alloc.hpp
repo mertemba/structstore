@@ -1,5 +1,7 @@
-#ifndef STRUCTSTORE_ALLOC_HPP
-#define STRUCTSTORE_ALLOC_HPP
+#ifndef STST_ALLOC_HPP
+#define STST_ALLOC_HPP
+
+#include "structstore/stst_lock.hpp"
 
 #include <type_traits>
 #include <scoped_allocator>
@@ -7,7 +9,10 @@
 #include <cmath>
 #include <cassert>
 #include <cstring>
-#include "structstore_lock.hpp"
+#include <exception>
+#include <sstream>
+#include <string>
+#include <vector>
 
 namespace structstore {
 

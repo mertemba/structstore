@@ -1,17 +1,18 @@
-#ifndef STRUCTSTORE_HPP
-#define STRUCTSTORE_HPP
+#ifndef STST_STRUCTSTORE_HPP
+#define STST_STRUCTSTORE_HPP
+
+#include "structstore/stst_serialization.hpp"
+#include "structstore/stst_alloc.hpp"
+#include "structstore/stst_field.hpp"
+#include "structstore/stst_lock.hpp"
+#include "structstore/stst_hashstring.hpp"
 
 #include <iostream>
 #include <unordered_map>
+
 #include <yaml-cpp/yaml.h>
 
-#include "serialization.hpp"
-#include "structstore_alloc.hpp"
-#include "structstore_field.hpp"
-#include "structstore_lock.hpp"
-#include "hashstring.hpp"
-
-namespace pybind11 {
+namespace nanobind {
 template<class type_, class ... options>
 struct class_;
 
@@ -22,8 +23,7 @@ struct object;
 
 namespace structstore {
 
-static constexpr size_t malloc_size = 1 << 16;
-static MiniMalloc static_alloc{malloc_size, std::malloc(malloc_size)};
+extern MiniMalloc static_alloc;
 
 class FieldAccess {
     StructStoreField& field;
@@ -153,25 +153,12 @@ public:
         slots.clear();
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const StructStore& self) {
-        os << "{";
-        for (const auto& name: self.slots) {
-            os << '"' << name.str << "\":" << self.fields.at(name) << ",";
-        }
-        os << "}";
-        return os;
-    }
+    friend std::ostream& operator<<(std::ostream& os, const StructStore& self);
 
-    friend YAML::Node to_yaml(const StructStore& self) {
-        YAML::Node root(YAML::NodeType::Map);
-        for (const auto& name: self.slots) {
-            root[name.str] = to_yaml(self.fields.at(name));
-        }
-        return root;
-    }
+    friend YAML::Node to_yaml(const StructStore& self);
 
     template<bool recursive>
-    friend pybind11::object to_object(const StructStore& store);
+    friend nanobind::object to_object(const StructStore& store);
 
     StructStoreField& get_field(HashString name) {
         auto it = fields.find(name);
@@ -227,19 +214,10 @@ public:
 };
 
 template<>
-FieldAccess& FieldAccess::operator=<const char*>(const char* const& value) {
-    get<structstore::string>() = value;
-    return *this;
-}
+FieldAccess& FieldAccess::operator=<const char*>(const char* const& value);
 
 template<>
-FieldAccess& FieldAccess::operator=<std::string>(const std::string& value) {
-    return *this = value.c_str();
-}
-
-static void destruct(StructStore& store) {
-    store.~StructStore();
-}
+FieldAccess& FieldAccess::operator=<std::string>(const std::string& value);
 
 }
 

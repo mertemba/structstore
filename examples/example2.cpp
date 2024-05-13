@@ -1,8 +1,7 @@
 #include <iostream>
-#include <structstore.hpp>
-#include <structstore_shared.hpp>
-#include <structstore_containers.hpp>
 #include <thread>
+
+#include <structstore/structstore.hpp>
 
 namespace stst = structstore;
 

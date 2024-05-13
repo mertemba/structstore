@@ -1,7 +1,7 @@
 # StructStore
 
 Structured object storage, dynamically typed, to be shared between processes.
-Header-only C++17 library and Python bindings.
+C++17 library and Python bindings.
 
 ## Usage examples
 

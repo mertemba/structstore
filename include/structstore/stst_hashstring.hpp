@@ -1,5 +1,5 @@
-#ifndef HASHSTRING_HPP
-#define HASHSTRING_HPP
+#ifndef STST_HASHSTRING_HPP
+#define STST_HASHSTRING_HPP
 
 #include <cstdint>
 #include <cstring>
