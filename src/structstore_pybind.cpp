@@ -273,7 +273,7 @@ void register_structstore_methods(py::class_<T>& cls) {
         auto lock = store.read_lock();
         return to_object<true>(store);
     });
-    cls.def("__copy__", [](T& t, py::handle&) {
+    cls.def("__copy__", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
         return to_object<false>(store);
@@ -430,7 +430,7 @@ void register_structstore_pybind(py::module_& m) {
         auto lock = list.read_lock();
         return to_list<true>(list);
     });
-    list.def("__copy__", [](const List& list, py::handle&) {
+    list.def("__copy__", [](const List& list) {
         auto lock = list.read_lock();
         return to_list<false>(list);
     });
