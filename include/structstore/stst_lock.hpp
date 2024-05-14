@@ -1,8 +1,9 @@
-#ifndef STRUCTSTORE_LOCK_HPP
-#define STRUCTSTORE_LOCK_HPP
+#ifndef STST_LOCK_HPP
+#define STST_LOCK_HPP
+
+#include <unistd.h>
 
 #include <atomic>
-#include <unistd.h>
 
 namespace structstore {
 

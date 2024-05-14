@@ -1,0 +1,15 @@
+include(CMakeFindDependencyMacro)
+find_dependency(yaml-cpp REQUIRED)
+
+check_required_components(StructStore)
+
+get_filename_component(STRUCTSTORE_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+set(STRUCTSTORE_INCLUDE_DIRS
+    "${STRUCTSTORE_CMAKE_DIR}/../include"
+    ${YAML_CPP_LIBRARIES})
+
+if(NOT TARGET StructStore AND NOT STRUCTSTORE_BINARY_DIR)
+  include("${STRUCTSTORE_CMAKE_DIR}/StructStoreTargets.cmake")
+endif()
+
+set(STRUCTSTORE_LIBRARIES structstore_lib)

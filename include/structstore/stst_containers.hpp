@@ -1,7 +1,8 @@
-#ifndef STRUCTSTORE_CONTAINERS_HPP
-#define STRUCTSTORE_CONTAINERS_HPP
+#ifndef STST_CONTAINERS_HPP
+#define STST_CONTAINERS_HPP
 
-#include "structstore.hpp"
+#include "structstore/stst_structstore.hpp"
+#include "structstore/stst_field.hpp"
 
 namespace structstore {
 
@@ -79,13 +80,7 @@ public:
         return {*this, data.size()};
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const List& self) {
-        os << "[";
-        for (const StructStoreField& field: self.data) {
-            os << field << ",";
-        }
-        return os << "]";
-    }
+    friend std::ostream& operator<<(std::ostream& os, const List& self);
 
     SpinMutex& get_mutex() {
         return mutex;
@@ -117,21 +112,7 @@ public:
 };
 
 template<>
-void List::push_back<const char*>(const char* const& value) {
-    push_back().get<structstore::string>() = value;
-}
-
-YAML::Node to_yaml(const List& list) {
-    auto node = YAML::Node(YAML::NodeType::Sequence);
-    for (const StructStoreField& field: list) {
-        node.push_back(to_yaml(field));
-    }
-    return node;
-}
-
-static void destruct(List& list) {
-    list.~List();
-}
+void List::push_back<const char*>(const char* const& value);
 
 class Matrix {
     MiniMalloc& mm_alloc;
@@ -187,7 +168,7 @@ public:
 
     bool is_vector() const { return _is_vector; }
 
-    void from(size_t rows, size_t cols, double* data, bool is_vector) {
+    void from(size_t rows, size_t cols, const double* data, bool is_vector) {
         if (data == _data) {
             if (rows != _rows || cols != _cols) {
                 throw std::runtime_error("setting matrix data to same pointer but different size");
@@ -207,18 +188,8 @@ public:
         std::memcpy(_data, data, sizeof(double) * _rows * _cols);
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const Matrix& self) {
-        os << "[";
-        for (int i = 0; i < self._rows * self._cols; ++i) {
-            os << self._data[i] << ",";
-        }
-        return os << "]";
-    }
+    friend std::ostream& operator<<(std::ostream& os, const Matrix& self);
 };
-
-static void destruct(Matrix& matrix) {
-    matrix.~Matrix();
-}
 
 }
 

@@ -1,11 +1,13 @@
-#ifndef STRUCTSTORE_FIELD_HPP
-#define STRUCTSTORE_FIELD_HPP
+#ifndef STST_FIELD_HPP
+#define STST_FIELD_HPP
+
+#include "structstore/stst_hashstring.hpp"
+#include "structstore/stst_alloc.hpp"
 
 #include <iostream>
 #include <unordered_map>
-#include <yaml-cpp/yaml.h>
 
-#include "hashstring.hpp"
+#include <yaml-cpp/yaml.h>
 
 namespace structstore {
 
@@ -72,11 +74,11 @@ struct FieldType<Matrix> {
     static constexpr auto value = FieldTypeValue::MATRIX;
 };
 
-static void destruct(StructStore& store);
+void destruct(StructStore& store);
 
-static void destruct(List& store);
+void destruct(List& store);
 
-static void destruct(Matrix& store);
+void destruct(Matrix& store);
 
 class StructStoreField {
 private:
@@ -164,14 +166,9 @@ public:
         return type;
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const StructStoreField& self) {
-        serialize_text(os, self.type, self.data);
-        return os;
-    }
+    friend std::ostream& operator<<(std::ostream& os, const StructStoreField& self);
 
-    friend YAML::Node to_yaml(const StructStoreField& self) {
-        return serialize_yaml(self.type, self.data);
-    }
+    friend YAML::Node to_yaml(const StructStoreField& self);
 
     template<typename T>
     T& get() const {
@@ -183,7 +180,7 @@ public:
     }
 
     template<typename T>
-    operator T&() {
+    explicit operator T&() {
         return get<T>();
     }
 

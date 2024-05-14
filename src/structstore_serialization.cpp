@@ -1,63 +1,34 @@
-#ifndef SERIALIZATION_HPP
-#define SERIALIZATION_HPP
+#include "structstore/stst_serialization.hpp"
 
-#include <iostream>
-#include <yaml-cpp/yaml.h>
-#include "structstore_alloc.hpp"
-#include "structstore_field.hpp"
-
-namespace structstore {
-
-std::ostream& operator<<(std::ostream&, const StructStore&);
-
-std::ostream& operator<<(std::ostream&, const List&);
-
-template<typename T>
-void serialize_text(std::ostream& os, void* val) {
-    os << *(T*) val;
-}
+using namespace structstore;
 
 template<>
-void serialize_text<bool>(std::ostream& os, void* val) {
+void structstore::serialize_text<bool>(std::ostream& os, void* val) {
     os << (*(bool*) val ? "true" : "false");
 }
 
 template<>
-void serialize_text<structstore::string>(std::ostream& os, void* val) {
+void structstore::serialize_text<structstore::string>(std::ostream& os, void* val) {
     os << '"' << *(structstore::string*) val << '"';
 }
 
-YAML::Node to_yaml(const int& val) {
+YAML::Node structstore::to_yaml(const int& val) {
     return YAML::Node(val);
 }
 
-YAML::Node to_yaml(const double& val) {
+YAML::Node structstore::to_yaml(const double& val) {
     return YAML::Node(val);
 }
 
-YAML::Node to_yaml(const bool& val) {
+YAML::Node structstore::to_yaml(const bool& val) {
     return YAML::Node(val);
 }
 
-YAML::Node to_yaml(const structstore::string& val) {
+YAML::Node structstore::to_yaml(const structstore::string& val) {
     return YAML::Node(val.c_str());
 }
 
-YAML::Node to_yaml(const StructStore&);
-
-YAML::Node to_yaml(const List&);
-
-template<typename T>
-YAML::Node serialize_yaml(void* val) {
-    return to_yaml(*(T*) val);
-}
-
-using SerializeTextFunc = void(std::ostream&, void*);
-using SerializeYamlFunc = YAML::Node(void*);
-
-enum class FieldTypeValue : uint8_t;
-
-void serialize_text(std::ostream& os, FieldTypeValue type, void* data) {
+void structstore::serialize_text(std::ostream& os, FieldTypeValue type, void* data) {
     switch (type) {
         case FieldTypeValue::EMPTY:
             os << "<empty>";
@@ -88,7 +59,7 @@ void serialize_text(std::ostream& os, FieldTypeValue type, void* data) {
     }
 }
 
-YAML::Node serialize_yaml(FieldTypeValue type, void* data) {
+YAML::Node structstore::serialize_yaml(FieldTypeValue type, void* data) {
     switch (type) {
         case FieldTypeValue::EMPTY:
             return YAML::Node(YAML::Null);
@@ -110,7 +81,3 @@ YAML::Node serialize_yaml(FieldTypeValue type, void* data) {
             throw std::runtime_error("internal error: unknown field type");
     }
 }
-
-}
-
-#endif
