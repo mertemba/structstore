@@ -8,7 +8,7 @@ C++17 library and Python bindings.
 ### C++
 
 ```c++
-#include <structstore.hpp>
+#include <structstore/structstore.hpp>
 namespace stst = structstore;
 
 int main() {

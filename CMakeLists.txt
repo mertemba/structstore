@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(structstore VERSION 0.1.1)
+project(structstore VERSION 0.1.2)
 
 set(PY_VERSION_SUFFIX "")
 set(PY_FULL_VERSION ${PROJECT_VERSION}${PY_VERSION_SUFFIX})
@@ -78,41 +78,48 @@ endforeach ()
 
 # install
 
-if (DEFINED PY_BUILD_CMAKE_PACKAGE_VERSION)
-    install(TARGETS structstore_lib
-            EXPORT StructStoreTargets
-            COMPONENT python_modules
-            DESTINATION ${PY_BUILD_CMAKE_MODULE_NAME})
-    install(TARGETS structstore_bindings
-            COMPONENT python_modules
-            DESTINATION ${PY_BUILD_CMAKE_MODULE_NAME})
-    install(DIRECTORY ${PROJECT_SOURCE_DIR}/include
-            COMPONENT python_modules
-            DESTINATION ${PY_BUILD_CMAKE_MODULE_NAME})
-
-    include(cmake/NanobindStubgen.cmake)
-    nanobind_stubgen(structstore_bindings)
-    nanobind_stubgen_install(structstore_bindings ${PY_BUILD_CMAKE_MODULE_NAME})
-
-    export(TARGETS structstore_lib
-            FILE "${PROJECT_BINARY_DIR}/MyLibTargets.cmake")
-    export(PACKAGE StructStore)
-    configure_file(${PROJECT_SOURCE_DIR}/cmake/StructStoreConfig.cmake.in
-            "${PROJECT_BINARY_DIR}/StructStoreConfig.cmake" @ONLY)
-    configure_file(${PROJECT_SOURCE_DIR}/cmake/StructStoreConfigVersion.cmake.in
-            "${PROJECT_BINARY_DIR}/StructStoreConfigVersion.cmake" @ONLY)
-    install(FILES
-            "${PROJECT_BINARY_DIR}/StructStoreConfig.cmake"
-            "${PROJECT_BINARY_DIR}/StructStoreConfigVersion.cmake"
-            COMPONENT python_modules
-            DESTINATION ${PY_BUILD_CMAKE_MODULE_NAME}/cmake)
-    install(EXPORT StructStoreTargets
-            COMPONENT python_modules
-            DESTINATION ${PY_BUILD_CMAKE_MODULE_NAME}/cmake)
+if (DEFINED PY_BUILD_CMAKE_MODULE_NAME)
+    set(STRUCTSTORE_INSTALL_DIR ${PY_BUILD_CMAKE_MODULE_NAME})
 else ()
     set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
-    install(TARGETS structstore_lib LIBRARY DESTINATION structstore)
-    install(TARGETS structstore_bindings LIBRARY DESTINATION structstore)
+    set(STRUCTSTORE_INSTALL_DIR install)
+endif ()
+
+install(TARGETS structstore_lib
+        EXPORT StructStoreTargets
+        COMPONENT python_modules
+        DESTINATION ${STRUCTSTORE_INSTALL_DIR})
+install(TARGETS structstore_bindings
+        COMPONENT python_modules
+        DESTINATION ${STRUCTSTORE_INSTALL_DIR})
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/include
+        COMPONENT python_modules
+        DESTINATION ${STRUCTSTORE_INSTALL_DIR})
+
+include(cmake/NanobindStubgen.cmake)
+nanobind_stubgen(structstore_bindings)
+nanobind_stubgen_install(structstore_bindings ${STRUCTSTORE_INSTALL_DIR})
+
+# inspired by https://stackoverflow.com/a/49857699
+export(TARGETS structstore_lib
+        FILE "${PROJECT_BINARY_DIR}/StructStoreTargets.cmake")
+export(PACKAGE StructStore)
+configure_file(${PROJECT_SOURCE_DIR}/cmake/StructStoreConfig.cmake.in
+        "${PROJECT_BINARY_DIR}/StructStoreConfig.cmake" @ONLY)
+configure_file(${PROJECT_SOURCE_DIR}/cmake/StructStoreConfigVersion.cmake.in
+        "${PROJECT_BINARY_DIR}/StructStoreConfigVersion.cmake" @ONLY)
+install(FILES
+        "${PROJECT_BINARY_DIR}/StructStoreConfig.cmake"
+        "${PROJECT_BINARY_DIR}/StructStoreConfigVersion.cmake"
+        COMPONENT python_modules
+        DESTINATION ${STRUCTSTORE_INSTALL_DIR}/cmake)
+install(EXPORT StructStoreTargets
+        COMPONENT python_modules
+        DESTINATION ${STRUCTSTORE_INSTALL_DIR}/cmake)
+
+if (NOT DEFINED PY_BUILD_CMAKE_PACKAGE_VERSION)
+    set(STRUCTSTORE_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/include)
+    set(STRUCTSTORE_LIBRARIES structstore_lib)
 
     add_subdirectory(examples)
 endif ()

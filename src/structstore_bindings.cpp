@@ -105,7 +105,7 @@ static void from_object(FieldAccess access, const nb::handle& value, const std::
             from_object(list.push_back(), val, std::to_string(i));
             ++i;
         }
-    } else if (nb::isinstance<nb::ndarray<nb::numpy, double>>(value)) {
+    } else if (nb::ndarray_check(value)) {
         access.set_type<Matrix>();
         auto array = nb::cast<nb::ndarray<nb::numpy, double>>(value);
         size_t rows, cols;
@@ -185,34 +185,29 @@ nb::object to_object(const StructStore& store) {
 
 class SpinLockContextManager {
 
-    SpinMutex* mutex;
-    bool locked;
+    SpinMutex* mutex = nullptr;
 
 public:
 
-    explicit SpinLockContextManager (SpinMutex* mutex)
-        : mutex{mutex}, locked{true} { }
+    explicit SpinLockContextManager(SpinMutex* mutex) : mutex{mutex} {}
 
-    SpinLockContextManager(SpinLockContextManager&& other) noexcept
-            : mutex{other.mutex}, locked{other.locked} {
-        other.locked = false;
+    SpinLockContextManager(SpinLockContextManager&& other) noexcept {
+        std::swap(mutex, other.mutex);
     }
 
     SpinLockContextManager(const SpinLockContextManager&) = delete;
     SpinLockContextManager& operator=(SpinLockContextManager&& other) = delete;
     SpinLockContextManager& operator=(const SpinLockContextManager&) = delete;
 
-    void exit(nb::handle&, nb::handle&, nb::handle&) {
-        if (locked) {
-            locked = false;
+    void unlock() {
+        if (mutex) {
             mutex->unlock();
+            mutex = nullptr;
         }
     }
 
-    ~SpinLockContextManager () {
-        if (locked) {
-            mutex->unlock();
-        }
+    ~SpinLockContextManager() {
+        unlock();
     }
 };
 
@@ -303,7 +298,9 @@ NB_MODULE(MODULE_NAME, m) {
 
     nb::class_<SpinLockContextManager>(m, "SpinLockContextManager")
             .def("__enter__", [](SpinLockContextManager&) {})
-        .def("__exit__", &SpinLockContextManager::exit);
+            .def("__exit__", [](SpinLockContextManager& con_man, nb::handle, nb::handle, nb::handle) {
+                con_man.unlock();
+            }, nb::arg().none(), nb::arg().none(), nb::arg().none());
 
     nb::class_<StructStore> cls = nb::class_<StructStore>{m, "StructStore"};
     cls.def(nb::init<>());

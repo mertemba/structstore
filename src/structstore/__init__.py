@@ -1,8 +1,11 @@
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 
 import pathlib
 
-from ._structstore_bindings import *
+try:
+    from ._structstore_bindings import *
+except ImportError:
+    from install._structstore_bindings import *
 
 
 def cmake_dir() -> str:

@@ -3,7 +3,7 @@ from typing import List
 
 import numpy as np
 
-from lib import structstore
+import structstore
 
 
 @dataclass
@@ -33,7 +33,8 @@ def __main__():
     print(state.deepcopy())
 
     shmem = structstore.StructStoreShared("/dyn_shdata_store", 16384)
-    shmem.state = State(5, 3.14, 'foo', True, Substate(42), [0, 1])
+    with shmem.lock():
+        shmem.state = State(5, 3.14, 'foo', True, Substate(42), [0, 1])
     print(shmem.deepcopy())
 
     shmem2 = structstore.StructStoreShared("/dyn_settings")
