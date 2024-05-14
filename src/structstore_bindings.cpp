@@ -54,7 +54,7 @@ nb::object to_object(const StructStoreField& field) {
                 shape[1] = m.cols();
             }
 
-            return nb::cast(nb::ndarray<nb::numpy, double>(m.data(), ndim, shape, parent));
+            return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), ndim, shape, parent));
         }
         case FieldTypeValue::EMPTY:
             return nb::none();
@@ -96,7 +96,7 @@ static void from_object(FieldAccess access, const nb::handle& value, const std::
         access.get<structstore::string>() = nb::cast<std::string>(value);
     } else if (nb::ndarray_check(value)) {
         access.set_type<Matrix>();
-        auto array = nb::cast<nb::ndarray<const double>>(value);
+        auto array = nb::cast<nb::ndarray<const double, nb::c_contig>>(value);
         size_t rows, cols;
         bool is_vector = false;
         if (array.ndim() == 1) {
