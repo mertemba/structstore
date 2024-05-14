@@ -168,7 +168,7 @@ public:
 
     bool is_vector() const { return _is_vector; }
 
-    void from(size_t rows, size_t cols, double* data, bool is_vector) {
+    void from(size_t rows, size_t cols, const double* data, bool is_vector) {
         if (data == _data) {
             if (rows != _rows || cols != _cols) {
                 throw std::runtime_error("setting matrix data to same pointer but different size");

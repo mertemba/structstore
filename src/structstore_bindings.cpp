@@ -94,20 +94,9 @@ static void from_object(FieldAccess access, const nb::handle& value, const std::
     } else if (nb::isinstance<nb::str>(value)) {
         access.set_type<structstore::string>();
         access.get<structstore::string>() = nb::cast<std::string>(value);
-    } else if (nb::isinstance<nb::list>(value)
-               || nb::isinstance<nb::tuple>(value)
-               || nb::isinstance<List>(value)) {
-        access.set_type<List>();
-        List& list = access.get<List>();
-        list.clear();
-        int i = 0;
-        for (const auto& val: nb::cast<nb::list>(value)) {
-            from_object(list.push_back(), val, std::to_string(i));
-            ++i;
-        }
     } else if (nb::ndarray_check(value)) {
         access.set_type<Matrix>();
-        auto array = nb::cast<nb::ndarray<nb::numpy, double>>(value);
+        auto array = nb::cast<nb::ndarray<const double>>(value);
         size_t rows, cols;
         bool is_vector = false;
         if (array.ndim() == 1) {
@@ -132,7 +121,7 @@ static void from_object(FieldAccess access, const nb::handle& value, const std::
         }
     } else if (nb::hasattr(value, "__slots__")) {
         access.set_type<StructStore>();
-        auto slots = nb::list(value.attr("__slots__"));
+        auto slots = nb::iterable(value.attr("__slots__"));
         StructStore& store = access.get<StructStore>();
         store.clear();
         for (const auto& key: slots) {
@@ -157,6 +146,15 @@ static void from_object(FieldAccess access, const nb::handle& value, const std::
         }
     } else if (value.is_none()) {
         access.clear();
+    } else if (nb::isinstance<nb::iterable>(value)) {
+        access.set_type<List>();
+        List& list = access.get<List>();
+        list.clear();
+        int i = 0;
+        for (const auto& val: nb::cast<nb::iterable>(value)) {
+            from_object(list.push_back(), val, std::to_string(i));
+            ++i;
+        }
     } else {
         std::ostringstream msg;
         msg << "field '" << field_name << "' has unsupported type '" << nb::cast<std::string>(nb::str(value.type()))
@@ -235,10 +233,10 @@ void register_structstore_methods(nb::class_<T>& cls) {
         auto lock = store.write_lock();
         from_object(store[name.c_str()], value, name);
     };
-    cls.def("__getattr__", get_field, nb::rv_policy::reference_internal);
-    cls.def("__setattr__", set_field);
-    cls.def("__getitem__", get_field, nb::rv_policy::reference_internal);
-    cls.def("__setitem__", set_field);
+    cls.def("__getattr__", get_field, nb::arg("name"), nb::rv_policy::reference_internal);
+    cls.def("__setattr__", set_field, nb::arg("name"), nb::arg("value").none());
+    cls.def("__getitem__", get_field, nb::arg("name"), nb::rv_policy::reference_internal);
+    cls.def("__setitem__", set_field, nb::arg("name"), nb::arg("value").none());
     cls.def("lock", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
         store.get_mutex().lock();
@@ -373,10 +371,10 @@ NB_MODULE(MODULE_NAME, m) {
         auto lock = list.write_lock();
         FieldAccess access = list.insert(index);
         from_object(access, value, std::to_string(index));
-    });
-    list.def("extend", [](List& list, nb::handle& value) {
+    }, nb::arg("index"), nb::arg("value").none());
+    list.def("extend", [](List& list, nb::iterable& value) {
         auto lock = list.write_lock();
-        for (const auto& val: nb::cast<nb::list>(value)) {
+        for (const auto& val: value) {
             std::string field_name = std::to_string(list.size());
             from_object(list.push_back(), val, field_name);
         }
@@ -384,20 +382,20 @@ NB_MODULE(MODULE_NAME, m) {
     list.def("append", [](List& list, nb::handle& value) {
         auto lock = list.write_lock();
         from_object(list.push_back(), value, std::to_string(list.size() - 1));
-    });
+    }, nb::arg("value").none());
     list.def("pop", [](List& list, size_t index) {
         auto lock = list.write_lock();
         const auto& res = to_object<true>(list[index].get_field());
         list.erase(index);
         return res;
     });
-    list.def("__add__", [](List& list, nb::handle& value) {
+    list.def("__add__", [](List& list, nb::list& value) {
         auto lock = list.read_lock();
-        return to_list<false>(list) + nb::cast<nb::list>(value);
+        return to_list<false>(list) + value;
     });
-    list.def("__iadd__", [](List& list, nb::handle& value) {
+    list.def("__iadd__", [](List& list, nb::list& value) {
         auto lock = list.write_lock();
-        for (const auto& val: nb::cast<nb::list>(value)) {
+        for (const auto& val: value) {
             from_object(list.push_back(), val, std::to_string(list.size() - 1));
         }
         return to_list<false>(list);
@@ -405,7 +403,7 @@ NB_MODULE(MODULE_NAME, m) {
     list.def("__setitem__", [](List& list, size_t index, nb::handle& value) {
         auto lock = list.write_lock();
         from_object(list[index], value, std::to_string(index));
-    });
+    }, nb::arg("index"), nb::arg("value").none());
     list.def("__getitem__", [](List& list, size_t index) {
         auto lock = list.read_lock();
         return to_object<false>(list[index].get_field());
