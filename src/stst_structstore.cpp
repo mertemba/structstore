@@ -5,9 +5,20 @@ using namespace structstore;
 static constexpr size_t malloc_size = 1 << 16;
 MiniMalloc structstore::static_alloc{malloc_size, std::malloc(malloc_size)};
 
-bool StructStore::has_constructor = typing::register_mm_alloc_constructor<StructStore>();
-
-bool StructStore::has_destructor = typing::register_default_destructor<StructStore>();
+bool StructStore::registered_type = []() {
+    typing::register_type<StructStore>("structstore::StructStore");
+    typing::register_mm_alloc_constructor<StructStore>();
+    typing::register_default_destructor<StructStore>();
+    typing::register_serializer_text<StructStore>(
+            [](std::ostream& os, const StructStore* store) -> std::ostream& {
+                return os << *store;
+            });
+    typing::register_serializer_yaml<StructStore>(
+            [](const StructStore* store) {
+                return to_yaml(*store);
+            });
+    return true;
+}();
 
 std::ostream& structstore::operator<<(std::ostream& os, const StructStore& store) {
     os << "{";
@@ -18,11 +29,6 @@ std::ostream& structstore::operator<<(std::ostream& os, const StructStore& store
     return os;
 }
 
-bool StructStore::has_serializer_text = typing::register_serializer_text<StructStore>(
-        [](std::ostream& os, const StructStore* store) -> std::ostream& {
-            return os << *store;
-        });
-
 YAML::Node structstore::to_yaml(const StructStore& store) {
     YAML::Node root(YAML::NodeType::Map);
     for (const auto& name: store.slots) {
@@ -30,11 +36,6 @@ YAML::Node structstore::to_yaml(const StructStore& store) {
     }
     return root;
 }
-
-bool StructStore::has_serializer_yaml = typing::register_serializer_yaml<StructStore>(
-        [](const StructStore* store) {
-            return to_yaml(*store);
-        });
 
 template<>
 FieldAccess& FieldAccess::operator=<const char*>(const char* const& value) {

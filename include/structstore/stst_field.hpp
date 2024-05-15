@@ -6,7 +6,6 @@
 #include "structstore/stst_typing.hpp"
 
 #include <iostream>
-#include <typeindex>
 
 #include <yaml-cpp/yaml.h>
 
@@ -21,7 +20,7 @@ YAML::Node to_yaml(const StructStoreField& self);
 class StructStoreField {
 private:
     void* data;
-    std::type_index type;
+    uint64_t type_hash;
 
     void assert_nonempty() const {
         if (data == nullptr) {
@@ -36,10 +35,10 @@ private:
     }
 
 public:
-    StructStoreField() : data(nullptr), type(typeid(nullptr_t)) {}
+    StructStoreField() : data(nullptr), type_hash(0) {}
 
     template<typename T>
-    explicit StructStoreField(T* data) : data(data), type(typeid(T)) {}
+    explicit StructStoreField(T* data) : data(data), type_hash(typing::get_type_hash<T>()) {}
 
     StructStoreField(StructStoreField&& other) noexcept: StructStoreField() {
         *this = std::move(other);
@@ -59,7 +58,7 @@ public:
 
     void clear(MiniMalloc& mm_alloc) {
         if (data) {
-            const typing::DestructorFn<>& destructor = typing::get_destructor(type);
+            const typing::DestructorFn<>& destructor = typing::get_destructor(type_hash);
             destructor(mm_alloc, data);
             mm_alloc.deallocate(data);
             data = nullptr;
@@ -72,19 +71,19 @@ public:
             mm_alloc.deallocate(data);
         }
         data = new_data;
-        type = typeid(T);
+        type_hash = typing::get_type_hash<T>();
     }
 
     StructStoreField& operator=(StructStoreField&& other) noexcept {
         std::swap(data, other.data);
-        std::swap(type, other.type);
+        std::swap(type_hash, other.type_hash);
         return *this;
     }
 
     StructStoreField& operator=(const StructStoreField&) = delete;
 
-    [[nodiscard]] std::type_index get_type() const {
-        return type;
+    [[nodiscard]] uint64_t get_type_hash() const {
+        return type_hash;
     }
 
     friend std::ostream& operator<<(std::ostream& os, const StructStoreField& self);
@@ -94,7 +93,7 @@ public:
     template<typename T>
     T& get() const {
         assert_nonempty();
-        if (type != typeid(T)) {
+        if (type_hash != typing::get_type_hash<T>()) {
             throw std::runtime_error("field accessed with wrong type");
         }
         return *(T*) data;

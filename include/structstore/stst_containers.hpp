@@ -8,10 +8,7 @@
 namespace structstore {
 
 class List {
-    static bool has_constructor;
-    static bool has_destructor;
-    static bool has_serializer_text;
-    static bool has_serializer_yaml;
+    static bool registered_type;
 
     MiniMalloc& mm_alloc;
     ::structstore::vector<StructStoreField> data;
@@ -136,9 +133,7 @@ public:
     static constexpr int MAX_DIMS = 8;
 
 protected:
-    static bool has_constructor;
-    static bool has_destructor;
-    static bool has_serializer_text;
+    static bool registered_type;
 
     MiniMalloc& mm_alloc;
     size_t _ndim;

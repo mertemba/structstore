@@ -46,7 +46,7 @@ public:
         }
         StlAllocator<T> tmp_alloc{mm_alloc};
         void* ptr = tmp_alloc.allocate(1);
-        const typing::ConstructorFn<>& constructor = typing::get_constructor(typeid(T));
+        const typing::ConstructorFn<>& constructor = typing::get_constructor(typing::get_type_hash<T>());
         constructor(mm_alloc, ptr);
         field.replace_data<T>(ptr, mm_alloc);
         return field.get<T>();
@@ -75,8 +75,8 @@ public:
         return os << self.field;
     }
 
-    [[nodiscard]] std::type_index get_type() const {
-        return field.get_type();
+    [[nodiscard]] uint64_t get_type_hash() const {
+        return field.get_type_hash();
     }
 
     void clear() {
@@ -85,7 +85,7 @@ public:
 
     template<typename T>
     void set_type() {
-        if (field.get_type() != typeid(T)) {
+        if (field.get_type_hash() != typing::get_type_hash<T>()) {
             clear();
             get<T>();
         }
@@ -99,12 +99,9 @@ class StructStore {
 
     friend class List;
 
-public:
-    static bool has_constructor;
-    static bool has_destructor;
-    static bool has_serializer_text;
-    static bool has_serializer_yaml;
+    static bool registered_type;
 
+public:
     MiniMalloc& mm_alloc;
     StlAllocator<char> alloc;
     mutable SpinMutex mutex;
