@@ -1,11 +1,11 @@
 #ifndef STST_STRUCTSTORE_HPP
 #define STST_STRUCTSTORE_HPP
 
-#include "structstore/stst_serialization.hpp"
 #include "structstore/stst_alloc.hpp"
 #include "structstore/stst_field.hpp"
 #include "structstore/stst_lock.hpp"
 #include "structstore/stst_hashstring.hpp"
+#include "structstore/stst_typing.hpp"
 
 #include <iostream>
 #include <unordered_map>
@@ -40,29 +40,20 @@ public:
 
     template<typename T>
     T& get() {
-        if (field.get_type() != FieldTypeValue::EMPTY) {
+        if (!field.empty()) {
             // field already exists, directly return
             return field.get<T>();
         }
         StlAllocator<T> tmp_alloc{mm_alloc};
-        T* ptr = tmp_alloc.allocate(1);
-        if constexpr (std::is_base_of<StructStore, T>::value) {
-            new(ptr) T(mm_alloc);
-        } else if constexpr (std::is_same<T, structstore::string>::value) {
-            new(ptr) T(tmp_alloc);
-        } else if constexpr (std::is_same<T, structstore::List>::value) {
-            new(ptr) T(mm_alloc);
-        } else if constexpr (std::is_same<T, structstore::Matrix>::value) {
-            new(ptr) T(mm_alloc);
-        } else {
-            new(ptr) T();
-        }
-        field.replace_data(ptr, mm_alloc);
+        void* ptr = tmp_alloc.allocate(1);
+        const typing::ConstructorFn<>& constructor = typing::get_constructor(typeid(T));
+        constructor(mm_alloc, ptr);
+        field.replace_data<T>(ptr, mm_alloc);
         return field.get<T>();
     }
 
-    structstore::string& get_str() {
-        return get<structstore::string>();
+    ::structstore::string& get_str() {
+        return get<::structstore::string>();
     }
 
     template<typename T>
@@ -84,7 +75,7 @@ public:
         return os << self.field;
     }
 
-    [[nodiscard]] FieldTypeValue get_type() const {
+    [[nodiscard]] std::type_index get_type() const {
         return field.get_type();
     }
 
@@ -94,7 +85,7 @@ public:
 
     template<typename T>
     void set_type() {
-        if (field.get_type() != FieldType<T>::value) {
+        if (field.get_type() != typeid(T)) {
             clear();
             get<T>();
         }
@@ -109,6 +100,11 @@ class StructStore {
     friend class List;
 
 public:
+    static bool has_constructor;
+    static bool has_destructor;
+    static bool has_serializer_text;
+    static bool has_serializer_yaml;
+
     MiniMalloc& mm_alloc;
     StlAllocator<char> alloc;
     mutable SpinMutex mutex;
@@ -176,6 +172,10 @@ public:
     template<typename T>
     T& get_hashed(HashString name) {
         return (*this)[name];
+    }
+
+    StructStore& substore(const char* name) {
+        return get<StructStore>(name);
     }
 
     FieldAccess operator[](HashString name) {

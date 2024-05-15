@@ -3,12 +3,18 @@
 
 #include "structstore/stst_structstore.hpp"
 #include "structstore/stst_field.hpp"
+#include "structstore/stst_typing.hpp"
 
 namespace structstore {
 
 class List {
+    static bool has_constructor;
+    static bool has_destructor;
+    static bool has_serializer_text;
+    static bool has_serializer_yaml;
+
     MiniMalloc& mm_alloc;
-    structstore::vector<StructStoreField> data;
+    ::structstore::vector<StructStoreField> data;
     mutable SpinMutex mutex;
 
 public:
@@ -90,8 +96,6 @@ public:
         return {*this, data.size()};
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const List& self);
-
     SpinMutex& get_mutex() {
         return mutex;
     }
@@ -132,6 +136,10 @@ public:
     static constexpr int MAX_DIMS = 8;
 
 protected:
+    static bool has_constructor;
+    static bool has_destructor;
+    static bool has_serializer_text;
+
     MiniMalloc& mm_alloc;
     size_t _ndim;
     size_t _shape[MAX_DIMS] = {};
@@ -216,8 +224,6 @@ public:
             }
         }
     }
-
-    friend std::ostream& operator<<(std::ostream& os, const Matrix& self);
 };
 
 }
