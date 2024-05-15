@@ -46,7 +46,7 @@ struct Settings {
     int& num = store["num"] = 5;
     bool& flag = store["flag"] = true;
     stst::string& str = store["str"] = "foo";
-    Subsettings subsettings{store.get<stst::StructStore>("subsettings")};
+    Subsettings subsettings{store.substore("subsettings")};
     
     explicit Settings(stst::StructStore& store) : store(store) {}
 };

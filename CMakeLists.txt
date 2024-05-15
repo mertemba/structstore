@@ -30,11 +30,11 @@ file(GLOB STRUCTSTORE_INC_FILES
         ${PROJECT_SOURCE_DIR}/include/*.hpp)
 
 set(STRUCTSTORE_SRC_FILES
-        ${PROJECT_SOURCE_DIR}/src/structstore.cpp
-        ${PROJECT_SOURCE_DIR}/src/structstore_containers.cpp
-        ${PROJECT_SOURCE_DIR}/src/structstore_field.cpp
-        ${PROJECT_SOURCE_DIR}/src/structstore_serialization.cpp
-        ${PROJECT_SOURCE_DIR}/src/structstore_shared.cpp)
+        ${PROJECT_SOURCE_DIR}/src/stst_containers.cpp
+        ${PROJECT_SOURCE_DIR}/src/stst_field.cpp
+        ${PROJECT_SOURCE_DIR}/src/stst_shared.cpp
+        ${PROJECT_SOURCE_DIR}/src/stst_structstore.cpp
+        ${PROJECT_SOURCE_DIR}/src/stst_typing.cpp)
 
 set(STRUCTSTORE_INC_DIRS
         ${YAML_CPP_INCLUDE_DIRS}
@@ -49,7 +49,7 @@ set_target_properties(structstore_lib PROPERTIES
         ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib
         ARCHIVE_OUTPUT_NAME structstore)
 
-nanobind_add_module(structstore_bindings src/structstore_bindings.cpp)
+nanobind_add_module(structstore_bindings src/stst_bindings.cpp)
 target_link_libraries(structstore_bindings PRIVATE structstore_lib)
 set_target_properties(structstore_bindings PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib

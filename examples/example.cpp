@@ -20,7 +20,7 @@ struct Settings {
     double& value = store["value"] = 3.14;
     bool& flag = store["flag"] = true;
     stst::string& str = store["str"] = (const char*) "foo";
-    Subsettings subsettings{store.get<stst::StructStore>("subsettings")};
+    Subsettings subsettings{store.substore("subsettings")};
 
     explicit Settings(stst::StructStore& store) : store(store) {}
 };
