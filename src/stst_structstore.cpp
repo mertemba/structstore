@@ -9,10 +9,7 @@ void StructStore::register_type() {
     typing::register_type<StructStore>("structstore::StructStore");
     typing::register_mm_alloc_constructor<StructStore>();
     typing::register_default_destructor<StructStore>();
-    typing::register_serializer_text<StructStore>(
-            [](std::ostream& os, const StructStore* store) -> std::ostream& {
-                return os << *store;
-            });
+    typing::register_default_serializer_text<StructStore>();
     typing::register_serializer_yaml<StructStore>(
             [](const StructStore* store) {
                 return to_yaml(*store);
