@@ -129,7 +129,13 @@ public:
 
     StructStore(StructStore&&) = delete;
 
-    StructStore& operator=(const StructStore&) = delete;
+    StructStore& operator=(const StructStore& other) {
+        if (other.fields.empty()) {
+            clear();
+            return *this;
+        }
+        throw std::runtime_error("copy assignment of structstore::StructStore is not supported");
+    }
 
     StructStore& operator=(StructStore&&) = delete;
 

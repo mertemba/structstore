@@ -83,13 +83,21 @@ public:
     }
 
     template<typename T_cpp>
-    static void register_object_from_python_trivial() {
-        // trivial handler: assignment to itself does nothing
+    static void register_object_from_python() {
         register_from_python_fn([](FieldAccess access, const nanobind::handle& value) {
             uint64_t type_hash = typing::get_type_hash<T_cpp>();
-            if (access.get_type_hash() == type_hash && nanobind::isinstance<T_cpp>(value)
-                && &nanobind::cast<T_cpp&>(value) == &access.get<T_cpp>()) {
-                return true;
+            if (access.get_field().empty() || access.get_type_hash() == type_hash) {
+                try {
+                    T_cpp& value_cpp = nanobind::cast<T_cpp&>(value, false);
+                    access.set_type<T_cpp>();
+                    T_cpp& field_cpp = access.get<T_cpp>();
+                    if (&value_cpp == &field_cpp) {
+                        return true;
+                    }
+                    access.get<T_cpp>() = value_cpp;
+                    return true;
+                } catch (const nanobind::cast_error&) {
+                }
             }
             return false;
         });
