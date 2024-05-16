@@ -56,7 +56,13 @@ public:
 
     List(List&&) = delete;
 
-    List& operator=(const List&) = delete;
+    List& operator=(const List& other) {
+        if (other.data.empty()) {
+            clear();
+            return *this;
+        }
+        throw std::runtime_error("copy assignment of structstore::List is not supported");
+    }
 
     List& operator=(List&&) = delete;
 

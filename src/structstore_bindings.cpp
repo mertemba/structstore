@@ -41,7 +41,7 @@ static bool registered_common_bindings = []() {
 
     // structstore::StructStore
     bindings::register_object_to_python<StructStore>();
-    bindings::register_object_from_python_trivial<StructStore>();
+    bindings::register_object_from_python<StructStore>();
     bindings::register_from_python_fn([](FieldAccess access, const nanobind::handle& value) {
         if (nb::hasattr(value, "__dict__")) {
             access.set_type<StructStore>();
@@ -88,7 +88,7 @@ static bool registered_common_bindings = []() {
 
     // structstore::List
     bindings::register_object_to_python<List>();
-    bindings::register_object_from_python_trivial<List>();
+    bindings::register_object_from_python<List>();
     bindings::register_from_python_fn([](FieldAccess access, const nanobind::handle& value) {
         if (nb::isinstance<nb::list>(value) || nb::isinstance<nb::tuple>(value)) {
             access.set_type<List>();
@@ -127,7 +127,6 @@ static bool registered_common_bindings = []() {
                     return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), ndim, shape));
                 }
             });
-    bindings::register_object_from_python_trivial<Matrix>();
     bindings::register_from_python_fn([](FieldAccess access, const nanobind::handle& value) {
         if (nb::ndarray_check(value)) {
             access.set_type<Matrix>();
@@ -373,6 +372,9 @@ NB_MODULE(MODULE_NAME, m) {
         shs.from_buffer((void*) buffer.c_str(), buffer.size());
     });
     shcls.def("close", &StructStoreShared::close);
+    shcls.def_prop_ro("store", [](StructStoreShared& store) -> StructStore& {
+        return *store;
+    });
 
     auto list = nb::class_<List>(m, "StructStoreList");
     list.def("__repr__", [](const List& list) {
