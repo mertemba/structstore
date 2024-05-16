@@ -5,7 +5,7 @@ using namespace structstore;
 static constexpr size_t malloc_size = 1 << 16;
 MiniMalloc structstore::static_alloc{malloc_size, std::malloc(malloc_size)};
 
-bool StructStore::registered_type = []() {
+void StructStore::register_type() {
     typing::register_type<StructStore>("structstore::StructStore");
     typing::register_mm_alloc_constructor<StructStore>();
     typing::register_default_destructor<StructStore>();
@@ -17,8 +17,7 @@ bool StructStore::registered_type = []() {
             [](const StructStore* store) {
                 return to_yaml(*store);
             });
-    return true;
-}();
+};
 
 std::ostream& structstore::operator<<(std::ostream& os, const StructStore& store) {
     os << "{";

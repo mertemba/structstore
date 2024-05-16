@@ -44,7 +44,7 @@ private:
 
 public:
 
-    static bool register_common_types();
+    static void register_common_types();
 
     template<typename T>
     static bool register_type(const char* name) {
@@ -67,7 +67,7 @@ public:
     }
 
     template<typename T>
-    static const uint64_t& get_type_hash() {
+    static uint64_t get_type_hash() {
         return get_type_hashes().at(typeid(T));
     }
 
