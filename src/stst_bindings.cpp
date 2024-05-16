@@ -183,6 +183,9 @@ static bool registered_common_bindings = []() {
 }();
 
 nb::object structstore::to_object(const StructStoreField& field, bool recursive) {
+    if (field.empty()) {
+        return nb::none();
+    }
     uint64_t type_hash = field.get_type_hash();
     try {
         bindings::ToPythonFn to_python_fn = bindings::get_to_python_fns().at(type_hash);
