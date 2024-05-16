@@ -8,11 +8,13 @@
 namespace structstore {
 
 class List {
-    static bool registered_type;
-
     MiniMalloc& mm_alloc;
     ::structstore::vector<StructStoreField> data;
     mutable SpinMutex mutex;
+
+    static void register_type();
+
+    friend void typing::register_common_types();
 
 public:
     class Iterator {
@@ -123,6 +125,10 @@ public:
     [[nodiscard]] auto read_lock() const {
         return ScopedLock(mutex);
     }
+
+    friend std::ostream& operator<<(std::ostream& os, const List& self);
+
+    friend YAML::Node to_yaml(const List& self);
 };
 
 template<>
@@ -133,12 +139,14 @@ public:
     static constexpr int MAX_DIMS = 8;
 
 protected:
-    static bool registered_type;
-
     MiniMalloc& mm_alloc;
     size_t _ndim;
     size_t _shape[MAX_DIMS] = {};
     double* _data;
+
+    static void register_type();
+
+    friend void typing::register_common_types();
 
 public:
     Matrix(MiniMalloc& mm_alloc) : Matrix(0, 0, mm_alloc) {}
@@ -219,6 +227,8 @@ public:
             }
         }
     }
+
+    friend std::ostream& operator<<(std::ostream& os, const Matrix& matrix);
 };
 
 }

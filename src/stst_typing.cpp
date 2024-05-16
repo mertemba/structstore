@@ -1,5 +1,5 @@
 #include "structstore/stst_typing.hpp"
-#include "structstore/stst_field.hpp"
+#include "structstore/stst_containers.hpp"
 
 using namespace structstore;
 
@@ -58,9 +58,17 @@ static bool register_common_types_() {
     return true;
 }
 
-bool typing::register_common_types() {
+void typing::register_common_types() {
     static bool success = register_common_types_();
-    return success;
+    if (success) {
+        List::register_type();
+        Matrix::register_type();
+        StructStore::register_type();
+    }
+    success = false;
 }
 
-static bool registered_common_types = []() { return typing::register_common_types(); }();
+static bool registered_common_types = []() {
+    typing::register_common_types();
+    return true;
+}();

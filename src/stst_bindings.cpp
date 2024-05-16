@@ -1,162 +1,222 @@
+#include "structstore/structstore.hpp"
+#include "structstore/stst_bindings.hpp"
+
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 #include <nanobind/make_iterator.h>
 #include <nanobind/stl/string.h>
-#include "structstore/structstore.hpp"
 
-namespace structstore {
+using namespace structstore;
 
 namespace nb = nanobind;
 
 static nb::object SimpleNamespace;
 
-template<bool recursive>
-nb::object to_list(const List& list);
+namespace structstore {
+nb::object to_object(const List& list, bool recursive);
 
-template<bool recursive>
-nb::object to_object(const StructStoreField& field) {
-    switch (field.get_type()) {
-        case FieldTypeValue::INT:
-            return nb::int_(field.get<int>());
-        case FieldTypeValue::DOUBLE:
-            return nb::float_(field.get<double>());
-        case FieldTypeValue::STRING:
-            return nb::str(field.get<structstore::string>().c_str());
-        case FieldTypeValue::BOOL:
-            return nb::bool_(field.get<bool>());
-        case FieldTypeValue::STRUCT:
-            if constexpr (recursive) {
-                return to_object<true>(field.get<StructStore>());
-            } else {
-                return nb::cast(field.get<StructStore>(), nb::rv_policy::reference);
-            }
-        case FieldTypeValue::LIST:
-            if constexpr (recursive) {
-                return to_list<true>(field.get<List>());
-            } else {
-                return nb::cast(field.get<List>(), nb::rv_policy::reference);
-            }
-        case FieldTypeValue::MATRIX: {
-            Matrix& m = field.get<Matrix>();
-            if constexpr (recursive) {
-                return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), {}),
-                                nb::rv_policy::copy);
-            } else {
-                return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), {}));
-            }
-        }
-        case FieldTypeValue::EMPTY:
-            return nb::none();
-        default:
-            throw std::runtime_error("this type cannot be stored in a StructStore");
-    }
+nb::object to_object(const StructStoreField& field, bool recursive);
+
+void from_object(FieldAccess access, const nb::handle& value, const std::string& field_name);
 }
 
-static void from_object(FieldAccess access, const nb::handle& value, const std::string& field_name) {
-    if (nb::isinstance<List>(value)
-            && access.get_type() == FieldTypeValue::LIST) {
-        if (&nb::cast<List&>(value) == &access.get<List>()) {
-            return;
+std::vector<bindings::FromPythonFn>& bindings::get_from_python_fns() {
+    static auto* from_python_fns = new std::vector<bindings::FromPythonFn>();
+    return *from_python_fns;
+}
+
+std::unordered_map<uint64_t, bindings::ToPythonFn>& bindings::get_to_python_fns() {
+    static auto* to_python_fns = new std::unordered_map<uint64_t, bindings::ToPythonFn>();
+    return *to_python_fns;
+}
+
+template<typename T_cpp, typename T_py>
+static void register_basic_binding() {
+    bindings::register_to_python_fn<T_cpp>([](const StructStoreField& field, bool recursive) -> nb::object {
+        return T_py(field.get<T_cpp>());
+    });
+    bindings::register_from_python_fn([](FieldAccess access, const nanobind::handle& value) {
+        if (nb::isinstance<T_py>(value)) {
+            access.set_type<T_cpp>();
+            access.get<T_cpp>() = nb::cast<T_cpp>(value);
+            return true;
         }
-    }
-    if (nb::isinstance<StructStore>(value)
-            && access.get_type() == FieldTypeValue::STRUCT) {
-        if (&nb::cast<StructStore&>(value) == &access.get<StructStore>()) {
-            return;
+        return false;
+    });
+}
+
+template<typename T_cpp>
+static void register_object_to_python() {
+    bindings::register_to_python_fn<T_cpp>([](const StructStoreField& field, bool recursive) -> nb::object {
+        if (recursive) {
+            return to_object(field.get<T_cpp>(), true);
+        } else {
+            return nb::cast(field.get<T_cpp>(), nb::rv_policy::reference);
         }
-    }
-    if (nb::isinstance<Matrix>(value)
-            && access.get_type() == FieldTypeValue::MATRIX) {
-        if (&nb::cast<Matrix&>(value) == &access.get<Matrix>()) {
-            return;
+    });
+}
+
+template<typename T_cpp>
+static void register_object_from_python_trivial() {
+    // trivial handler: assignment to itself does nothing
+    bindings::register_from_python_fn([](FieldAccess access, const nanobind::handle& value) {
+        uint64_t type_hash = typing::get_type_hash<T_cpp>();
+        if (access.get_type_hash() == type_hash && nb::isinstance<T_cpp>(value)
+            && &nb::cast<T_cpp&>(value) == &access.get<T_cpp>()) {
+            return true;
         }
-    }
-    if (nb::isinstance<nb::bool_>(value)) {
-        access.set_type<bool>();
-        access.get<bool>() = nb::cast<bool>(value);
-    } else if (nb::isinstance<nb::int_>(value)) {
-        access.set_type<int>();
-        access.get<int>() = nb::cast<int>(value);
-    } else if (nb::isinstance<nb::float_>(value)) {
-        access.set_type<double>();
-        access.get<double>() = nb::cast<double>(value);
-    } else if (nb::isinstance<nb::str>(value)) {
-        access.set_type<structstore::string>();
-        access.get<structstore::string>() = nb::cast<std::string>(value);
-    } else if (nb::ndarray_check(value)) {
-        access.set_type<Matrix>();
-        auto array = nb::cast<nb::ndarray<const double, nb::c_contig>>(value);
-        if (array.ndim() > Matrix::MAX_DIMS) {
-            throw std::runtime_error("Incompatible buffer dimension!");
+        return false;
+    });
+}
+
+static bool registered_common_bindings = []() {
+    typing::register_common_types();
+    register_basic_binding<int, nb::int_>();
+    register_basic_binding<double, nb::float_>();
+    register_basic_binding<bool, nb::bool_>();
+
+    // structstore::string
+    bindings::register_to_python_fn<structstore::string>(
+            [](const StructStoreField& field, bool recursive) -> nb::object {
+                return nb::str(field.get<structstore::string>().c_str());
+            });
+    bindings::register_from_python_fn([](FieldAccess access, const nanobind::handle& value) {
+        if (nb::isinstance<nb::str>(value)) {
+            access.set_type<structstore::string>();
+            access.get<structstore::string>() = nb::cast<std::string>(value);
+            return true;
         }
-        access.get<Matrix>().from(array.ndim(), (const size_t*) array.shape_ptr(), array.data());
-    } else if (nb::hasattr(value, "__dict__")) {
-        access.set_type<StructStore>();
-        auto dict = nb::dict(value.attr("__dict__"));
-        StructStore& store = access.get<StructStore>();
-        store.clear();
-        for (const auto& [key, val]: dict) {
-            std::string key_str = nb::cast<std::string>(key);
-            from_object(store[key_str.c_str()], dict[key], key_str);
-        }
-    } else if (nb::hasattr(value, "__slots__")) {
-        access.set_type<StructStore>();
-        auto slots = nb::iterable(value.attr("__slots__"));
-        StructStore& store = access.get<StructStore>();
-        store.clear();
-        for (const auto& key: slots) {
-            std::string key_str = nb::cast<std::string>(key);
-            from_object(store[key_str.c_str()], nb::getattr(value, key), key_str);
-        }
-    } else if (nb::isinstance<nb::dict>(value)) {
-        access.set_type<StructStore>();
-        nb::dict dict = nb::cast<nb::dict>(value);
-        StructStore& store = access.get<StructStore>();
-        store.clear();
-        for (const auto& [key, val]: dict) {
-            if (!nb::isinstance<nb::str>(key)) {
-                std::ostringstream msg;
-                msg << "Key '" << nb::cast<std::string>(nb::str(key))
-                    << "' has unsupported type '" << nb::cast<std::string>(nb::str(key.type()))
-                    << "'! Only string keys are supported.";
-                throw nb::type_error(msg.str().c_str());
+        return false;
+    });
+
+    // structstore::StructStore
+    register_object_to_python<StructStore>();
+    register_object_from_python_trivial<StructStore>();
+    bindings::register_from_python_fn([](FieldAccess access, const nanobind::handle& value) {
+        if (nb::hasattr(value, "__dict__")) {
+            access.set_type<StructStore>();
+            auto dict = nb::dict(value.attr("__dict__"));
+            StructStore& store = access.get<StructStore>();
+            store.clear();
+            for (const auto& [key, val]: dict) {
+                std::string key_str = nb::cast<std::string>(key);
+                from_object(store[key_str.c_str()], dict[key], key_str);
             }
-            std::string key_str = nb::cast<std::string>(key);
-            from_object(store[key_str.c_str()], dict[key], key_str);
+            return true;
         }
-    } else if (value.is_none()) {
+        if (nb::hasattr(value, "__slots__")) {
+            access.set_type<StructStore>();
+            auto slots = nb::iterable(value.attr("__slots__"));
+            StructStore& store = access.get<StructStore>();
+            store.clear();
+            for (const auto& key: slots) {
+                std::string key_str = nb::cast<std::string>(key);
+                from_object(store[key_str.c_str()], nb::getattr(value, key), key_str);
+            }
+            return true;
+        }
+        if (nb::isinstance<nb::dict>(value)) {
+            access.set_type<StructStore>();
+            nb::dict dict = nb::cast<nb::dict>(value);
+            StructStore& store = access.get<StructStore>();
+            store.clear();
+            for (const auto& [key, val]: dict) {
+                if (!nb::isinstance<nb::str>(key)) {
+                    std::ostringstream msg;
+                    msg << "Key '" << nb::cast<std::string>(nb::str(key))
+                        << "' has unsupported type '" << nb::cast<std::string>(nb::str(key.type()))
+                        << "'! Only string keys are supported.";
+                    throw nb::type_error(msg.str().c_str());
+                }
+                std::string key_str = nb::cast<std::string>(key);
+                from_object(store[key_str.c_str()], dict[key], key_str);
+            }
+            return true;
+        }
+        return false;
+    });
+
+    // structstore::List
+    register_object_to_python<List>();
+    register_object_from_python_trivial<List>();
+    bindings::register_from_python_fn([](FieldAccess access, const nanobind::handle& value) {
+        if (nb::isinstance<nb::list>(value) || nb::isinstance<nb::tuple>(value)) {
+            access.set_type<List>();
+            List& list = access.get<List>();
+            list.clear();
+            int i = 0;
+            for (const auto& val: nb::cast<nb::iterable>(value)) {
+                from_object(list.push_back(), val, std::to_string(i));
+                ++i;
+            }
+            return true;
+        }
+        return false;
+    });
+
+    // structstore::Matrix
+    bindings::register_to_python_fn<structstore::Matrix>(
+            [](const StructStoreField& field, bool recursive) -> nb::object {
+                Matrix& m = field.get<Matrix>();
+                if (recursive) {
+                    return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape()),
+                                    nb::rv_policy::copy);
+                } else {
+                    return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape()));
+                }
+            });
+    register_object_from_python_trivial<Matrix>();
+    bindings::register_from_python_fn([](FieldAccess access, const nanobind::handle& value) {
+        if (nb::ndarray_check(value)) {
+            access.set_type<Matrix>();
+            auto array = nb::cast<nb::ndarray<const double, nb::c_contig>>(value);
+            if (array.ndim() > Matrix::MAX_DIMS) {
+                throw std::runtime_error("Incompatible buffer dimension!");
+            }
+            access.get<Matrix>().from(array.ndim(), (const size_t*) array.shape_ptr(), array.data());
+            return true;
+        }
+        return false;
+    });
+
+    return true;
+}();
+
+nb::object structstore::to_object(const StructStoreField& field, bool recursive) {
+    uint64_t type_hash = field.get_type_hash();
+    bindings::ToPythonFn to_python_fn = bindings::get_to_python_fns().at(type_hash);
+    return to_python_fn(field, recursive);
+}
+
+void structstore::from_object(FieldAccess access, const nb::handle& value, const std::string& field_name) {
+    if (value.is_none()) {
         access.clear();
-    } else if (nb::isinstance<nb::iterable>(value)) {
-        access.set_type<List>();
-        List& list = access.get<List>();
-        list.clear();
-        int i = 0;
-        for (const auto& val: nb::cast<nb::iterable>(value)) {
-            from_object(list.push_back(), val, std::to_string(i));
-            ++i;
-        }
-    } else {
-        std::ostringstream msg;
-        msg << "field '" << field_name << "' has unsupported type '" << nb::cast<std::string>(nb::str(value.type()))
-            << "'";
-        throw nb::type_error(msg.str().c_str());
+        return;
     }
+    for (const bindings::FromPythonFn& from_python_fn: bindings::get_from_python_fns()) {
+        bool success = from_python_fn(access, value);
+        if (success) {
+            return;
+        }
+    }
+    std::ostringstream msg;
+    msg << "field '" << field_name << "' has unsupported type '" << nb::cast<std::string>(nb::str(value.type()))
+        << "'";
+    throw nb::type_error(msg.str().c_str());
 }
 
-template<bool recursive>
-nb::object to_list(const List& list) {
+nb::object structstore::to_object(const List& list, bool recursive) {
     auto pylist = nb::list();
     for (const StructStoreField& field: list) {
-        pylist.append(to_object<recursive>(field));
+        pylist.append(to_object(field, recursive));
     }
     return pylist;
 }
 
-template<bool recursive>
-nb::object to_object(const StructStore& store) {
+nb::object structstore::to_object(const StructStore& store, bool recursive) {
     auto obj = SimpleNamespace();
     for (const auto& name: store.slots) {
-        nb::setattr(obj, name.str, to_object<recursive>(store.fields.at(name)));
+        nb::setattr(obj, name.str, to_object(store.fields.at(name), recursive));
     }
     return obj;
 }
@@ -206,7 +266,7 @@ void register_structstore_methods(nb::class_<T>& cls) {
         if (field == nullptr) {
             throw nb::attribute_error();
         }
-        return to_object<false>(*field);
+        return to_object(*field, false);
     };
     auto set_field = [](T& t, const std::string& name, const nb::object& value) {
         StructStore& store = static_cast<StructStore&>(t);
@@ -237,22 +297,22 @@ void register_structstore_methods(nb::class_<T>& cls) {
     cls.def("copy", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
-        return to_object<false>(store);
+        return to_object(store, false);
     });
     cls.def("deepcopy", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
-        return to_object<true>(store);
+        return to_object(store, true);
     });
     cls.def("__copy__", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
-        return to_object<false>(store);
+        return to_object(store, false);
     });
     cls.def("__deepcopy__", [](T& t, nb::handle&) {
         StructStore& store = static_cast<StructStore&>(t);
         auto lock = store.read_lock();
-        return to_object<true>(store);
+        return to_object(store, true);
     });
     cls.def("size", [](T& t) {
         StructStore& store = static_cast<StructStore&>(t);
@@ -365,20 +425,20 @@ NB_MODULE(MODULE_NAME, m) {
     }, nb::arg("value").none());
     list.def("pop", [](List& list, size_t index) {
         auto lock = list.write_lock();
-        const auto& res = to_object<true>(list[index].get_field());
+        const auto& res = to_object(list[index].get_field(), true);
         list.erase(index);
         return res;
     });
     list.def("__add__", [](List& list, nb::list& value) {
         auto lock = list.read_lock();
-        return to_list<false>(list) + value;
+        return to_object(list, false) + value;
     });
     list.def("__iadd__", [](List& list, nb::list& value) {
         auto lock = list.write_lock();
         for (const auto& val: value) {
             from_object(list.push_back(), val, std::to_string(list.size() - 1));
         }
-        return to_list<false>(list);
+        return to_object(list, false);
     });
     list.def("__setitem__", [](List& list, size_t index, nb::handle& value) {
         auto lock = list.write_lock();
@@ -386,7 +446,7 @@ NB_MODULE(MODULE_NAME, m) {
     }, nb::arg("index"), nb::arg("value").none());
     list.def("__getitem__", [](List& list, size_t index) {
         auto lock = list.read_lock();
-        return to_object<false>(list[index].get_field());
+        return to_object(list[index].get_field(), false);
     });
     list.def("__delitem__", [](List& list, size_t index) {
         auto lock = list.write_lock();
@@ -398,26 +458,24 @@ NB_MODULE(MODULE_NAME, m) {
     }, nb::keep_alive<0, 1>());
     list.def("copy", [](const List& list) {
         auto lock = list.read_lock();
-        return to_list<false>(list);
+        return to_object(list, false);
     });
     list.def("deepcopy", [](const List& list) {
         auto lock = list.read_lock();
-        return to_list<true>(list);
+        return to_object(list, true);
     });
     list.def("__copy__", [](const List& list) {
         auto lock = list.read_lock();
-        return to_list<false>(list);
+        return to_object(list, false);
     });
     list.def("__deepcopy__", [](const List& list, nb::handle&) {
         auto lock = list.read_lock();
-        return to_list<true>(list);
+        return to_object(list, true);
     });
     list.def("clear", [](List& list) {
         auto lock = list.write_lock();
         list.clear();
     });
-}
-
 }
 
 // required to make __iter__ method work
@@ -428,7 +486,7 @@ public:
     NB_TYPE_CASTER(structstore::StructStoreField, const_name("StructStoreField"))
 
     static handle from_cpp(structstore::StructStoreField& src, rv_policy, cleanup_list*) {
-        return structstore::to_object<false>(src).release();
+        return structstore::to_object(src, false).release();
     }
 };
 }

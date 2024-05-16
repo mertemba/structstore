@@ -99,7 +99,9 @@ class StructStore {
 
     friend class List;
 
-    static bool registered_type;
+    static void register_type();
+
+    friend void typing::register_common_types();
 
 public:
     MiniMalloc& mm_alloc;
@@ -150,8 +152,7 @@ public:
 
     friend YAML::Node to_yaml(const StructStore& self);
 
-    template<bool recursive>
-    friend nanobind::object to_object(const StructStore& store);
+    friend nanobind::object to_object(const StructStore& store, bool recursive);
 
     StructStoreField* try_get_field(HashString name) {
         auto it = fields.find(name);
