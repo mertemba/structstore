@@ -68,11 +68,23 @@ public:
 
     template<typename T>
     static uint64_t get_type_hash() {
-        return get_type_hashes().at(typeid(T));
+        try {
+            return get_type_hashes().at(typeid(T));
+        } catch (const std::out_of_range&) {
+            std::ostringstream str;
+            str << "error at get_type_hash() for type '" << typeid(T).name() << "'";
+            throw std::runtime_error(str.str());
+        }
     }
 
     static const std::string& get_type_name(uint64_t type_hash) {
-        return get_type_names().at(type_hash);
+        try {
+            return get_type_names().at(type_hash);
+        } catch (const std::out_of_range&) {
+            std::ostringstream str;
+            str << "error at get_type_name() for hash '" << type_hash << "'";
+            throw std::runtime_error(str.str());
+        }
     }
 
     template<typename T>
@@ -175,19 +187,43 @@ public:
     }
 
     static ConstructorFn<>& get_constructor(uint64_t type_hash) {
-        return get_constructors().at(type_hash);
+        try{
+            return get_constructors().at(type_hash);
+        } catch (const std::out_of_range&) {
+            std::ostringstream str;
+            str << "error at get_constructor() for type '" << get_type_name(type_hash) << "'";
+            throw std::runtime_error(str.str());
+        }
     }
 
     static const DestructorFn<>& get_destructor(uint64_t type_hash) {
-        return get_destructors().at(type_hash);
+        try{
+            return get_destructors().at(type_hash);
+        } catch (const std::out_of_range&) {
+            std::ostringstream str;
+            str << "error at get_destructor() for type '" << get_type_name(type_hash) << "'";
+            throw std::runtime_error(str.str());
+        }
     }
 
     static const SerializeTextFn<>& get_serializer_text(uint64_t type_hash) {
-        return get_serializers_text().at(type_hash);
+        try{
+            return get_serializers_text().at(type_hash);
+        } catch (const std::out_of_range&) {
+            std::ostringstream str;
+            str << "error at get_serializer_text() for type '" << get_type_name(type_hash) << "'";
+            throw std::runtime_error(str.str());
+        }
     }
 
     static const SerializeYamlFn<>& get_serializer_yaml(uint64_t type_hash) {
-        return get_serializers_yaml().at(type_hash);
+        try{
+            return get_serializers_yaml().at(type_hash);
+        } catch (const std::out_of_range&) {
+            std::ostringstream str;
+            str << "error at get_serializer_yaml() for type '" << get_type_name(type_hash) << "'";
+            throw std::runtime_error(str.str());
+        }
     }
 
 };
