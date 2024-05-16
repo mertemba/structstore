@@ -33,19 +33,10 @@ std::unordered_map<uint64_t, typing::SerializeYamlFn<>>& typing::get_serializers
     return *serializers_yaml;
 }
 
-template<typename T>
-static void register_basic_type(const char* name) {
-    typing::register_type<T>(name);
-    typing::register_default_constructor<T>();
-    typing::register_default_destructor<T>();
-    typing::register_default_serializer_text<T>();
-    typing::register_default_serializer_yaml<T>();
-}
-
 static bool register_common_types_() {
-    register_basic_type<int>("int");
-    register_basic_type<double>("double");
-    register_basic_type<bool>("bool");
+    typing::register_basic_type<int>("int");
+    typing::register_basic_type<double>("double");
+    typing::register_basic_type<bool>("bool");
 
     typing::register_type<structstore::string>("structstore::string");
     typing::register_stl_alloc_constructor<structstore::string>();

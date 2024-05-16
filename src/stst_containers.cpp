@@ -6,10 +6,7 @@ void List::register_type() {
     typing::register_type<List>("structstore::List");
     typing::register_mm_alloc_constructor<List>();
     typing::register_default_destructor<List>();
-    typing::register_serializer_text<List>(
-            [](std::ostream& os, const List* list) -> std::ostream& {
-                return os << *list;
-            });
+    typing::register_default_serializer_text<List>();
     typing::register_serializer_yaml<List>(
             [](const List* list) -> YAML::Node {
                 return to_yaml(*list);
@@ -41,10 +38,7 @@ void Matrix::register_type() {
     typing::register_type<Matrix>("structstore::Matrix");
     typing::register_mm_alloc_constructor<Matrix>();
     typing::register_default_destructor<Matrix>();
-    typing::register_serializer_text<Matrix>(
-            [](std::ostream& os, const Matrix* matrix) -> std::ostream& {
-                return os << *matrix;
-            });
+    typing::register_default_serializer_text<Matrix>();
 }
 
 std::ostream& structstore::operator<<(std::ostream& os, const Matrix& self) {
