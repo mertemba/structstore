@@ -184,8 +184,14 @@ static bool registered_common_bindings = []() {
 
 nb::object structstore::to_object(const StructStoreField& field, bool recursive) {
     uint64_t type_hash = field.get_type_hash();
-    bindings::ToPythonFn to_python_fn = bindings::get_to_python_fns().at(type_hash);
-    return to_python_fn(field, recursive);
+    try {
+        bindings::ToPythonFn to_python_fn = bindings::get_to_python_fns().at(type_hash);
+        return to_python_fn(field, recursive);
+    } catch (const std::out_of_range&) {
+        std::ostringstream str;
+        str << "error at get_to_python_fns().at() for type '" << typing::get_type_name(type_hash) << "'";
+        throw std::runtime_error(str.str());
+    }
 }
 
 void structstore::from_object(FieldAccess access, const nb::handle& value, const std::string& field_name) {
