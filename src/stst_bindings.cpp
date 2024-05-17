@@ -11,8 +11,8 @@ using namespace structstore;
 namespace nb = nanobind;
 
 __attribute__((__visibility__("default")))
-std::vector<bindings::FromPythonFn>& bindings::get_from_python_fns() {
-    static auto* from_python_fns = new std::vector<bindings::FromPythonFn>();
+std::unordered_map<uint64_t, bindings::FromPythonFn>& bindings::get_from_python_fns() {
+    static auto* from_python_fns = new std::unordered_map<uint64_t, bindings::FromPythonFn>();
     return *from_python_fns;
 }
 
@@ -20,9 +20,4 @@ __attribute__((__visibility__("default")))
 std::unordered_map<uint64_t, bindings::ToPythonFn>& bindings::get_to_python_fns() {
     static auto* to_python_fns = new std::unordered_map<uint64_t, bindings::ToPythonFn>();
     return *to_python_fns;
-}
-
-__attribute__((__visibility__("default")))
-void bindings::register_from_python_fn(const bindings::FromPythonFn& from_python_fn) {
-    bindings::get_from_python_fns().push_back(from_python_fn);
 }

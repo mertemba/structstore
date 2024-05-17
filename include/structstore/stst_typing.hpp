@@ -46,17 +46,28 @@ public:
 
     static void register_common_types();
 
+    static std::runtime_error already_registered_type_error(uint64_t type_hash) {
+        std::ostringstream str;
+        str << "type already registered: " << get_type_name(type_hash);
+        return std::runtime_error(str.str());
+    }
+
     template<typename T>
     static void register_type(const char* name) {
         uint64_t type_hash = const_hash(name);
+        if (type_hash == 0) {
+            std::ostringstream str;
+            str << "hash collision between '" << name << "' and empty type";
+            throw std::runtime_error(str.str());
+        }
         bool success = get_type_hashes().insert({typeid(T), type_hash}).second;
         if (!success) {
-            throw std::runtime_error("type already registered");
+            throw already_registered_type_error(type_hash);
         }
         auto ret = get_type_names().insert({type_hash, name});
         if (!ret.second) {
             if (ret.first->second == name) {
-                throw std::runtime_error("type already registered");
+                throw already_registered_type_error(type_hash);
             } else {
                 std::ostringstream str;
                 str << "hash collision between '" << name << "' and '" << ret.first->second << "'";
@@ -77,6 +88,10 @@ public:
     }
 
     static const std::string& get_type_name(uint64_t type_hash) {
+        static std::string empty = "<empty>";
+        if (type_hash == 0) {
+            return empty;
+        }
         try {
             return get_type_names().at(type_hash);
         } catch (const std::out_of_range&) {
@@ -88,92 +103,100 @@ public:
 
     template<typename T>
     static void register_default_constructor() {
+        uint64_t type_hash = typing::get_type_hash<T>();
         static ConstructorFn<T> default_constructor = [](MiniMalloc&, T* t) {
             new(t)T();
         };
         bool success = get_constructors().insert(
-                {get_type_hash<T>(), (const ConstructorFn<>&) default_constructor}).second;
+                {type_hash, (const ConstructorFn<>&) default_constructor}).second;
         if (!success) {
-            throw std::runtime_error("type already registered");
+            throw already_registered_type_error(type_hash);
         }
     }
 
     template<typename T>
     static void register_mm_alloc_constructor() {
+        uint64_t type_hash = typing::get_type_hash<T>();
         static ConstructorFn<T> alloc_constructor = [](MiniMalloc& mm_alloc, T* t) {
             new(t)T(mm_alloc);
         };
         bool success = get_constructors().insert(
-                {get_type_hash<T>(), (const ConstructorFn<>&) alloc_constructor}).second;
+                {type_hash, (const ConstructorFn<>&) alloc_constructor}).second;
         if (!success) {
-            throw std::runtime_error("type already registered");
+            throw already_registered_type_error(type_hash);
         }
     }
 
     template<typename T>
     static void register_stl_alloc_constructor() {
+        uint64_t type_hash = typing::get_type_hash<T>();
         static ConstructorFn<T> alloc_constructor = [](MiniMalloc& mm_alloc, T* t) {
             StlAllocator<T> tmp_alloc{mm_alloc};
             new(t)T(tmp_alloc);
         };
         bool success = get_constructors().insert(
-                {get_type_hash<T>(), (const ConstructorFn<>&) alloc_constructor}).second;
+                {type_hash, (const ConstructorFn<>&) alloc_constructor}).second;
         if (!success) {
-            throw std::runtime_error("type already registered");
+            throw already_registered_type_error(type_hash);
         }
     }
 
     template<typename T>
     static void register_default_destructor() {
+        uint64_t type_hash = typing::get_type_hash<T>();
         static DestructorFn<T> default_destructor = [](MiniMalloc&, T* t) {
             t->~T();
         };
         bool success = get_destructors().insert(
-                {get_type_hash<T>(), (const DestructorFn<>&) default_destructor}).second;
+                {type_hash, (const DestructorFn<>&) default_destructor}).second;
         if (!success) {
-            throw std::runtime_error("type already registered");
+            throw already_registered_type_error(type_hash);
         }
     }
 
     template<typename T>
     static void register_default_serializer_text() {
+        uint64_t type_hash = typing::get_type_hash<T>();
         static SerializeTextFn<T> serializer = [](std::ostream& os, const T* t) -> std::ostream& {
             return os << *t;
         };
         bool success = get_serializers_text().insert(
-                {get_type_hash<T>(), (const SerializeTextFn<>&) serializer}).second;
+                {type_hash, (const SerializeTextFn<>&) serializer}).second;
         if (!success) {
-            throw std::runtime_error("type already registered");
+            throw already_registered_type_error(type_hash);
         }
     }
 
     template<typename T>
     static void register_serializer_text(const SerializeTextFn<T>& serializer) {
+        uint64_t type_hash = typing::get_type_hash<T>();
         bool success = get_serializers_text().insert(
-                {get_type_hash<T>(), (const SerializeTextFn<>&) serializer}).second;
+                {type_hash, (const SerializeTextFn<>&) serializer}).second;
         if (!success) {
-            throw std::runtime_error("type already registered");
+            throw already_registered_type_error(type_hash);
         }
     }
 
     template<typename T>
     static void register_default_serializer_yaml() {
+        uint64_t type_hash = typing::get_type_hash<T>();
         static SerializeYamlFn<T> serializer = [](const T* t) {
             return YAML::Node(*t);
         };
         bool success = get_serializers_yaml().insert(
-                {get_type_hash<T>(), (const SerializeYamlFn<>&) serializer}).second;
+                {type_hash, (const SerializeYamlFn<>&) serializer}).second;
         if (!success) {
-            throw std::runtime_error("type already registered");
+            throw already_registered_type_error(type_hash);
         }
     }
 
     template<typename T>
     static void register_serializer_yaml(const SerializeYamlFn<T>& serializer) {
+        uint64_t type_hash = typing::get_type_hash<T>();
         bool success = get_serializers_yaml().insert(
-                {get_type_hash<T>(), (const SerializeYamlFn<>&) serializer}).second;
+                {type_hash, (const SerializeYamlFn<>&) serializer}).second;
         if (!success) {
-            throw std::runtime_error("type already registered");
+            throw already_registered_type_error(type_hash);
         }
     }
 
