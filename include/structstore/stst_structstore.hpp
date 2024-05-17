@@ -82,14 +82,6 @@ public:
     void clear() {
         field.clear(mm_alloc);
     }
-
-    template<typename T>
-    void set_type() {
-        if (field.get_type_hash() != typing::get_type_hash<T>()) {
-            clear();
-            get<T>();
-        }
-    }
 };
 
 class StructStore {

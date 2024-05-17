@@ -63,6 +63,7 @@ public:
             destructor(mm_alloc, data);
             mm_alloc.deallocate(data);
             data = nullptr;
+            type_hash = 0;
         }
     }
 

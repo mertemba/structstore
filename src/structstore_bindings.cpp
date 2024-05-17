@@ -30,9 +30,8 @@ static bool registered_common_bindings = []() {
             [](const StructStoreField& field, bool recursive) -> nb::object {
                 return nb::str(field.get<structstore::string>().c_str());
             });
-    bindings::register_from_python_fn([](FieldAccess access, const nanobind::handle& value) {
+    bindings::register_from_python_fn<structstore::string>([](FieldAccess access, const nanobind::handle& value) {
         if (nb::isinstance<nb::str>(value)) {
-            access.set_type<structstore::string>();
             access.get<structstore::string>() = nb::cast<std::string>(value);
             return true;
         }
@@ -41,10 +40,11 @@ static bool registered_common_bindings = []() {
 
     // structstore::StructStore
     bindings::register_object_to_python<StructStore>();
-    bindings::register_object_from_python<StructStore>();
-    bindings::register_from_python_fn([](FieldAccess access, const nanobind::handle& value) {
+    bindings::register_from_python_fn<StructStore>([](FieldAccess access, const nanobind::handle& value) {
+        if (bindings::object_from_python<StructStore>(access, value)) {
+            return true;
+        }
         if (nb::hasattr(value, "__dict__")) {
-            access.set_type<StructStore>();
             auto dict = nb::dict(value.attr("__dict__"));
             StructStore& store = access.get<StructStore>();
             store.clear();
@@ -55,7 +55,6 @@ static bool registered_common_bindings = []() {
             return true;
         }
         if (nb::hasattr(value, "__slots__")) {
-            access.set_type<StructStore>();
             auto slots = nb::iterable(value.attr("__slots__"));
             StructStore& store = access.get<StructStore>();
             store.clear();
@@ -66,7 +65,6 @@ static bool registered_common_bindings = []() {
             return true;
         }
         if (nb::isinstance<nb::dict>(value)) {
-            access.set_type<StructStore>();
             nb::dict dict = nb::cast<nb::dict>(value);
             StructStore& store = access.get<StructStore>();
             store.clear();
@@ -88,10 +86,11 @@ static bool registered_common_bindings = []() {
 
     // structstore::List
     bindings::register_object_to_python<List>();
-    bindings::register_object_from_python<List>();
-    bindings::register_from_python_fn([](FieldAccess access, const nanobind::handle& value) {
+    bindings::register_from_python_fn<List>([](FieldAccess access, const nanobind::handle& value) {
+        if (bindings::object_from_python<List>(access, value)) {
+            return true;
+        }
         if (nb::isinstance<nb::list>(value) || nb::isinstance<nb::tuple>(value)) {
-            access.set_type<List>();
             List& list = access.get<List>();
             list.clear();
             int i = 0;
@@ -127,9 +126,8 @@ static bool registered_common_bindings = []() {
                     return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), ndim, shape));
                 }
             });
-    bindings::register_from_python_fn([](FieldAccess access, const nanobind::handle& value) {
+    bindings::register_from_python_fn<Matrix>([](FieldAccess access, const nanobind::handle& value) {
         if (nb::ndarray_check(value)) {
-            access.set_type<Matrix>();
             auto array = nb::cast<nb::ndarray<const double, nb::c_contig>>(value);
             size_t rows, cols;
             bool is_vector = false;
@@ -172,10 +170,18 @@ void structstore::from_object(FieldAccess access, const nb::handle& value, const
         access.clear();
         return;
     }
-    for (const bindings::FromPythonFn& from_python_fn: bindings::get_from_python_fns()) {
+    if (!access.get_field().empty()) {
+        auto from_python_fn = bindings::get_from_python_fns().at(access.get_type_hash());
         bool success = from_python_fn(access, value);
         if (success) {
             return;
+        }
+    } else {
+        for (const auto& [type_hash, from_python_fn]: bindings::get_from_python_fns()) {
+            bool success = from_python_fn(access, value);
+            if (success) {
+                return;
+            }
         }
     }
     std::ostringstream msg;
