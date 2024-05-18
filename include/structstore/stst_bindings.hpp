@@ -143,72 +143,86 @@ public:
     template<typename T>
     static void register_structstore_bindings(nb::class_<T>& cls) {
         cls.def_prop_ro("__slots__", [](T& t) {
-            auto& store = static_cast<StructStore&>(t);
+            auto& store = t.get_store();
             return __slots__(store);
         });
 
         cls.def("__getattr__", [](T& t, const std::string& name) {
-            auto& store = static_cast<StructStore&>(t);
+            auto& store = t.get_store();
             return get_field(store, name);
         }, nb::arg("name"), nb::rv_policy::reference_internal);
 
         cls.def("__setattr__", [](T& t, const std::string& name, const nb::object& value) {
-            auto& store = static_cast<StructStore&>(t);
+            auto& store = t.get_store();
             return set_field(store, name, value);
         }, nb::arg("name"), nb::arg("value").none());
 
         cls.def("__getitem__", [](T& t, const std::string& name) {
-            auto& store = static_cast<StructStore&>(t);
+            auto& store = t.get_store();
             return get_field(store, name);
         }, nb::arg("name"), nb::rv_policy::reference_internal);
 
         cls.def("__setitem__", [](T& t, const std::string& name, const nb::object& value) {
-            auto& store = static_cast<StructStore&>(t);
+            auto& store = t.get_store();
             return set_field(store, name, value);
         }, nb::arg("name"), nb::arg("value").none());
 
         cls.def("lock", [](T& t) {
-            auto& store = static_cast<StructStore&>(t);
+            auto& store = t.get_store();
             return lock(store);
         }, nb::rv_policy::move);
 
         cls.def("to_yaml", [](T& t) {
-            auto& store = static_cast<StructStore&>(t);
+            auto& store = t.get_store();
             auto lock = store.read_lock();
             return YAML::Dump(to_yaml(store));
         });
 
         cls.def("__repr__", [](T& t) {
-            auto& store = static_cast<StructStore&>(t);
+            auto& store = t.get_store();
             return __repr__(store);
         });
 
         cls.def("copy", [](T& t) {
-            auto& store = static_cast<StructStore&>(t);
+            auto& store = t.get_store();
             return copy(store);
         });
 
         cls.def("deepcopy", [](T& t) {
-            auto& store = static_cast<StructStore&>(t);
+            auto& store = t.get_store();
             return deepcopy(store);
         });
 
         cls.def("__copy__", [](T& t) {
-            auto& store = static_cast<StructStore&>(t);
+            auto& store = t.get_store();
             return copy(store);
         });
 
         cls.def("__deepcopy__", [](T& t, nb::handle&) {
-            auto& store = static_cast<StructStore&>(t);
+            auto& store = t.get_store();
             return deepcopy(store);
         });
 
         cls.def("clear", [](T& t) {
-            auto& store = static_cast<StructStore&>(t);
+            auto& store = t.get_store();
             return clear(store);
         });
     }
 };
+
+template<typename T>
+void register_struct_type_and_bindings(nb::module_& m, const std::string& name) {
+    static_assert(std::is_base_of<Struct, T>::value,
+                  "template parameter is not derived from structstore::Struct");
+    typing::register_type<T>(name);
+    typing::register_mm_alloc_constructor<T>();
+    typing::register_default_destructor<T>();
+
+    auto nb_cls = nb::class_<T>(m, name.c_str());
+    nb_cls.def(nb::init());
+    bindings::register_basic_bindings<T>(nb_cls);
+    bindings::register_structstore_bindings(nb_cls);
+}
 
 }
 
