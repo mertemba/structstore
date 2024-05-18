@@ -2,7 +2,6 @@
 #define STRUCTSTORE_HPP
 
 #include "structstore/stst_alloc.hpp"
-#include "structstore/stst_bindings.hpp"
 #include "structstore/stst_containers.hpp"
 #include "structstore/stst_field.hpp"
 #include "structstore/stst_hashstring.hpp"

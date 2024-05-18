@@ -46,7 +46,8 @@ public:
         }
         StlAllocator<T> tmp_alloc{mm_alloc};
         void* ptr = tmp_alloc.allocate(1);
-        const typing::ConstructorFn<>& constructor = typing::get_constructor(typing::get_type_hash<T>());
+        uint64_t type_hash = typing::get_type_hash<T>();
+        const typing::ConstructorFn<>& constructor = typing::get_constructor(type_hash);
         constructor(mm_alloc, ptr);
         field.replace_data<T>(ptr, mm_alloc);
         return field.get<T>();
@@ -95,14 +96,14 @@ class StructStore {
 
     friend void typing::register_common_types();
 
-public:
+private:
     MiniMalloc& mm_alloc;
     StlAllocator<char> alloc;
     mutable SpinMutex mutex;
 
-private:
     unordered_map<HashString, StructStoreField> fields;
     vector<HashString> slots;
+    bool pin_fields;
 
     HashString internal_string(HashString str) {
         size_t len = std::strlen(str.str);
@@ -112,10 +113,8 @@ private:
     }
 
 public:
-    explicit StructStore(MiniMalloc& mm_alloc)
-            : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {}
-
-    StructStore() : mm_alloc(static_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {}
+    explicit StructStore(MiniMalloc& mm_alloc, bool pin_fields = false)
+            : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc), pin_fields(pin_fields) {}
 
     StructStore(const StructStore&) = delete;
 
@@ -166,7 +165,7 @@ public:
     }
 
     template<typename T>
-    T& get_hashed(HashString name) {
+    T& get(HashString name) {
         return (*this)[name];
     }
 
@@ -180,6 +179,9 @@ public:
             HashString name_int = internal_string(name);
             it = fields.emplace(name_int, StructStoreField{}).first;
             slots.emplace_back(name_int);
+        if (pin_fields) {
+            field.pin();
+        }
         }
         return {it->second, mm_alloc};
     }
@@ -210,6 +212,13 @@ public:
 
     const vector<HashString>& get_slots() const {
         return slots;
+    }
+
+    void unpin() {
+        for (auto& [key, value]: fields) {
+            value.unpin();
+        }
+        pin_fields = false;
     }
 };
 

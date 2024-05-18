@@ -47,7 +47,7 @@ public:
 };
 
 class ScopedLock {
-    SpinMutex* mutex;
+    SpinMutex* mutex = nullptr;
 
     ScopedLock() : mutex{nullptr} {}
 
@@ -56,10 +56,15 @@ public:
         mutex.lock();
     }
 
-    ~ScopedLock() {
+    void unlock() {
         if (mutex) {
             mutex->unlock();
+            mutex = nullptr;
         }
+    }
+
+    ~ScopedLock() {
+        unlock();
     }
 
     ScopedLock(ScopedLock&& other) noexcept: ScopedLock() {

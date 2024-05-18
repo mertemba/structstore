@@ -1,4 +1,5 @@
 #include "structstore/structstore.hpp"
+#include "structstore/stst_bindings.hpp"
 
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
@@ -9,21 +10,11 @@ using namespace structstore;
 
 namespace nb = nanobind;
 
-static nb::object SimpleNamespace;
-
-namespace structstore {
-nb::object to_object(const List& list, bool recursive);
-
-nb::object to_object(const StructStoreField& field, bool recursive);
-
-void from_object(FieldAccess access, const nb::handle& value, const std::string& field_name);
-}
-
 static bool registered_common_bindings = []() {
     typing::register_common_types();
-    bindings::register_basic_binding<int, nb::int_>();
-    bindings::register_basic_binding<double, nb::float_>();
-    bindings::register_basic_binding<bool, nb::bool_>();
+    bindings::register_basic_bindings<int, nb::int_>();
+    bindings::register_basic_bindings<double, nb::float_>();
+    bindings::register_basic_bindings<bool, nb::bool_>();
 
     // structstore::string
     bindings::register_to_python_fn<structstore::string>(
@@ -150,186 +141,19 @@ static bool registered_common_bindings = []() {
     return true;
 }();
 
-nb::object structstore::to_object(const StructStoreField& field, bool recursive) {
-    if (field.empty()) {
-        return nb::none();
-    }
-    uint64_t type_hash = field.get_type_hash();
-    try {
-        bindings::ToPythonFn to_python_fn = bindings::get_to_python_fns().at(type_hash);
-        return to_python_fn(field, recursive);
-    } catch (const std::out_of_range&) {
-        std::ostringstream str;
-        str << "error at get_to_python_fns().at() for type '" << typing::get_type_name(type_hash) << "'";
-        throw std::runtime_error(str.str());
-    }
-}
-
-void structstore::from_object(FieldAccess access, const nb::handle& value, const std::string& field_name) {
-    if (value.is_none()) {
-        access.clear();
-        return;
-    }
-    if (!access.get_field().empty()) {
-        auto from_python_fn = bindings::get_from_python_fns().at(access.get_type_hash());
-        bool success = from_python_fn(access, value);
-        if (success) {
-            return;
-        }
-    } else {
-        for (const auto& [type_hash, from_python_fn]: bindings::get_from_python_fns()) {
-            bool success = from_python_fn(access, value);
-            if (success) {
-                return;
-            }
-        }
-    }
-    std::ostringstream msg;
-    msg << "field '" << field_name << "' has unsupported type '" << nb::cast<std::string>(nb::str(value.type()))
-        << "'";
-    throw nb::type_error(msg.str().c_str());
-}
-
-nb::object structstore::to_object(const List& list, bool recursive) {
-    auto pylist = nb::list();
-    for (const StructStoreField& field: list) {
-        pylist.append(to_object(field, recursive));
-    }
-    return pylist;
-}
-
-nb::object structstore::to_object(const StructStore& store, bool recursive) {
-    auto obj = SimpleNamespace();
-    for (const auto& name: store.slots) {
-        nb::setattr(obj, name.str, to_object(store.fields.at(name), recursive));
-    }
-    return obj;
-}
-
-class SpinLockContextManager {
-
-    SpinMutex* mutex = nullptr;
-
-public:
-
-    explicit SpinLockContextManager(SpinMutex* mutex) : mutex{mutex} {}
-
-    SpinLockContextManager(SpinLockContextManager&& other) noexcept {
-        std::swap(mutex, other.mutex);
-    }
-
-    SpinLockContextManager(const SpinLockContextManager&) = delete;
-
-    SpinLockContextManager& operator=(SpinLockContextManager&& other) = delete;
-
-    SpinLockContextManager& operator=(const SpinLockContextManager&) = delete;
-
-    void unlock() {
-        if (mutex) {
-            mutex->unlock();
-            mutex = nullptr;
-        }
-    }
-
-    ~SpinLockContextManager() {
-        unlock();
-    }
-};
-
-template<typename T>
-void register_structstore_methods(nb::class_<T>& cls) {
-    cls.def_prop_ro("__slots__", [](T& t) {
-        StructStore& store = static_cast<StructStore&>(t);
-        auto ret = nb::list();
-        for (const auto& str: store.get_slots()) {
-            ret.append(str.str);
-        }
-        return ret;
-    });
-    auto get_field = [](T& t, const std::string& name) {
-        StructStore& store = static_cast<StructStore&>(t);
-        auto lock = store.read_lock();
-        StructStoreField* field = store.try_get_field(HashString{name.c_str()});
-        if (field == nullptr) {
-            throw nb::attribute_error();
-        }
-        return to_object(*field, false);
-    };
-    auto set_field = [](T& t, const std::string& name, const nb::object& value) {
-        StructStore& store = static_cast<StructStore&>(t);
-        auto lock = store.write_lock();
-        from_object(store[name.c_str()], value, name);
-    };
-    cls.def("__getattr__", get_field, nb::arg("name"), nb::rv_policy::reference_internal);
-    cls.def("__setattr__", set_field, nb::arg("name"), nb::arg("value").none());
-    cls.def("__getitem__", get_field, nb::arg("name"), nb::rv_policy::reference_internal);
-    cls.def("__setitem__", set_field, nb::arg("name"), nb::arg("value").none());
-    cls.def("lock", [](T& t) {
-        StructStore& store = static_cast<StructStore&>(t);
-        store.get_mutex().lock();
-        return SpinLockContextManager(&store.get_mutex());
-    }, nb::rv_policy::move);
-    cls.def("to_yaml", [](T& t) {
-        StructStore& store = static_cast<StructStore&>(t);
-        auto lock = store.read_lock();
-        return YAML::Dump(to_yaml(store));
-    });
-    cls.def("__repr__", [](T& t) {
-        StructStore& store = static_cast<StructStore&>(t);
-        auto lock = store.read_lock();
-        std::ostringstream str;
-        str << store;
-        return str.str();
-    });
-    cls.def("copy", [](T& t) {
-        StructStore& store = static_cast<StructStore&>(t);
-        auto lock = store.read_lock();
-        return to_object(store, false);
-    });
-    cls.def("deepcopy", [](T& t) {
-        StructStore& store = static_cast<StructStore&>(t);
-        auto lock = store.read_lock();
-        return to_object(store, true);
-    });
-    cls.def("__copy__", [](T& t) {
-        StructStore& store = static_cast<StructStore&>(t);
-        auto lock = store.read_lock();
-        return to_object(store, false);
-    });
-    cls.def("__deepcopy__", [](T& t, nb::handle&) {
-        StructStore& store = static_cast<StructStore&>(t);
-        auto lock = store.read_lock();
-        return to_object(store, true);
-    });
-    cls.def("size", [](T& t) {
-        StructStore& store = static_cast<StructStore&>(t);
-        return store.mm_alloc.get_size();
-    });
-    cls.def("allocated", [](T& t) {
-        StructStore& store = static_cast<StructStore&>(t);
-        return store.mm_alloc.get_allocated();
-    });
-    cls.def("clear", [](T& t) {
-        StructStore& store = static_cast<StructStore&>(t);
-        auto lock = store.write_lock();
-        store.clear();
-    });
-}
-
 NB_MODULE(MODULE_NAME, m) {
     m.attr("__version__") = VERSION_INFO;
 
-    SimpleNamespace = nb::module_::import_("types").attr("SimpleNamespace");
+    bindings::SimpleNamespace = nb::module_::import_("types").attr("SimpleNamespace");
 
-    nb::class_<SpinLockContextManager>(m, "SpinLockContextManager")
-            .def("__enter__", [](SpinLockContextManager&) {})
-            .def("__exit__", [](SpinLockContextManager& con_man, nb::handle, nb::handle, nb::handle) {
+    nb::class_<ScopedLock>(m, "ScopedLock")
+            .def("__enter__", [](ScopedLock&) {})
+            .def("__exit__", [](ScopedLock& con_man, nb::handle, nb::handle, nb::handle) {
                 con_man.unlock();
             }, nb::arg().none(), nb::arg().none(), nb::arg().none());
 
     nb::class_<StructStore> cls = nb::class_<StructStore>{m, "StructStore"};
-    cls.def(nb::init<>());
-    register_structstore_methods(cls);
+    bindings::register_structstore_bindings(cls);
 
     nb::enum_<CleanupMode>(m, "CleanupMode")
             .value("NEVER", NEVER)
@@ -338,7 +162,7 @@ NB_MODULE(MODULE_NAME, m) {
             .export_values();
 
     auto shcls = nb::class_<StructStoreShared>(m, "StructStoreShared");
-    register_structstore_methods(shcls);
+    bindings::register_structstore_bindings(shcls);
     shcls.def("__init__",
               [](StructStoreShared* s, const std::string& path, size_t size, bool reinit, bool use_file,
                  CleanupMode cleanup, uintptr_t target_addr) {
@@ -391,7 +215,7 @@ NB_MODULE(MODULE_NAME, m) {
     });
     list.def("lock", [](List& list) {
         list.get_mutex().lock();
-        return SpinLockContextManager(&list.get_mutex());
+        return ScopedLock(list.get_mutex());
     }, nb::rv_policy::move);
     list.def("__len__", [](List& list) {
         auto lock = list.read_lock();

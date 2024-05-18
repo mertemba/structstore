@@ -41,7 +41,6 @@ int main() {
     std::cout << "shared data: " << *shdata_store << std::endl;
     shdata_store->get<int>("num") = 52;
     shdata_store[H("num")] = 53;
-    std::cout << "allocated bytes: " << shdata_store->mm_alloc.get_allocated() << std::endl;
 
     stst::StructStoreShared shsettings_store("/shsettings_store");
     Settings shsettings{*shsettings_store};
