@@ -47,27 +47,30 @@ public:
 };
 
 class ScopedLock {
-    SpinMutex* mutex;
+    SpinMutex* mutex = nullptr;
 
 public:
     explicit ScopedLock(SpinMutex& mutex) : mutex(&mutex) {
         mutex.lock();
     }
 
-    ~ScopedLock() {
+    void unlock() {
         if (mutex) {
             mutex->unlock();
+            mutex = nullptr;
         }
     }
 
+    ~ScopedLock() {
+        unlock();
+    }
+
     ScopedLock(ScopedLock&& other) noexcept {
-        mutex = other.mutex;
-        other.mutex = nullptr;
+        std::swap(mutex, other.mutex);
     }
 
     ScopedLock& operator=(ScopedLock&& other) noexcept {
-        mutex = other.mutex;
-        other.mutex = nullptr;
+        std::swap(mutex, other.mutex);
         return *this;
     }
 

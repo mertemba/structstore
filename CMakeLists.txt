@@ -39,7 +39,6 @@ file(GLOB STRUCTSTORE_INC_FILES
         ${PROJECT_SOURCE_DIR}/include/*.hpp)
 
 set(STRUCTSTORE_SRC_FILES
-        ${PROJECT_SOURCE_DIR}/src/stst_bindings.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_containers.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_field.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_shared.cpp
@@ -52,16 +51,25 @@ set(STRUCTSTORE_INC_DIRS
 
 # targets: library and python bindings
 
-add_library(structstore_lib SHARED
+add_library(structstore_lib_cpponly SHARED
         ${STRUCTSTORE_INC_FILES}
         ${STRUCTSTORE_SRC_FILES})
+set_target_properties(structstore_lib_cpponly PROPERTIES
+        ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib
+        ARCHIVE_OUTPUT_NAME structstore)
+
+add_library(structstore_lib SHARED
+        ${STRUCTSTORE_INC_FILES}
+        ${PROJECT_SOURCE_DIR}/src/stst_bindings.cpp)
 set_target_properties(structstore_lib PROPERTIES
         ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib
         ARCHIVE_OUTPUT_NAME structstore)
-target_link_libraries(structstore_lib PUBLIC nanobind-static)
+target_link_libraries(structstore_lib PUBLIC
+        structstore_lib_cpponly
+        nanobind-static)
 
 nanobind_add_module(structstore_bindings src/structstore_bindings.cpp NB_STATIC)
-target_link_libraries(structstore_bindings PRIVATE structstore_lib)
+target_link_libraries(structstore_bindings PUBLIC structstore_lib)
 set_target_properties(structstore_bindings PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib
         LIBRARY_OUTPUT_NAME _structstore_bindings)
@@ -79,7 +87,7 @@ endif ()
 set_target_properties(structstore_bindings PROPERTIES
         INSTALL_RPATH "\\\$ORIGIN")
 
-foreach (TARGET structstore_lib structstore_bindings)
+foreach (TARGET structstore_lib_cpponly structstore_lib structstore_bindings)
     target_compile_features(${TARGET} PUBLIC cxx_std_17)
     target_compile_options(${TARGET} PUBLIC -fPIC)
     target_compile_options(${TARGET} PUBLIC -Wall -Wextra -pedantic)
@@ -92,7 +100,7 @@ endforeach ()
 
 # install
 
-install(TARGETS structstore_lib nanobind-static
+install(TARGETS structstore_lib_cpponly structstore_lib nanobind-static
         EXPORT StructStoreTargets
         COMPONENT python_modules
         DESTINATION ${STRUCTSTORE_INSTALL_DIR})
@@ -108,7 +116,7 @@ nanobind_stubgen(structstore_bindings)
 nanobind_stubgen_install(structstore_bindings ${STRUCTSTORE_INSTALL_DIR})
 
 # inspired by https://stackoverflow.com/a/49857699
-export(TARGETS structstore_lib nanobind-static
+export(TARGETS structstore_lib_cpponly structstore_lib nanobind-static
         FILE "${PROJECT_BINARY_DIR}/StructStoreTargets.cmake")
 export(PACKAGE StructStore)
 configure_file(${PROJECT_SOURCE_DIR}/cmake/StructStoreConfig.cmake.in
@@ -126,7 +134,6 @@ install(EXPORT StructStoreTargets
 
 if (NOT DEFINED PY_BUILD_CMAKE_PACKAGE_VERSION)
     set(STRUCTSTORE_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/include)
-    set(STRUCTSTORE_LIBRARIES structstore_lib)
 
     add_subdirectory(examples)
 endif ()
