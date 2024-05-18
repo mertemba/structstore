@@ -53,8 +53,8 @@ public:
     }
 
     template<typename T>
-    static void register_type(const char* name) {
-        uint64_t type_hash = const_hash(name);
+    static void register_type(const std::string& name) {
+        uint64_t type_hash = const_hash(name.c_str());
         if (type_hash == 0) {
             std::ostringstream str;
             str << "hash collision between '" << name << "' and empty type";

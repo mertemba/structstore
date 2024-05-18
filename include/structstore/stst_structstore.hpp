@@ -113,8 +113,8 @@ private:
     }
 
 public:
-    explicit StructStore(MiniMalloc& mm_alloc, bool pin_fields = false)
-            : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc), pin_fields(pin_fields) {}
+    explicit StructStore(MiniMalloc& mm_alloc)
+            : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc), pin_fields(false) {}
 
     StructStore(const StructStore&) = delete;
 
@@ -214,6 +214,17 @@ public:
         return slots;
     }
 
+    StructStore& get_store() {
+        return *this;
+    }
+
+    void pin() {
+        for (auto& [key, value]: fields) {
+            value.pin();
+        }
+        pin_fields = true;
+    }
+
     void unpin() {
         for (auto& [key, value]: fields) {
             value.unpin();
@@ -227,6 +238,26 @@ FieldAccess& FieldAccess::operator=<const char*>(const char* const& value);
 
 template<>
 FieldAccess& FieldAccess::operator=<std::string>(const std::string& value);
+
+class Struct {
+protected:
+    StructStore store;
+
+    Struct() : Struct(static_alloc) {}
+
+    explicit Struct(MiniMalloc& mm_alloc) : store(mm_alloc) {
+        store.pin();
+    }
+
+    ~Struct() {
+        store.unpin();
+    }
+
+public:
+    StructStore& get_store() {
+        return store;
+    }
+};
 
 }
 
