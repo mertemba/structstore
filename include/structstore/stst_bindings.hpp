@@ -83,6 +83,7 @@ public:
 
     template<typename T_cpp, typename T_py>
     static void register_basic_bindings() {
+        static_assert(!std::is_pointer<T_cpp>::value);
         register_to_python_fn<T_cpp>([](const StructStoreField& field, bool recursive) -> nb::object {
             return T_py(field.get<T_cpp>());
         });
@@ -97,12 +98,28 @@ public:
 
     template<typename T_cpp>
     static void register_basic_bindings(const nb::handle& T_py) {
+        static_assert(!std::is_pointer<T_cpp>::value);
         register_to_python_fn<T_cpp>([](const StructStoreField& field, bool recursive) -> nb::object {
             return nb::cast(field.get<T_cpp>(), nb::rv_policy::reference);
         });
         register_from_python_fn<T_cpp>([T_py](FieldAccess access, const nb::handle& value) {
             if (value.type().equal(T_py)) {
                 access.get<T_cpp>() = nb::cast<T_cpp&>(value);
+                return true;
+            }
+            return false;
+        });
+    }
+
+    template<typename T_cpp>
+    static void register_ptr_bindings(const nb::handle& T_ptr_py, const nb::handle& T_py) {
+        static_assert(std::is_pointer<T_cpp>::value);
+        register_to_python_fn<T_cpp>([](const StructStoreField& field, bool recursive) -> nb::object {
+            return nb::cast(field.get<T_cpp>(), nb::rv_policy::reference);
+        });
+        register_from_python_fn<T_cpp>([T_ptr_py, T_py](FieldAccess access, const nb::handle& value) {
+            if (value.type().equal(T_ptr_py) || (!access.get_field().empty() && value.type().equal(T_py))) {
+                access.get<T_cpp>() = nb::cast<T_cpp>(value);
                 return true;
             }
             return false;
@@ -211,7 +228,7 @@ public:
 };
 
 template<typename T>
-void register_struct_type_and_bindings(nb::module_& m, const std::string& name) {
+nb::class_<T> register_struct_type_and_bindings(nb::module_& m, const std::string& name) {
     static_assert(std::is_base_of<Struct, T>::value,
                   "template parameter is not derived from structstore::Struct");
     typing::register_type<T>(name);
@@ -222,6 +239,7 @@ void register_struct_type_and_bindings(nb::module_& m, const std::string& name) 
     nb_cls.def(nb::init());
     bindings::register_basic_bindings<T>(nb_cls);
     bindings::register_structstore_bindings(nb_cls);
+    return nb_cls;
 }
 
 }

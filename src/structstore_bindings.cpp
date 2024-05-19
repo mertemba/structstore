@@ -45,7 +45,7 @@ static bool registered_common_bindings = []() {
             }
             return true;
         }
-        if (nb::hasattr(value, "__slots__")) {
+        if (false && nb::hasattr(value, "__slots__")) {
             auto slots = nb::iterable(value.attr("__slots__"));
             StructStore& store = access.get<StructStore>();
             store.clear();
