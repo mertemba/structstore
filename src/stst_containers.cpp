@@ -41,7 +41,7 @@ void Matrix::register_type() {
     typing::register_default_serializer_text<Matrix>();
 }
 
-std::ostream& structstore::operator<<(std::ostream& os, const Matrix& self) {
+std::ostream& structstore::operator<<(std::ostream& os, const Matrix& matrix) {
     size_t size = 1;
     for (size_t i = 0; i < matrix._ndim; ++i) {
         size *= matrix._shape[i];
