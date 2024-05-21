@@ -42,19 +42,7 @@ nb::object to_object(const StructStoreField& field) {
             // then memory lifetime is managed by structstore field
             // auto parent = recursive ? nb::handle() : nb::capsule([]() {}).release();
             auto parent = nb::handle();
-
-            int ndim;
-            size_t shape[2];
-            if (m.is_vector()) {
-                ndim = 1;
-                shape[0] = m.rows() * m.cols();
-            } else {
-                ndim = 2;
-                shape[0] = m.rows();
-                shape[1] = m.cols();
-            }
-
-            return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), ndim, shape, parent));
+            return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), parent));
         }
         case FieldTypeValue::EMPTY:
             return nb::none();
@@ -97,19 +85,10 @@ static void from_object(FieldAccess access, const nb::handle& value, const std::
     } else if (nb::ndarray_check(value)) {
         access.set_type<Matrix>();
         auto array = nb::cast<nb::ndarray<const double, nb::c_contig>>(value);
-        size_t rows, cols;
-        bool is_vector = false;
-        if (array.ndim() == 1) {
-            rows = array.shape(0);
-            cols = 1;
-            is_vector = true;
-        } else if (array.ndim() == 2) {
-            rows = array.shape(0);
-            cols = array.shape(1);
-        } else {
+        if (array.ndim() > Matrix::MAX_DIMS) {
             throw std::runtime_error("Incompatible buffer dimension!");
         }
-        access.get<Matrix>().from(rows, cols, array.data(), is_vector);
+        access.get<Matrix>().from(array.ndim(), (const size_t*) array.shape_ptr(), array.data());
     } else if (nb::hasattr(value, "__dict__")) {
         access.set_type<StructStore>();
         auto dict = nb::dict(value.attr("__dict__"));

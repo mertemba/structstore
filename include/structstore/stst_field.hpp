@@ -180,7 +180,7 @@ public:
     }
 
     template<typename T>
-    explicit operator T&() {
+    operator T&() {
         return get<T>();
     }
 

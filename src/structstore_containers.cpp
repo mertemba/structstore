@@ -23,10 +23,14 @@ YAML::Node structstore::to_yaml(const List& list) {
     return node;
 }
 
-std::ostream& structstore::operator<<(std::ostream& os, const Matrix& self) {
+std::ostream& structstore::operator<<(std::ostream& os, const Matrix& matrix) {
+    size_t size = 1;
+    for (size_t i = 0; i < matrix._ndim; ++i) {
+        size *= matrix._shape[i];
+    }
     os << "[";
-    for (size_t i = 0; i < self._rows * self._cols; ++i) {
-        os << self._data[i] << ",";
+    for (size_t i = 0; i < size; ++i) {
+        os << matrix._data[i] << ",";
     }
     return os << "]";
 }

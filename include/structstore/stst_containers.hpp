@@ -115,20 +115,24 @@ template<>
 void List::push_back<const char*>(const char* const& value);
 
 class Matrix {
+public:
+    static constexpr int MAX_DIMS = 4;
+
+protected:
     MiniMalloc& mm_alloc;
-    size_t _rows, _cols;
+    size_t _ndim;
+    size_t _shape[MAX_DIMS] = {};
     double* _data;
-    bool _is_vector = false;
 
 public:
     Matrix(MiniMalloc& mm_alloc) : Matrix(0, 0, mm_alloc) {}
 
-    Matrix(size_t rows, size_t cols, MiniMalloc& mm_alloc, bool is_vector = false)
-            : mm_alloc(mm_alloc), _rows(rows), _cols(cols), _is_vector(is_vector) {
-        if (rows == 0 || cols == 0) {
+    Matrix(size_t ndim, const size_t* shape, MiniMalloc& mm_alloc)
+            : mm_alloc(mm_alloc), _ndim(ndim) {
+        if (ndim == 0) {
             _data = nullptr;
         } else {
-            _data = (double*) mm_alloc.allocate(sizeof(double) * rows * cols);
+            from(ndim, shape, nullptr);
         }
     }
 
@@ -146,46 +150,58 @@ public:
 
     Matrix& operator=(Matrix&& other) {
         if (&mm_alloc == &other.mm_alloc) {
-            _data = other._data;
+            std::swap(_ndim, other._ndim);
+            std::swap(_shape, other._shape);
+            std::swap(_data, other._data);
         } else {
             const Matrix& other_ = other;
             *this = other_;
         }
-        other._data = nullptr;
         return *this;
     }
 
     Matrix& operator=(const Matrix& other) {
-        from(other._rows, other._cols, other._data, other._is_vector);
+        from(other._ndim, other._shape, other._data);
         return *this;
     }
 
+    size_t ndim() const { return _ndim; }
+
+    const size_t* shape() const { return _shape; }
+
     double* data() { return _data; }
 
-    size_t rows() const { return _rows; }
-
-    size_t cols() const { return _cols; }
-
-    bool is_vector() const { return _is_vector; }
-
-    void from(size_t rows, size_t cols, const double* data, bool is_vector) {
+    void from(size_t ndim, const size_t* shape, const double* data) {
         if (data == _data) {
-            if (rows != _rows || cols != _cols) {
+            if (ndim != _ndim) {
                 throw std::runtime_error("setting matrix data to same pointer but different size");
             }
-            _is_vector = is_vector;
+            for (size_t i = 0; i < ndim; ++i) {
+                if (shape[i] != _shape[i]) {
+                    throw std::runtime_error("setting matrix data to same pointer but different size");
+                }
+            }
             return;
         }
-        if (_data == nullptr || rows != _rows || cols != _cols) {
-            if (_data != nullptr) {
-                mm_alloc.deallocate(_data);
-            }
-            _rows = rows;
-            _cols = cols;
-            _is_vector = is_vector;
-            _data = (double*) mm_alloc.allocate(sizeof(double) * _rows * _cols);
+        if (_data != nullptr) {
+            mm_alloc.deallocate(_data);
+            _data = nullptr;
         }
-        std::memcpy(_data, data, sizeof(double) * _rows * _cols);
+        _ndim = ndim;
+        size_t size = sizeof(double);
+        for (size_t i = 0; i < ndim; ++i) {
+            if ((ssize_t) shape[i] < 0) {
+                throw std::runtime_error("initializing matrix with invalid shape");
+            }
+            _shape[i] = shape[i];
+            size *= shape[i];
+        }
+        if (size > 0) {
+            _data = (double*) mm_alloc.allocate(size);
+            if (data != nullptr) {
+                std::memcpy(_data, data, size);
+            }
+        }
     }
 
     friend std::ostream& operator<<(std::ostream& os, const Matrix& self);
