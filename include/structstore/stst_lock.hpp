@@ -29,18 +29,18 @@ public:
     void lock() {
         int v = flag.load(std::memory_order_relaxed);
         if (v == tid) {
-            lock_level++;
+            ++lock_level;
             return;
         }
         v = 0;
         while (!flag.compare_exchange_strong(v, tid, std::memory_order_acquire)) {
             while ((v = flag.load(std::memory_order_relaxed)) != 0) { }
         }
-        lock_level++;
+        ++lock_level;
     }
 
     void unlock() {
-        if ((lock_level -= 1) == 0) {
+        if ((--lock_level) == 0) {
             flag.store(0, std::memory_order_release);
         }
     }

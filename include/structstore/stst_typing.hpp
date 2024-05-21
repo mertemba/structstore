@@ -88,10 +88,6 @@ public:
     }
 
     static const std::string& get_type_name(uint64_t type_hash) {
-        static std::string empty = "<empty>";
-        if (type_hash == 0) {
-            return empty;
-        }
         try {
             return get_type_names().at(type_hash);
         } catch (const std::out_of_range&) {
@@ -250,6 +246,9 @@ public:
     }
 
 };
+
+template<>
+uint64_t typing::get_type_hash<void>();
 
 }
 
