@@ -192,9 +192,6 @@ public:
             HashString name_int = internal_string(name);
             it = fields.emplace(name_int, StructStoreField{}).first;
             slots.emplace_back(name_int);
-        if (pin_fields) {
-            field.pin();
-        }
         }
         return {it->second, mm_alloc, unmanaged};
     }
