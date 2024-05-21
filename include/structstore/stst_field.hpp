@@ -21,7 +21,6 @@ class StructStoreField {
 private:
     void* data;
     uint64_t type_hash;
-    bool pinned = false;
 
     void assert_nonempty() const {
         if (data == nullptr) {
@@ -39,7 +38,8 @@ public:
     StructStoreField() : data(nullptr), type_hash(0) {}
 
     template<typename T>
-    explicit StructStoreField(T* data) : data(data), type_hash(typing::get_type_hash<T>()) {}
+    explicit StructStoreField(T* data)
+            : data(data), type_hash(typing::get_type_hash<T>()) {}
 
     StructStoreField(StructStoreField&& other) noexcept: StructStoreField() {
         *this = std::move(other);
@@ -57,21 +57,19 @@ public:
         return !data;
     }
 
-    void clear(MiniMalloc& mm_alloc) {
-        if (data) {
-            if (pinned) {
-                throw std::runtime_error("cannot deconstruct pinned field");
-            }
+    void clear(MiniMalloc& mm_alloc, bool unmanaged = false) {
+        if (data && !unmanaged) {
             const typing::DestructorFn<>& destructor = typing::get_destructor(type_hash);
             destructor(mm_alloc, data);
             mm_alloc.deallocate(data);
-            data = nullptr;
-            type_hash = 0;
         }
+        data = nullptr;
+        type_hash = 0;
     }
 
     template<typename T>
     void replace_data(void* new_data, MiniMalloc& mm_alloc) {
+        assert_empty();
         clear(mm_alloc);
         data = new_data;
         type_hash = typing::get_type_hash<T>();
@@ -111,14 +109,6 @@ public:
     StructStoreField& operator=(const T& value) {
         get<T>() = value;
         return *this;
-    }
-
-    void pin() {
-        pinned = true;
-    }
-
-    void unpin() {
-        pinned = false;
     }
 };
 

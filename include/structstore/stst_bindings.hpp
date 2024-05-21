@@ -234,6 +234,7 @@ nb::class_<T> register_struct_type_and_bindings(nb::module_& m, const std::strin
     typing::register_type<T>(name);
     typing::register_mm_alloc_constructor<T>();
     typing::register_default_destructor<T>();
+    typing::register_default_serializer_text<T>();
 
     auto nb_cls = nb::class_<T>(m, name.c_str());
     nb_cls.def(nb::init());

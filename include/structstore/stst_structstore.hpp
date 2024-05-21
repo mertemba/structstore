@@ -28,11 +28,13 @@ extern MiniMalloc static_alloc;
 class FieldAccess {
     StructStoreField& field;
     MiniMalloc& mm_alloc;
+    bool unmanaged;
 
 public:
     FieldAccess() = delete;
 
-    FieldAccess(StructStoreField& field, MiniMalloc& mm_alloc) : field(field), mm_alloc(mm_alloc) {}
+    FieldAccess(StructStoreField& field, MiniMalloc& mm_alloc, bool unmanaged = false)
+            : field(field), mm_alloc(mm_alloc), unmanaged(unmanaged) {}
 
     FieldAccess(const FieldAccess& other) = default;
 
@@ -43,6 +45,9 @@ public:
         if (!field.empty()) {
             // field already exists, directly return
             return field.get<T>();
+        }
+        if (unmanaged) {
+            throw std::runtime_error("cannot create field in StructStore with unmanaged data");
         }
         StlAllocator<T> tmp_alloc{mm_alloc};
         void* ptr = tmp_alloc.allocate(1);
@@ -85,12 +90,20 @@ public:
     }
 };
 
+class StructStoreShared;
+
+class List;
+
+class Struct;
+
 class StructStore {
-    friend class StructStoreShared;
+    friend class structstore::StructStoreShared;
 
-    friend class FieldAccess;
+    friend class structstore::FieldAccess;
 
-    friend class List;
+    friend class structstore::List;
+
+    friend class structstore::Struct;
 
     static void register_type();
 
@@ -103,7 +116,7 @@ private:
 
     unordered_map<HashString, StructStoreField> fields;
     vector<HashString> slots;
-    bool pin_fields;
+    bool unmanaged = false;
 
     HashString internal_string(HashString str) {
         size_t len = std::strlen(str.str);
@@ -114,7 +127,7 @@ private:
 
 public:
     explicit StructStore(MiniMalloc& mm_alloc)
-            : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc), pin_fields(false) {}
+            : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {}
 
     StructStore(const StructStore&) = delete;
 
@@ -136,7 +149,7 @@ public:
 
     void clear() {
         for (auto& [key, value]: fields) {
-            value.clear(mm_alloc);
+            value.clear(mm_alloc, unmanaged);
         }
         fields.clear();
         for (const HashString& str: slots) {
@@ -183,7 +196,7 @@ public:
             field.pin();
         }
         }
-        return {it->second, mm_alloc};
+        return {it->second, mm_alloc, unmanaged};
     }
 
     FieldAccess operator[](const char* name) {
@@ -196,6 +209,32 @@ public:
 
     FieldAccess at(const char* name) {
         return at(HashString{name});
+    }
+
+    template<typename T>
+    void operator()(HashString name, T& t) {
+        if (!unmanaged) {
+            throw std::runtime_error("cannot register field with existing data in StructStore with only managed data");
+        }
+        if constexpr (std::is_base_of<Struct, T>::value) {
+            if (&t.get_alloc() != &mm_alloc) {
+                std::ostringstream str;
+                str << "registering Struct field '" << name.str << "' with a different allocator "
+                    << "than this StructStore, this is probably not what you want";
+                throw std::runtime_error(str.str());
+            }
+        }
+        HashString name_int = internal_string(name);
+        auto ret = fields.emplace(name_int, StructStoreField{&t});
+        if (!ret.second) {
+            throw std::runtime_error("field name already exists");
+        }
+        slots.emplace_back(name_int);
+    }
+
+    template<typename T>
+    void operator()(const char* name, T& t) {
+        (*this)(HashString{name}, t);
     }
 
     SpinMutex& get_mutex() {
@@ -217,20 +256,6 @@ public:
     StructStore& get_store() {
         return *this;
     }
-
-    void pin() {
-        for (auto& [key, value]: fields) {
-            value.pin();
-        }
-        pin_fields = true;
-    }
-
-    void unpin() {
-        for (auto& [key, value]: fields) {
-            value.unpin();
-        }
-        pin_fields = false;
-    }
 };
 
 template<>
@@ -239,23 +264,39 @@ FieldAccess& FieldAccess::operator=<const char*>(const char* const& value);
 template<>
 FieldAccess& FieldAccess::operator=<std::string>(const std::string& value);
 
+class bindings;
+
 class Struct {
+    friend class structstore::bindings;
+
+    friend class structstore::StructStore;
+
+private:
+    MiniMalloc& mm_alloc;
+
 protected:
     StructStore store;
 
     Struct() : Struct(static_alloc) {}
 
-    explicit Struct(MiniMalloc& mm_alloc) : store(mm_alloc) {
-        store.pin();
+    explicit Struct(MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), store(mm_alloc) {
+        store.unmanaged = true;
     }
 
-    ~Struct() {
-        store.unpin();
-    }
-
-public:
     StructStore& get_store() {
         return store;
+    }
+
+    MiniMalloc& get_alloc() {
+        return mm_alloc;
+    }
+
+    StlAllocator<char> get_stl_alloc() {
+        return StlAllocator<char>{mm_alloc};
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const Struct& struct_) {
+        return os << "Struct(" << struct_.store << ")";
     }
 };
 

@@ -42,7 +42,7 @@ public:
         }
     };
 
-    List() : mm_alloc(*(MiniMalloc*) nullptr), data(StlAllocator<StructStoreField>(mm_alloc)) {
+    List() : mm_alloc(*(MiniMalloc*) nullptr), data(StlAllocator<StructStoreField>(static_alloc)) {
         throw std::runtime_error("List should not be constructed without an allocator");
     }
 
@@ -52,7 +52,9 @@ public:
         clear();
     }
 
-    List(const List&) = delete;
+    List(const List& other) : List() {
+        *this = other;
+    }
 
     List(List&&) = delete;
 

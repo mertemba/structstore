@@ -33,7 +33,21 @@ std::unordered_map<uint64_t, typing::SerializeYamlFn<>>& typing::get_serializers
     return *serializers_yaml;
 }
 
+template<>
+uint64_t typing::get_type_hash<void>() {
+    return 0;
+}
+
 static bool register_common_types_() {
+    // empty
+    typing::register_type<void>("<empty>");
+    typing::register_serializer_text<void>([](std::ostream& os, const void* data) -> std::ostream& {
+        return os << "<empty>";
+    });
+    typing::register_serializer_yaml<void>([](const void* data) {
+        return YAML::Node(YAML::Null);
+    });
+
     typing::register_basic_type<int>("int");
     typing::register_basic_type<double>("double");
     typing::register_basic_type<bool>("bool");

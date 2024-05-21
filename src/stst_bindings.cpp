@@ -61,7 +61,6 @@ void structstore::from_object(FieldAccess access, const nb::handle& value, const
         access.clear();
         return;
     }
-    std::cout << "at field " << field_name << std::endl;
     if (!access.get_field().empty()) {
         auto from_python_fn = bindings::get_from_python_fns().at(access.get_type_hash());
         bool success = from_python_fn(access, value);
@@ -77,8 +76,8 @@ void structstore::from_object(FieldAccess access, const nb::handle& value, const
         }
     }
     std::ostringstream msg;
-    msg << "field '" << field_name << "' has unsupported type '" << nb::cast<std::string>(nb::str(value.type()))
-        << "'";
+    msg << "cannot assign value of type '" << nb::cast<std::string>(nb::str(value.type()))
+        << "' to field '" << field_name << "' of type '" << typing::get_type_name(access.get_type_hash()) << "'";
     throw nb::type_error(msg.str().c_str());
 }
 
@@ -105,7 +104,6 @@ void bindings::set_field(StructStore& store, const std::string& name, const nb::
 }
 
 ScopedLock bindings::lock(StructStore& store) {
-    store.get_mutex().lock();
     return ScopedLock{store.get_mutex()};
 }
 
