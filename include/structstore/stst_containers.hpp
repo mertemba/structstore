@@ -116,7 +116,7 @@ void List::push_back<const char*>(const char* const& value);
 
 class Matrix {
 public:
-    static constexpr int MAX_DIMS = 4;
+    static constexpr int MAX_DIMS = 8;
 
 protected:
     MiniMalloc& mm_alloc;
