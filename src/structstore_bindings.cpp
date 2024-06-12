@@ -38,11 +38,12 @@ nb::object to_object(const StructStoreField& field) {
             }
         case FieldTypeValue::MATRIX: {
             Matrix& m = field.get<Matrix>();
-            // todo: in the recursive case use empty capsule to avoid copy?
-            // then memory lifetime is managed by structstore field
-            // auto parent = recursive ? nb::handle() : nb::capsule([]() {}).release();
-            auto parent = nb::handle();
-            return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), parent));
+            if constexpr (recursive) {
+                return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape()),
+                                nb::rv_policy::copy);
+            } else {
+                return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape()));
+            }
         }
         case FieldTypeValue::EMPTY:
             return nb::none();
