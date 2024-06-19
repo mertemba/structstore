@@ -103,16 +103,15 @@ public:
     template<typename T>
     explicit StructStoreField(T* data) : data(data), type(FieldType<T>::value) {}
 
-    StructStoreField(StructStoreField&& other) noexcept: data(other.data), type(other.type) {
-        other.data = nullptr;
-        other.type = FieldTypeValue::EMPTY;
+    StructStoreField(StructStoreField&& other) noexcept: StructStoreField() {
+        *this = std::move(other);
     }
 
     StructStoreField(const StructStoreField&) = delete;
 
-    ~StructStoreField() {
+    ~StructStoreField() noexcept(false) {
         if (data) {
-            throw std::runtime_error("field was not cleaned up");
+            throw std::runtime_error("field was not cleaned up, type is " + std::to_string((int) type));
         }
     }
 
@@ -154,7 +153,7 @@ public:
         type = FieldType<T>::value;
     }
 
-    StructStoreField& operator=(StructStoreField&& other) {
+    StructStoreField& operator=(StructStoreField&& other) noexcept {
         std::swap(data, other.data);
         std::swap(type, other.type);
         return *this;

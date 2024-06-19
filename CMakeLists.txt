@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(structstore VERSION 0.1.7)
+project(structstore VERSION 0.1.8)
 
 set(PY_VERSION_SUFFIX "")
 set(PY_FULL_VERSION ${PROJECT_VERSION}${PY_VERSION_SUFFIX})

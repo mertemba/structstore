@@ -36,11 +36,11 @@ public:
 
     explicit FD(int fd) : fd(fd) {}
 
-    FD(FD&& other) : FD() {
-        std::swap(fd, other.fd);
+    FD(FD&& other) noexcept: FD() {
+        *this = std::move(other);
     }
 
-    FD& operator=(FD&& other) {
+    FD& operator=(FD&& other) noexcept {
         std::swap(fd, other.fd);
         return *this;
     }
@@ -97,11 +97,11 @@ class StructStoreShared {
         ~SharedData() = delete;
     };
 
-    std::string path;
-    FD fd;
-    SharedData* sh_data_ptr;
-    bool use_file;
-    CleanupMode cleanup;
+    std::string path{};
+    FD fd{};
+    SharedData* sh_data_ptr{};
+    bool use_file{};
+    CleanupMode cleanup{};
 
 public:
 
@@ -115,17 +115,11 @@ public:
 
     explicit StructStoreShared(int fd, bool init);
 
-    StructStoreShared(StructStoreShared&& other) {
-        path = std::move(other.path);
-        fd = std::move(other.fd);
-        sh_data_ptr = other.sh_data_ptr;
-        use_file = other.use_file;
-        cleanup = other.cleanup;
-        other.sh_data_ptr = nullptr;
-        other.cleanup = NEVER;
+    StructStoreShared(StructStoreShared&& other) noexcept {
+        *this = std::move(other);
     }
 
-    StructStoreShared& operator=(StructStoreShared&& other) {
+    StructStoreShared& operator=(StructStoreShared&& other) noexcept {
         path = std::move(other.path);
         fd = std::move(other.fd);
         sh_data_ptr = other.sh_data_ptr;
