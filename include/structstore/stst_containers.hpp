@@ -14,13 +14,13 @@ class List {
 public:
     class Iterator {
         const List& list;
-        size_t idx;
+        size_t index;
 
     public:
-        Iterator(const List& list, size_t idx) : list(list), idx(idx) {}
+        Iterator(const List& list, size_t index) : list(list), index(index) {}
 
         bool operator==(Iterator& other) const {
-            return &list == &other.list && idx == other.idx;
+            return &list == &other.list && index == other.index;
         }
 
         bool operator!=(Iterator& other) const {
@@ -28,12 +28,12 @@ public:
         }
 
         Iterator& operator++() {
-            ++idx;
+            ++index;
             return *this;
         }
 
         StructStoreField& operator*() {
-            return ((List&) list).data[idx];
+            return ((List&) list).data.at(index);
         }
     };
 
@@ -65,11 +65,21 @@ public:
     }
 
     FieldAccess insert(size_t index) {
+        if (index > data.size()) {
+            throw std::out_of_range("index out of bounds: " + std::to_string(index));
+        }
         return {*data.emplace(data.begin() + index), mm_alloc};
     }
 
-    FieldAccess operator[](size_t idx) {
-        return {data[idx], mm_alloc};
+    FieldAccess operator[](size_t index) {
+        if (index >= data.size()) {
+            throw std::out_of_range("index out of bounds: " + std::to_string(index));
+        }
+        return {data.at(index), mm_alloc};
+    }
+
+    FieldAccess at(size_t index) {
+        return {data.at(index), mm_alloc};
     }
 
     Iterator begin() const {
@@ -91,7 +101,10 @@ public:
     }
 
     void erase(size_t index) {
-        data[index].clear(mm_alloc);
+        if (index >= data.size()) {
+            throw std::out_of_range("index out of bounds: " + std::to_string(index));
+        }
+        data.at(index).clear(mm_alloc);
         data.erase(data.begin() + index);
     }
 

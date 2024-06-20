@@ -160,16 +160,6 @@ public:
     template<bool recursive>
     friend nanobind::object to_object(const StructStore& store);
 
-    StructStoreField& get_field(HashString name) {
-        auto it = fields.find(name);
-        if (it == fields.end()) {
-            HashString name_int = internal_string(name);
-            it = fields.emplace(name_int, StructStoreField{}).first;
-            slots.emplace_back(name_int);
-        }
-        return it->second;
-    }
-
     StructStoreField* try_get_field(HashString name) {
         auto it = fields.find(name);
         if (it == fields.end()) {
@@ -189,11 +179,25 @@ public:
     }
 
     FieldAccess operator[](HashString name) {
-        return {get_field(name), mm_alloc};
+        auto it = fields.find(name);
+        if (it == fields.end()) {
+            HashString name_int = internal_string(name);
+            it = fields.emplace(name_int, StructStoreField{}).first;
+            slots.emplace_back(name_int);
+        }
+        return {it->second, mm_alloc};
     }
 
     FieldAccess operator[](const char* name) {
-        return {get_field(HashString{name}), mm_alloc};
+        return operator[](HashString{name});
+    }
+
+    FieldAccess at(HashString name) {
+        return {fields.at(name), mm_alloc};
+    }
+
+    FieldAccess at(const char* name) {
+        return at(HashString{name});
     }
 
     SpinMutex& get_mutex() {

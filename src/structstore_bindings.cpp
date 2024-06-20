@@ -39,10 +39,10 @@ nb::object to_object(const StructStoreField& field) {
         case FieldTypeValue::MATRIX: {
             Matrix& m = field.get<Matrix>();
             if constexpr (recursive) {
-                return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape()),
+                return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), {}),
                                 nb::rv_policy::copy);
             } else {
-                return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape()));
+                return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), {}));
             }
         }
         case FieldTypeValue::EMPTY:
