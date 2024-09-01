@@ -30,13 +30,13 @@ extern MiniMalloc static_alloc;
 class FieldAccess {
     StructStoreField& field;
     MiniMalloc& mm_alloc;
-    bool unmanaged;
+    bool managed;
 
 public:
     FieldAccess() = delete;
 
-    FieldAccess(StructStoreField& field, MiniMalloc& mm_alloc, bool unmanaged = false)
-            : field(field), mm_alloc(mm_alloc), unmanaged(unmanaged) {}
+    FieldAccess(StructStoreField& field, MiniMalloc& mm_alloc, bool managed = true)
+        : field(field), mm_alloc(mm_alloc), managed(managed) {}
 
     FieldAccess(const FieldAccess& other) = default;
 
@@ -48,7 +48,7 @@ public:
             // field already exists, directly return
             return field.get<T>();
         }
-        if (unmanaged) {
+        if (!managed) {
             throw std::runtime_error("cannot create field in StructStore with unmanaged data");
         }
         StlAllocator<T> tmp_alloc{mm_alloc};
@@ -90,6 +90,10 @@ public:
     void clear() {
         field.clear(mm_alloc);
     }
+
+    void check() const {
+        try_with_info("at FieldAccess: ", field.check(mm_alloc););
+    }
 };
 
 class StructStoreShared;
@@ -118,9 +122,9 @@ private:
 
     unordered_map<HashString, StructStoreField> fields;
     vector<HashString> slots;
-    bool unmanaged = false;
+    bool managed = true;
 
-    HashString internal_string(HashString str) {
+    HashString internal_string(const HashString& str) {
         size_t len = std::strlen(str.str);
         char* buf = (char*) mm_alloc.allocate(len + 1);
         std::strcpy(buf, str.str);
@@ -151,7 +155,7 @@ public:
 
     void clear() {
         for (auto& [key, value]: fields) {
-            value.clear(mm_alloc, unmanaged);
+            value.clear(mm_alloc, managed);
         }
         fields.clear();
         for (const HashString& str: slots) {
@@ -195,7 +199,7 @@ public:
             it = fields.emplace(name_int, StructStoreField{}).first;
             slots.emplace_back(name_int);
         }
-        return {it->second, mm_alloc, unmanaged};
+        return {it->second, mm_alloc, managed};
     }
 
     FieldAccess operator[](const char* name) {
@@ -212,7 +216,7 @@ public:
 
     template<typename T>
     void operator()(HashString name, T& t) {
-        if (!unmanaged) {
+        if (managed) {
             throw std::runtime_error("cannot register field with existing data in StructStore with only managed data");
         }
         if constexpr (std::is_base_of<Struct, T>::value) {
@@ -264,8 +268,10 @@ public:
       for (const auto &[key, value] : fields) {
         try_with_info("in field '" << key.str << "' name: ",
                       mm_alloc.assert_owned(key.str););
-        try_with_info("in field '" << key.str << "' value: ",
-                      value.check(mm_alloc););
+        if (managed) {
+            try_with_info("in field '" << key.str << "' value: ",
+                          value.check(mm_alloc););
+        }
       }
     }
 };
@@ -302,8 +308,13 @@ protected:
     Struct() : Struct(static_alloc) {}
 
     explicit Struct(MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), store(mm_alloc) {
-        store.unmanaged = true;
+        store.managed = false;
     }
+
+    Struct(const Struct&) = delete;
+    Struct(Struct&&) = delete;
+    Struct& operator=(const Struct&) = delete;
+    Struct& operator=(Struct&&) = delete;
 
     StructStore& get_store() {
         return store;

@@ -366,7 +366,7 @@ public:
             std::ostringstream str;
             str << "insufficient space in mm_alloc region, currently allocated: " << allocated;
             str << ", requested: " << field_size;
-            throw std::runtime_error(str.str().c_str());
+            throw std::runtime_error(str.str());
         }
         auto* node = (memnode*) (((byte*) ptr) - ALLOC_NODE_SIZE);
         allocated += node->size;
@@ -388,7 +388,7 @@ public:
         return allocated;
     }
 
-    void assert_owned(const void* ptr) {
+    void assert_owned(const void* ptr) const {
         if (ptr == nullptr) {
             throw std::runtime_error("pointer is NULL");
         }
@@ -419,6 +419,19 @@ public:
 
     void deallocate(T* p, std::size_t) {
         mm_alloc.deallocate(p);
+    }
+
+    // defined in stst_typing.hpp
+    inline void construct(T* p);
+
+    void construct(T* p, T&& other) {
+        construct(p);
+        *p = std::move(other);
+    }
+
+    void construct(T* p, const T& other) {
+        construct(p);
+        *p = other;
     }
 
     template<typename U>

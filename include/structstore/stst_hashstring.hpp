@@ -19,6 +19,28 @@ struct HashString {
     const char* str;
     uint64_t hash;
 
+    HashString() : str(nullptr), hash(0) {}
+
+    HashString(HashString&& other) : HashString() {
+        *this = std::move(other);
+    }
+
+    HashString(const HashString& other) : HashString() {
+        *this = other;
+    }
+
+    HashString& operator=(HashString&& other) {
+        std::swap(str, other.str);
+        std::swap(hash, other.hash);
+        return *this;
+    }
+
+    HashString& operator=(const HashString& other) {
+        str = other.str;
+        hash = other.hash;
+        return *this;
+    }
+
     explicit HashString(const char* str) : str(str), hash(const_hash(str)) {}
 
     HashString(const char* str, uint64_t hash) : str(str), hash(hash) {}

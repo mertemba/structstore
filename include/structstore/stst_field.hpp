@@ -58,8 +58,8 @@ public:
         return !data;
     }
 
-    void clear(MiniMalloc& mm_alloc, bool unmanaged = false) {
-        if (data && !unmanaged) {
+    void clear(MiniMalloc& mm_alloc, bool managed = true) {
+        if (data && managed) {
             const typing::DestructorFn<>& destructor = typing::get_destructor(type_hash);
             destructor(mm_alloc, data);
             mm_alloc.deallocate(data);

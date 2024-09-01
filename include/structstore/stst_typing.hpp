@@ -93,6 +93,16 @@ public:
         }
     }
 
+    template<typename T>
+    static const uint64_t* find_type_hash() {
+        auto& type_hashes = get_type_hashes();
+        auto it = type_hashes.find(typeid(T));
+        if (it == type_hashes.end()) {
+            return nullptr;
+        }
+        return &it->second;
+    }
+
     static const std::string& get_type_name(uint64_t type_hash) {
         try {
             return get_type_names().at(type_hash);
@@ -288,6 +298,15 @@ public:
 template<>
 uint64_t typing::get_type_hash<void>();
 
+template<typename T>
+inline void StlAllocator<T>::construct(T* p) {
+    const uint64_t* type_hash = typing::find_type_hash<T>();
+    if (type_hash) {
+    typing::get_constructor(*type_hash)(mm_alloc, p);
+    } else {
+        new (p) T;
+    }
 }
+} // namespace structstore
 
 #endif

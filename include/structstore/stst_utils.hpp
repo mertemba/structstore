@@ -10,7 +10,7 @@
     } catch (std::runtime_error _e) {                                          \
       std::ostringstream _str;                                                 \
       _str << info_stream << _e.what();                                        \
-      throw std::runtime_error(_str.str().c_str());                            \
+      throw std::runtime_error(_str.str());                                    \
     }                                                                          \
   } while (0)
 
