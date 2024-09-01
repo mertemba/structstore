@@ -3,9 +3,11 @@
 
 #include "structstore/stst_alloc.hpp"
 #include "structstore/stst_field.hpp"
-#include "structstore/stst_lock.hpp"
 #include "structstore/stst_hashstring.hpp"
+#include "structstore/stst_lock.hpp"
+#include "structstore/stst_stl_types.hpp"
 #include "structstore/stst_typing.hpp"
+#include "structstore/stst_utils.hpp"
 
 #include <iostream>
 #include <unordered_map>
@@ -253,6 +255,19 @@ public:
     StructStore& get_store() {
         return *this;
     }
+
+    void check() const {
+      for (const HashString &str : slots) {
+        try_with_info("in slot '" << str.str << "' name: ",
+                      mm_alloc.assert_owned(str.str););
+      }
+      for (const auto &[key, value] : fields) {
+        try_with_info("in field '" << key.str << "' name: ",
+                      mm_alloc.assert_owned(key.str););
+        try_with_info("in field '" << key.str << "' value: ",
+                      value.check(mm_alloc););
+      }
+    }
 };
 
 template<>
@@ -263,10 +278,20 @@ FieldAccess& FieldAccess::operator=<std::string>(const std::string& value);
 
 class bindings;
 
+class Struct;
+
+static const StructStore& get_store(const Struct&);
+
+static StructStore& get_store(Struct&);
+
 class Struct {
     friend class structstore::bindings;
 
     friend class structstore::StructStore;
+
+    friend const StructStore& structstore::get_store(const Struct&);
+
+    friend StructStore& structstore::get_store(Struct&);
 
 private:
     MiniMalloc& mm_alloc;
@@ -296,6 +321,14 @@ protected:
         return os << "Struct(" << struct_.store << ")";
     }
 };
+
+static inline const StructStore& get_store(const Struct& str) {
+    return str.store;
+}
+
+static inline StructStore& get_store(Struct& str) {
+    return str.store;
+}
 
 }
 

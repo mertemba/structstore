@@ -3,6 +3,7 @@
 
 #include "structstore/stst_hashstring.hpp"
 #include "structstore/stst_alloc.hpp"
+#include "structstore/stst_utils.hpp"
 
 #include <iostream>
 #include <unordered_map>
@@ -28,6 +29,9 @@ public:
     template<typename T=void>
     using SerializeYamlFn = std::function<YAML::Node(const T*)>;
 
+    template <typename T = void>
+    using CheckFn = std::function<void(MiniMalloc &, const T *)>;
+
 private:
 
     static std::unordered_map<std::type_index, uint64_t>& get_type_hashes();
@@ -41,6 +45,8 @@ private:
     static std::unordered_map<uint64_t, SerializeTextFn<>>& get_serializers_text();
 
     static std::unordered_map<uint64_t, SerializeYamlFn<>>& get_serializers_yaml();
+
+    static std::unordered_map<uint64_t, CheckFn<>> &get_checks();
 
 public:
 
@@ -196,6 +202,27 @@ public:
         }
     }
 
+    template <typename T> static void register_default_check() {
+      uint64_t type_hash = typing::get_type_hash<T>();
+      static CheckFn<T> check = [](MiniMalloc &mm_alloc, const T *t) {
+        try_with_info("in default check: ", mm_alloc.assert_owned(t););
+      };
+      bool success =
+          get_checks().insert({type_hash, (const CheckFn<> &)check}).second;
+      if (!success) {
+        throw already_registered_type_error(type_hash);
+      }
+    }
+
+    template <typename T> static void register_check(const CheckFn<T> &check) {
+      uint64_t type_hash = typing::get_type_hash<T>();
+      bool success =
+          get_checks().insert({type_hash, (const CheckFn<> &)check}).second;
+      if (!success) {
+        throw already_registered_type_error(type_hash);
+      }
+    }
+
     static ConstructorFn<>& get_constructor(uint64_t type_hash) {
         try {
             return get_constructors().at(type_hash);
@@ -236,6 +263,16 @@ public:
         }
     }
 
+    static const CheckFn<> &get_check(uint64_t type_hash) {
+      try {
+        return get_checks().at(type_hash);
+      } catch (const std::out_of_range &) {
+        std::ostringstream str;
+        str << "error at get_check() for type '" << get_type_name(type_hash) << "'";
+        throw std::runtime_error(str.str());
+      }
+    }
+
     template<typename T>
     static void register_basic_type(const char* name) {
         typing::register_type<T>(name);
@@ -243,6 +280,7 @@ public:
         typing::register_default_destructor<T>();
         typing::register_default_serializer_text<T>();
         typing::register_default_serializer_yaml<T>();
+        typing::register_default_check<T>();
     }
 
 };

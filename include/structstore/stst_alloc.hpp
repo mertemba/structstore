@@ -3,15 +3,16 @@
 
 #include "structstore/stst_lock.hpp"
 
-#include <type_traits>
-#include <scoped_allocator>
-#include <unordered_map>
-#include <cmath>
 #include <cassert>
+#include <cmath>
 #include <cstring>
 #include <exception>
+#include <scoped_allocator>
 #include <sstream>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 namespace structstore {
@@ -40,11 +41,11 @@ class MiniMalloc {
 
     // member variables
     SpinMutex mutex;
-    ptrdiff_type (* free_nodes)[SIZES_COUNT] = nullptr;
+    byte* const buffer;
+    ptrdiff_type (*free_nodes)[SIZES_COUNT] = nullptr;
     size_type sizes[SIZES_COUNT];
     const size_t blocksize;
     size_t allocated;
-
 
     // member methods
     static inline bool is_allocated(memnode* node) {
@@ -109,7 +110,11 @@ class MiniMalloc {
     }
 
     static int uint64_log2(uint64_t n) {
-#define S(k) if (n >= (UINT64_C(1) << k)) { i += k; n >>= k; }
+#define S(k)                       \
+    if (n >= (UINT64_C(1) << k)) { \
+        i += k;                    \
+        n >>= k;                   \
+    }
         int i = -(n == 0);
         S(32);
         S(16);
@@ -183,8 +188,8 @@ class MiniMalloc {
         attach_free_nodes(node, old_first_free);
     }
 
-    void init_mini_malloc(void* buffer) {
-        byte* ptr = (byte*) buffer;
+    void init_mini_malloc() {
+        byte* ptr = buffer;
         // ensure 8-byte alignment
         static_assert((ALLOC_NODE_SIZE % 8) == 0);
         static_assert(sizeof(memnode) == 16);
@@ -219,7 +224,7 @@ class MiniMalloc {
         last_node->size = 0;
         set_next_free_node(get_free_nodes_head(SIZES_COUNT - 1), block_node);
         set_zero(block_node);
-        assert((byte*) last_node + ALLOC_NODE_SIZE == (byte*) buffer + blocksize);
+        assert((byte*) last_node + ALLOC_NODE_SIZE == buffer + blocksize);
     }
 
     void* mm_alloc(size_t size) {
@@ -326,12 +331,12 @@ class MiniMalloc {
     }
 
 public:
-    MiniMalloc(size_t size, void* buffer) : blocksize(size), allocated{0} {
+    MiniMalloc(size_t size, void* buffer) : buffer{(byte*) buffer}, blocksize{size}, allocated{0} {
         ScopedLock lock{mutex};
         if (buffer == nullptr) {
             return;
         }
-        init_mini_malloc((byte*) buffer);
+        init_mini_malloc();
     }
 
     MiniMalloc() = delete;
@@ -382,12 +387,21 @@ public:
     size_t get_allocated() const {
         return allocated;
     }
+
+    void assert_owned(const void* ptr) {
+        if (ptr == nullptr) {
+            throw std::runtime_error("pointer is NULL");
+        }
+        if (ptr < buffer || ptr >= buffer + blocksize) {
+            throw std::runtime_error("pointer not inside managed memory");
+        }
+    }
 };
 
 template<typename T>
 class StlAllocator {
-    template<typename U> friend
-    struct StlAllocator;
+    template<typename U>
+    friend class StlAllocator;
 
     MiniMalloc& mm_alloc;
 
@@ -416,16 +430,9 @@ public:
     bool operator!=(StlAllocator<U> const& rhs) const {
         return &mm_alloc != &rhs.mm_alloc;
     }
+
+    MiniMalloc& get_alloc() { return mm_alloc; }
 };
-
-using string = std::basic_string<char, std::char_traits<char>, StlAllocator<char>>;
-
-template<class T>
-using vector = std::vector<T, StlAllocator<T>>;
-
-template<class K, class T>
-using unordered_map = std::unordered_map<K, T, std::hash<K>, std::equal_to<K>, StlAllocator<std::pair<const K, T>>>;
-
-}
+} // namespace structstore
 
 #endif

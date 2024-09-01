@@ -1,9 +1,10 @@
 #ifndef STST_FIELD_HPP
 #define STST_FIELD_HPP
 
-#include "structstore/stst_hashstring.hpp"
 #include "structstore/stst_alloc.hpp"
+#include "structstore/stst_hashstring.hpp"
 #include "structstore/stst_typing.hpp"
+#include "structstore/stst_utils.hpp"
 
 #include <iostream>
 
@@ -49,7 +50,7 @@ public:
 
     ~StructStoreField() noexcept(false) {
         if (data) {
-            throw std::runtime_error("field was not cleaned up, type is " + std::to_string((int) type));
+            throw std::runtime_error("field was not cleaned up, type is " + typing::get_type_name(type_hash));
         }
     }
 
@@ -109,6 +110,14 @@ public:
     StructStoreField& operator=(const T& value) {
         get<T>() = value;
         return *this;
+    }
+
+    void check(MiniMalloc& mm_alloc) const {
+        if (data != nullptr) {
+            try_with_info("in field data ptr: ", mm_alloc.assert_owned(data););
+            const typing::CheckFn<>& check = typing::get_check(type_hash);
+            try_with_info("in field data content: ", check(mm_alloc, data););
+        }
     }
 };
 

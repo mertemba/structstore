@@ -1,4 +1,5 @@
 #include "structstore/stst_containers.hpp"
+#include "structstore/stst_alloc.hpp"
 
 using namespace structstore;
 
@@ -11,7 +12,13 @@ void List::register_type() {
             [](const List* list) -> YAML::Node {
                 return to_yaml(*list);
             });
-};
+    typing::register_check<List>([](MiniMalloc& mm_alloc, const List* list) {
+        try_with_info("List*: ", mm_alloc.assert_owned(list););
+        for (const StructStoreField& field: list->data) {
+            try_with_info("in List iter: ", field.check(mm_alloc););
+        }
+    });
+}
 
 std::ostream& structstore::operator<<(std::ostream& os, const List& list) {
     os << "[";
@@ -39,6 +46,10 @@ void Matrix::register_type() {
     typing::register_mm_alloc_constructor<Matrix>();
     typing::register_default_destructor<Matrix>();
     typing::register_default_serializer_text<Matrix>();
+    typing::register_check<Matrix>([](MiniMalloc& mm_alloc, const Matrix* matrix) {
+        try_with_info("Matrix*: ", mm_alloc.assert_owned(matrix););
+        try_with_info("Matrix data: ", mm_alloc.assert_owned(matrix->_data););
+    });
 }
 
 std::ostream& structstore::operator<<(std::ostream& os, const Matrix& matrix) {

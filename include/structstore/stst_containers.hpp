@@ -3,6 +3,7 @@
 
 #include "structstore/stst_structstore.hpp"
 #include "structstore/stst_field.hpp"
+#include "structstore/stst_stl_types.hpp"
 #include "structstore/stst_typing.hpp"
 
 namespace structstore {
@@ -181,14 +182,12 @@ public:
     }
 
     Matrix& operator=(Matrix&& other) {
-        if (&mm_alloc == &other.mm_alloc) {
-            std::swap(_ndim, other._ndim);
-            std::swap(_shape, other._shape);
-            std::swap(_data, other._data);
-        } else {
-            const Matrix& other_ = other;
-            *this = other_;
+        if (&mm_alloc != &other.mm_alloc) {
+            throw std::runtime_error("move assignment of structstore::Matrix between different StructStores is not supported");
         }
+        std::swap(_ndim, other._ndim);
+        std::swap(_shape, other._shape);
+        std::swap(_data, other._data);
         return *this;
     }
 

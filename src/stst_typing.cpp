@@ -33,6 +33,11 @@ std::unordered_map<uint64_t, typing::SerializeYamlFn<>>& typing::get_serializers
     return *serializers_yaml;
 }
 
+std::unordered_map<uint64_t, typing::CheckFn<>>& typing::get_checks() {
+    static auto* checks = new std::unordered_map<uint64_t, typing::CheckFn<>>();
+    return *checks;
+}
+
 template<>
 uint64_t typing::get_type_hash<void>() {
     return 0;

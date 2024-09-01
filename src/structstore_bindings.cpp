@@ -99,10 +99,10 @@ static bool registered_common_bindings = []() {
             [](const StructStoreField& field, bool recursive) -> nb::object {
                 Matrix& m = field.get<Matrix>();
                 if (recursive) {
-                    return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape()),
+                    return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()),
                                     nb::rv_policy::copy);
                 } else {
-                    return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape()));
+                    return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()));
                 }
             });
     bindings::register_from_python_fn<Matrix>([](FieldAccess access, const nanobind::handle& value) {

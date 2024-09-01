@@ -3,7 +3,7 @@
 using namespace structstore;
 
 static constexpr size_t malloc_size = 1 << 20;
-MiniMalloc structstore::static_alloc{malloc_size, std::malloc(malloc_size)};
+MiniMalloc structstore::static_alloc(malloc_size, std::malloc(malloc_size));
 
 void StructStore::register_type() {
     typing::register_type<StructStore>("structstore::StructStore");

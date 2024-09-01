@@ -1,8 +1,9 @@
 #ifndef STST_BINDINGS_HPP
 #define STST_BINDINGS_HPP
 
+#include "structstore/stst_alloc.hpp"
 #include "structstore/stst_containers.hpp"
-#include "structstore/stst_hashstring.hpp"
+#include "structstore/stst_stl_types.hpp"
 #include "structstore/stst_structstore.hpp"
 #include "structstore/stst_typing.hpp"
 
@@ -11,6 +12,17 @@
 #include <functional>
 
 #include <nanobind/nanobind.h>
+
+// make customized STL containers opaque to nanobind
+namespace nanobind::detail {
+template<class T>
+class type_caster<structstore::vector<T>>
+    : public type_caster_base<structstore::vector<T>> {};
+
+template<class K, class T>
+class type_caster<structstore::unordered_map<K, T>>
+    : public type_caster_base<structstore::unordered_map<K, T>> {};
+} // namespace nanobind::detail
 
 namespace structstore {
 
@@ -224,6 +236,11 @@ public:
             auto& store = t.get_store();
             return clear(store);
         });
+
+        cls.def("check", [](T& t) {
+            auto& store = t.get_store();
+            return store.check();
+        });
     }
 };
 
@@ -235,6 +252,9 @@ nb::class_<T> register_struct_type_and_bindings(nb::module_& m, const std::strin
     typing::register_mm_alloc_constructor<T>();
     typing::register_default_destructor<T>();
     typing::register_default_serializer_text<T>();
+    typing::register_check<T>([](MiniMalloc&, const T* t) {
+        get_store(*t).check();
+    });
 
     auto nb_cls = nb::class_<T>(m, name.c_str());
     nb_cls.def(nb::init());
