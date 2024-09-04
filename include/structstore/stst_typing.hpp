@@ -33,7 +33,6 @@ public:
     using CheckFn = std::function<void(MiniMalloc &, const T *)>;
 
 private:
-
     static std::unordered_map<std::type_index, uint64_t>& get_type_hashes();
 
     static std::unordered_map<uint64_t, std::string>& get_type_names();
@@ -49,7 +48,6 @@ private:
     static std::unordered_map<uint64_t, CheckFn<>> &get_checks();
 
 public:
-
     static void register_common_types();
 
     static std::runtime_error already_registered_type_error(uint64_t type_hash) {
@@ -171,6 +169,19 @@ public:
         uint64_t type_hash = typing::get_type_hash<T>();
         static SerializeTextFn<T> serializer = [](std::ostream& os, const T* t) -> std::ostream& {
             return os << *t;
+        };
+        bool success = get_serializers_text().insert(
+                {type_hash, (const SerializeTextFn<>&) serializer}).second;
+        if (!success) {
+            throw already_registered_type_error(type_hash);
+        }
+    }
+
+    template<typename T>
+    static void register_dummy_serializer_text() {
+        uint64_t type_hash = typing::get_type_hash<T>();
+        static SerializeTextFn<T> serializer = [type_hash](std::ostream& os, const T* t) -> std::ostream& {
+            return os << "{" << typing::get_type_name(type_hash) << "}";
         };
         bool success = get_serializers_text().insert(
                 {type_hash, (const SerializeTextFn<>&) serializer}).second;

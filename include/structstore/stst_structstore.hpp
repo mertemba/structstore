@@ -96,6 +96,26 @@ public:
     }
 };
 
+class AccessView {
+    StructStoreField field;
+    MiniMalloc& mm_alloc;
+
+public:
+    template<typename T>
+    explicit AccessView(T& data, MiniMalloc& mm_alloc) : field{&data}, mm_alloc{mm_alloc} {}
+
+    template<typename T>
+    explicit AccessView(T& data, uint64_t type_hash, MiniMalloc& mm_alloc) : field{&data, type_hash}, mm_alloc{mm_alloc} {}
+
+    FieldAccess operator*() {
+        return {field, mm_alloc, false};
+    }
+
+    ~AccessView() {
+        field.clear_unmanaged();
+    }
+};
+
 class StructStoreShared;
 
 class List;
@@ -155,7 +175,11 @@ public:
 
     void clear() {
         for (auto& [key, value]: fields) {
-            value.clear(mm_alloc, managed);
+            if (managed) {
+                value.clear(mm_alloc);
+            } else {
+                value.clear_unmanaged();
+            }
         }
         fields.clear();
         for (const HashString& str: slots) {
@@ -168,7 +192,7 @@ public:
 
     friend YAML::Node to_yaml(const StructStore& self);
 
-    friend nanobind::object to_object(const StructStore& store, bool recursive);
+    friend nanobind::object to_python(const StructStore& store, bool recursive);
 
     StructStoreField* try_get_field(HashString name) {
         auto it = fields.find(name);

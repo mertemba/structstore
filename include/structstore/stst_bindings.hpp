@@ -3,14 +3,18 @@
 
 #include "structstore/stst_alloc.hpp"
 #include "structstore/stst_containers.hpp"
+#include "structstore/stst_field.hpp"
 #include "structstore/stst_stl_types.hpp"
 #include "structstore/stst_structstore.hpp"
 #include "structstore/stst_typing.hpp"
+#include "structstore/stst_utils.hpp"
 
-#include <iostream>
-#include <unordered_map>
 #include <functional>
+#include <iostream>
+#include <stdexcept>
+#include <unordered_map>
 
+#include <nanobind/make_iterator.h>
 #include <nanobind/nanobind.h>
 
 // make customized STL containers opaque to nanobind
@@ -28,13 +32,9 @@ namespace structstore {
 
 namespace nb = nanobind;
 
-nb::object to_object(const StructStoreField& field, bool recursive);
+nb::object to_python(const StructStoreField& field, bool recursive);
 
-nb::object to_object(const StructStore& store, bool recursive);
-
-nb::object to_object(const List& list, bool recursive);
-
-void from_object(FieldAccess access, const nb::handle& value, const std::string& field_name);
+void from_python(FieldAccess access, const nb::handle& value, const std::string& field_name);
 
 class bindings {
 private:
@@ -108,18 +108,37 @@ public:
         });
     }
 
-    template<typename T_cpp>
-    static void register_basic_bindings(const nb::handle& T_py) {
-        static_assert(!std::is_pointer<T_cpp>::value);
-        register_to_python_fn<T_cpp>([](const StructStoreField& field, bool recursive) -> nb::object {
-            return nb::cast(field.get<T_cpp>(), nb::rv_policy::reference);
+    template<typename T>
+    static void register_basic_bindings(nb::class_<T>& cls) {
+        uint64_t type_hash = typing::get_type_hash<T>();
+        static_assert(!std::is_pointer<T>::value);
+        register_to_python_fn<T>([](const StructStoreField& field, bool /*recursive*/) -> nb::object {
+            return nb::cast(field.get<T>(), nb::rv_policy::reference);
         });
-        register_from_python_fn<T_cpp>([T_py](FieldAccess access, const nb::handle& value) {
-            if (value.type().equal(T_py)) {
-                access.get<T_cpp>() = nb::cast<T_cpp&>(value);
+        register_from_python_fn<T>([cls](FieldAccess access, const nb::handle& value) {
+            if (value.type().equal(cls)) {
+                access.get<T>() = nb::cast<T&>(value);
                 return true;
             }
             return false;
+        });
+        cls.def("to_yaml", [=](T& t) {
+            return YAML::Dump(to_yaml(*FieldView{t, type_hash}));
+        });
+        cls.def("__repr__", [=](T& t) {
+            return (std::ostringstream() << *FieldView{t, type_hash}).str();
+        });
+        cls.def("copy", [=](T& t) {
+            return structstore::to_python(*FieldView{t, type_hash}, false);
+        });
+        cls.def("deepcopy", [=](T& t) {
+            return structstore::to_python(*FieldView{t, type_hash}, true);
+        });
+        cls.def("__copy__", [=](T& t) {
+            return structstore::to_python(*FieldView{t, type_hash}, false);
+        });
+        cls.def("__deepcopy__", [=](T& t, nb::handle&) {
+            return structstore::to_python(*FieldView{t, type_hash}, true);
         });
     }
 
@@ -135,17 +154,6 @@ public:
                 return true;
             }
             return false;
-        });
-    }
-
-    template<typename T_cpp>
-    static void register_object_to_python() {
-        register_to_python_fn<T_cpp>([](const StructStoreField& field, bool recursive) -> nb::object {
-            if (recursive) {
-                return to_object(field.get<T_cpp>(), true);
-            } else {
-                return nb::cast(field.get<T_cpp>(), nb::rv_policy::reference);
-            }
         });
     }
 
@@ -178,59 +186,23 @@ public:
 
         cls.def("__getattr__", [](T& t, const std::string& name) {
             auto& store = t.get_store();
-            return get_field(store, name);
-        }, nb::arg("name"), nb::rv_policy::reference_internal);
+            return get_field(store, name); }, nb::arg("name"), nb::rv_policy::reference_internal);
 
         cls.def("__setattr__", [](T& t, const std::string& name, const nb::object& value) {
             auto& store = t.get_store();
-            return set_field(store, name, value);
-        }, nb::arg("name"), nb::arg("value").none());
+            return set_field(store, name, value); }, nb::arg("name"), nb::arg("value").none());
 
         cls.def("__getitem__", [](T& t, const std::string& name) {
             auto& store = t.get_store();
-            return get_field(store, name);
-        }, nb::arg("name"), nb::rv_policy::reference_internal);
+            return get_field(store, name); }, nb::arg("name"), nb::rv_policy::reference_internal);
 
         cls.def("__setitem__", [](T& t, const std::string& name, const nb::object& value) {
             auto& store = t.get_store();
-            return set_field(store, name, value);
-        }, nb::arg("name"), nb::arg("value").none());
+            return set_field(store, name, value); }, nb::arg("name"), nb::arg("value").none());
 
         cls.def("lock", [](T& t) {
             auto& store = t.get_store();
-            return lock(store);
-        }, nb::rv_policy::move);
-
-        cls.def("to_yaml", [](T& t) {
-            auto& store = t.get_store();
-            auto lock = store.read_lock();
-            return YAML::Dump(to_yaml(store));
-        });
-
-        cls.def("__repr__", [](T& t) {
-            auto& store = t.get_store();
-            return __repr__(store);
-        });
-
-        cls.def("copy", [](T& t) {
-            auto& store = t.get_store();
-            return copy(store);
-        });
-
-        cls.def("deepcopy", [](T& t) {
-            auto& store = t.get_store();
-            return deepcopy(store);
-        });
-
-        cls.def("__copy__", [](T& t) {
-            auto& store = t.get_store();
-            return copy(store);
-        });
-
-        cls.def("__deepcopy__", [](T& t, nb::handle&) {
-            auto& store = t.get_store();
-            return deepcopy(store);
-        });
+            return lock(store); }, nb::rv_policy::move);
 
         cls.def("clear", [](T& t) {
             auto& store = t.get_store();
@@ -238,6 +210,7 @@ public:
         });
 
         cls.def("check", [](T& t) {
+            std::cout << "checking from python ..." << std::endl;
             auto& store = t.get_store();
             return store.check();
         });
@@ -263,6 +236,6 @@ nb::class_<T> register_struct_type_and_bindings(nb::module_& m, const std::strin
     return nb_cls;
 }
 
-}
+} // namespace structstore
 
 #endif

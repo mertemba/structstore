@@ -24,7 +24,7 @@ std::unordered_map<uint64_t, bindings::ToPythonFn>& bindings::get_to_python_fns(
     return *to_python_fns;
 }
 
-nb::object structstore::to_object(const StructStoreField& field, bool recursive) {
+nb::object structstore::to_python(const StructStoreField& field, bool recursive) {
     if (field.empty()) {
         return nb::none();
     }
@@ -39,24 +39,8 @@ nb::object structstore::to_object(const StructStoreField& field, bool recursive)
     }
 }
 
-nb::object structstore::to_object(const List& list, bool recursive) {
-    auto pylist = nb::list();
-    for (const StructStoreField& field: list) {
-        pylist.append(to_object(field, recursive));
-    }
-    return pylist;
-}
-
-nb::object structstore::to_object(const StructStore& store, bool recursive) {
-    auto obj = bindings::SimpleNamespace();
-    for (const auto& name: store.slots) {
-        nb::setattr(obj, name.str, to_object(store.fields.at(name), recursive));
-    }
-    return obj;
-}
-
 __attribute__((__visibility__("default")))
-void structstore::from_object(FieldAccess access, const nb::handle& value, const std::string& field_name) {
+void structstore::from_python(FieldAccess access, const nb::handle& value, const std::string& field_name) {
     if (value.is_none()) {
         access.clear();
         return;
@@ -95,33 +79,16 @@ nb::object bindings::get_field(StructStore& store, const std::string& name) {
     if (field == nullptr) {
         throw nb::attribute_error();
     }
-    return to_object(*field, false);
+    return to_python(*field, false);
 }
 
 void bindings::set_field(StructStore& store, const std::string& name, const nb::object& value) {
     auto lock = store.write_lock();
-    from_object(store[name.c_str()], value, name);
+    from_python(store[name.c_str()], value, name);
 }
 
 ScopedLock bindings::lock(StructStore& store) {
     return ScopedLock{store.get_mutex()};
-}
-
-nb::object bindings::__repr__(StructStore& store) {
-    auto lock = store.read_lock();
-    std::ostringstream str;
-    str << store;
-    return nb::cast(str.str());
-}
-
-nb::object bindings::copy(StructStore& store) {
-    auto lock = store.read_lock();
-    return to_object(store, false);
-}
-
-nb::object bindings::deepcopy(StructStore& store) {
-    auto lock = store.read_lock();
-    return to_object(store, true);
 }
 
 void bindings::clear(StructStore& store) {

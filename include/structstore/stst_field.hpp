@@ -42,6 +42,9 @@ public:
     explicit StructStoreField(T* data)
             : data(data), type_hash(typing::get_type_hash<T>()) {}
 
+    explicit StructStoreField(void* data, uint64_t type_hash)
+        : data(data), type_hash(type_hash) {}
+
     StructStoreField(StructStoreField&& other) noexcept: StructStoreField() {
         *this = std::move(other);
     }
@@ -58,12 +61,17 @@ public:
         return !data;
     }
 
-    void clear(MiniMalloc& mm_alloc, bool managed = true) {
-        if (data && managed) {
+    void clear(MiniMalloc& mm_alloc) {
+        if (data) {
             const typing::DestructorFn<>& destructor = typing::get_destructor(type_hash);
             destructor(mm_alloc, data);
             mm_alloc.deallocate(data);
         }
+        data = nullptr;
+        type_hash = 0;
+    }
+
+    void clear_unmanaged() {
         data = nullptr;
         type_hash = 0;
     }
@@ -121,6 +129,24 @@ public:
     }
 };
 
+class FieldView {
+    StructStoreField field;
+
+public:
+    template<typename T>
+    explicit FieldView(T& data) : field{&data} {}
+
+    template<typename T>
+    explicit FieldView(T& data, uint64_t type_hash) : field{&data, type_hash} {}
+
+    StructStoreField& operator*() {
+        return field;
+    }
+
+    ~FieldView() {
+        field.clear_unmanaged();
+    }
+};
 }
 
 #endif

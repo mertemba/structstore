@@ -30,7 +30,6 @@ static bool registered_common_bindings = []() {
     });
 
     // structstore::StructStore
-    bindings::register_object_to_python<StructStore>();
     bindings::register_from_python_fn<StructStore>([](FieldAccess access, const nanobind::handle& value) {
         if (bindings::object_from_python<StructStore>(access, value)) {
             return true;
@@ -41,7 +40,7 @@ static bool registered_common_bindings = []() {
             store.clear();
             for (const auto& [key, val]: dict) {
                 std::string key_str = nb::cast<std::string>(key);
-                from_object(store[key_str.c_str()], dict[key], key_str);
+                from_python(store[key_str.c_str()], dict[key], key_str);
             }
             return true;
         }
@@ -51,7 +50,7 @@ static bool registered_common_bindings = []() {
             store.clear();
             for (const auto& key: slots) {
                 std::string key_str = nb::cast<std::string>(key);
-                from_object(store[key_str.c_str()], nb::getattr(value, key), key_str);
+                from_python(store[key_str.c_str()], nb::getattr(value, key), key_str);
             }
             return true;
         }
@@ -68,7 +67,7 @@ static bool registered_common_bindings = []() {
                     throw nb::type_error(msg.str().c_str());
                 }
                 std::string key_str = nb::cast<std::string>(key);
-                from_object(store[key_str.c_str()], dict[key], key_str);
+                from_python(store[key_str.c_str()], dict[key], key_str);
             }
             return true;
         }
@@ -76,7 +75,6 @@ static bool registered_common_bindings = []() {
     });
 
     // structstore::List
-    bindings::register_object_to_python<List>();
     bindings::register_from_python_fn<List>([](FieldAccess access, const nanobind::handle& value) {
         if (bindings::object_from_python<List>(access, value)) {
             return true;
@@ -86,7 +84,7 @@ static bool registered_common_bindings = []() {
             list.clear();
             int i = 0;
             for (const auto& val: nb::cast<nb::iterable>(value)) {
-                from_object(list.push_back(), val, std::to_string(i));
+                from_python(list.push_back(), val, std::to_string(i));
                 ++i;
             }
             return true;
@@ -186,14 +184,8 @@ NB_MODULE(MODULE_NAME, m) {
     });
 
     auto list = nb::class_<List>(m, "StructStoreList");
-    list.def("__repr__", [](const List& list) {
-        auto lock = list.read_lock();
-        std::ostringstream str;
-        str << list;
-        return str.str();
-    });
+    uint64_t list_type_hash = typing::get_type_hash<List>();
     list.def("lock", [](List& list) {
-        list.get_mutex().lock();
         return ScopedLock(list.get_mutex());
     }, nb::rv_policy::move);
     list.def("__len__", [](List& list) {
@@ -203,43 +195,43 @@ NB_MODULE(MODULE_NAME, m) {
     list.def("insert", [](List& list, size_t index, nb::handle& value) {
         auto lock = list.write_lock();
         FieldAccess access = list.insert(index);
-        from_object(access, value, std::to_string(index));
+        from_python(access, value, std::to_string(index));
     }, nb::arg("index"), nb::arg("value").none());
     list.def("extend", [](List& list, nb::iterable& value) {
         auto lock = list.write_lock();
         for (const auto& val: value) {
             std::string field_name = std::to_string(list.size());
-            from_object(list.push_back(), val, field_name);
+            from_python(list.push_back(), val, field_name);
         }
     });
     list.def("append", [](List& list, nb::handle& value) {
         auto lock = list.write_lock();
-        from_object(list.push_back(), value, std::to_string(list.size() - 1));
+        from_python(list.push_back(), value, std::to_string(list.size() - 1));
     }, nb::arg("value").none());
     list.def("pop", [](List& list, size_t index) {
         auto lock = list.write_lock();
-        const auto& res = to_object(list[index].get_field(), true);
+        const auto& res = to_python(list[index].get_field(), true);
         list.erase(index);
         return res;
     });
-    list.def("__add__", [](List& list, nb::list& value) {
+    list.def("__add__", [=](List& list, nb::list& value) {
         auto lock = list.read_lock();
-        return to_object(list, false) + value;
+        return to_python(*FieldView{list,list_type_hash}, false) + value;
     });
-    list.def("__iadd__", [](List& list, nb::list& value) {
+    list.def("__iadd__", [=](List& list, nb::list& value) {
         auto lock = list.write_lock();
         for (const auto& val: value) {
-            from_object(list.push_back(), val, std::to_string(list.size() - 1));
+            from_python(list.push_back(), val, std::to_string(list.size() - 1));
         }
-        return to_object(list, false);
+        return to_python(*FieldView{list,list_type_hash}, false);
     });
     list.def("__setitem__", [](List& list, size_t index, nb::handle& value) {
         auto lock = list.write_lock();
-        from_object(list[index], value, std::to_string(index));
+        from_python(list[index], value, std::to_string(index));
     }, nb::arg("index"), nb::arg("value").none());
     list.def("__getitem__", [](List& list, size_t index) {
         auto lock = list.read_lock();
-        return to_object(list[index].get_field(), false);
+        return to_python(list[index].get_field(), false);
     });
     list.def("__delitem__", [](List& list, size_t index) {
         auto lock = list.write_lock();
@@ -249,22 +241,6 @@ NB_MODULE(MODULE_NAME, m) {
         auto lock = list.read_lock();
         return nb::make_iterator(nb::type<List>(), "list_iter", list.begin(), list.end());
     }, nb::keep_alive<0, 1>());
-    list.def("copy", [](const List& list) {
-        auto lock = list.read_lock();
-        return to_object(list, false);
-    });
-    list.def("deepcopy", [](const List& list) {
-        auto lock = list.read_lock();
-        return to_object(list, true);
-    });
-    list.def("__copy__", [](const List& list) {
-        auto lock = list.read_lock();
-        return to_object(list, false);
-    });
-    list.def("__deepcopy__", [](const List& list, nb::handle&) {
-        auto lock = list.read_lock();
-        return to_object(list, true);
-    });
     list.def("clear", [](List& list) {
         auto lock = list.write_lock();
         list.clear();
@@ -279,7 +255,7 @@ public:
     NB_TYPE_CASTER(structstore::StructStoreField, const_name("StructStoreField"))
 
     static handle from_cpp(structstore::StructStoreField& src, rv_policy, cleanup_list*) {
-        return structstore::to_object(src, false).release();
+        return structstore::to_python(src, false).release();
     }
 };
 }
