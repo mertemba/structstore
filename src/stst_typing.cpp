@@ -61,9 +61,7 @@ static bool register_common_types_() {
     typing::register_stl_alloc_constructor<structstore::string>();
     typing::register_default_destructor<structstore::string>();
     typing::register_default_serializer_text<structstore::string>();
-    typing::register_serializer_yaml<structstore::string>([](const structstore::string* str) {
-        return YAML::Node(str->c_str());
-    });
+    typing::register_default_serializer_yaml<structstore::string>();
 
     return true;
 }

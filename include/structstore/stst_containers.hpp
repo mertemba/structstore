@@ -3,7 +3,6 @@
 
 #include "structstore/stst_structstore.hpp"
 #include "structstore/stst_field.hpp"
-#include "structstore/stst_stl_types.hpp"
 #include "structstore/stst_typing.hpp"
 
 namespace structstore {
@@ -135,10 +134,18 @@ public:
         return ScopedLock(mutex);
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const List& self);
+    template<typename T>
+    friend std::ostream& structstore::to_text(std::ostream&, const T&);
 
-    friend YAML::Node to_yaml(const List& self);
+    template<typename T>
+    friend YAML::Node structstore::to_yaml(const T&);
 };
+
+template<>
+std::ostream& to_text(std::ostream&, const List&);
+
+template<>
+YAML::Node to_yaml(const List&);
 
 template<>
 void List::push_back<const char*>(const char* const& value);
@@ -235,7 +242,11 @@ public:
         }
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const Matrix& matrix);
+    template<typename T>
+    friend std::ostream& structstore::to_text(std::ostream&, const T&);
+
+    template<typename T>
+    friend YAML::Node structstore::to_yaml(const T&);
 };
 
 }

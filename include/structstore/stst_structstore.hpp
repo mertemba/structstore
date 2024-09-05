@@ -5,7 +5,6 @@
 #include "structstore/stst_field.hpp"
 #include "structstore/stst_hashstring.hpp"
 #include "structstore/stst_lock.hpp"
-#include "structstore/stst_stl_types.hpp"
 #include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
 
@@ -122,6 +121,14 @@ class List;
 
 class Struct;
 
+class StructStore;
+
+template<>
+std::ostream& to_text(std::ostream&, const StructStore&);
+
+template<>
+YAML::Node to_yaml(const StructStore&);
+
 class StructStore {
     friend class structstore::StructStoreShared;
 
@@ -188,9 +195,15 @@ public:
         slots.clear();
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const StructStore& self);
+    template<typename T>
+    friend std::ostream& structstore::to_text(std::ostream&, const T&);
 
-    friend YAML::Node to_yaml(const StructStore& self);
+    template<typename T>
+    friend YAML::Node structstore::to_yaml(const T&);
+
+    friend std::ostream& operator<<(std::ostream& os, const StructStore& store) {
+        return to_text(os, store);
+    }
 
     friend nanobind::object to_python(const StructStore& store, bool recursive);
 
@@ -352,10 +365,28 @@ protected:
         return StlAllocator<char>{mm_alloc};
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const Struct& struct_) {
-        return os << "Struct(" << struct_.store << ")";
-    }
+    template<typename T>
+    friend std::ostream& structstore::to_text(std::ostream&, const T&);
+
+    template<typename T>
+    friend YAML::Node structstore::to_yaml(const T&);
+
+    friend std::ostream& operator<<(std::ostream&, const Struct&);
 };
+
+template<>
+inline std::ostream& to_text(std::ostream& os, const Struct& struct_) {
+    return to_text(os, struct_.store);
+}
+
+template<>
+inline YAML::Node to_yaml(const Struct& struct_) {
+    return to_yaml(struct_.store);
+}
+
+inline std::ostream& operator<<(std::ostream& os, const Struct& struct_) {
+    return to_text(os, struct_);
+}
 
 static inline const StructStore& get_store(const Struct& str) {
     return str.store;

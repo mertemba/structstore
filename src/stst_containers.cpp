@@ -8,10 +8,7 @@ void List::register_type() {
     typing::register_mm_alloc_constructor<List>();
     typing::register_default_destructor<List>();
     typing::register_default_serializer_text<List>();
-    typing::register_serializer_yaml<List>(
-            [](const List* list) -> YAML::Node {
-                return to_yaml(*list);
-            });
+    typing::register_default_serializer_yaml<List>();
     typing::register_check<List>([](MiniMalloc& mm_alloc, const List* list) {
         try_with_info("List*: ", mm_alloc.assert_owned(list););
         for (const StructStoreField& field: list->data) {
@@ -20,14 +17,16 @@ void List::register_type() {
     });
 }
 
-std::ostream& structstore::operator<<(std::ostream& os, const List& list) {
+template<>
+std::ostream& structstore::to_text(std::ostream& os, const List& list) {
     os << "[";
     for (const StructStoreField& field: list.data) {
-        os << field << ",";
+        to_text(os, field) << ",";
     }
     return os << "]";
 }
 
+template<>
 YAML::Node structstore::to_yaml(const List& list) {
     auto node = YAML::Node(YAML::NodeType::Sequence);
     for (const StructStoreField& field: list) {
@@ -52,7 +51,8 @@ void Matrix::register_type() {
     });
 }
 
-std::ostream& structstore::operator<<(std::ostream& os, const Matrix& matrix) {
+template<>
+std::ostream& structstore::to_text(std::ostream& os, const Matrix& matrix) {
     size_t size = 1;
     for (size_t i = 0; i < matrix._ndim; ++i) {
         size *= matrix._shape[i];

@@ -14,9 +14,11 @@ namespace structstore {
 
 class StructStoreField;
 
-std::ostream& operator<<(std::ostream& os, const StructStoreField& self);
+template<>
+std::ostream& to_text(std::ostream&, const StructStoreField&);
 
-YAML::Node to_yaml(const StructStoreField& self);
+template<>
+YAML::Node to_yaml(const StructStoreField&);
 
 class StructStoreField {
 private:
@@ -96,9 +98,15 @@ public:
         return type_hash;
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const StructStoreField& self);
+    template<typename T>
+    friend std::ostream& structstore::to_text(std::ostream&, const T&);
 
-    friend YAML::Node to_yaml(const StructStoreField& self);
+    template<typename T>
+    friend YAML::Node structstore::to_yaml(const T&);
+
+    friend std::ostream& operator<<(std::ostream& os, const StructStoreField& field) {
+        return to_text(os, field);
+    }
 
     template<typename T>
     T& get() const {

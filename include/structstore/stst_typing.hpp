@@ -14,6 +14,16 @@
 
 namespace structstore {
 
+template<typename T>
+std::ostream& to_text(std::ostream& os, const T& t) {
+    return os << t;
+}
+
+template<typename T>
+YAML::Node to_yaml(const T& t) {
+    return YAML::Node(t);
+}
+
 class typing {
 public:
 
@@ -168,7 +178,7 @@ public:
     static void register_default_serializer_text() {
         uint64_t type_hash = typing::get_type_hash<T>();
         static SerializeTextFn<T> serializer = [](std::ostream& os, const T* t) -> std::ostream& {
-            return os << *t;
+            return to_text(os, *t);
         };
         bool success = get_serializers_text().insert(
                 {type_hash, (const SerializeTextFn<>&) serializer}).second;
@@ -204,7 +214,7 @@ public:
     static void register_default_serializer_yaml() {
         uint64_t type_hash = typing::get_type_hash<T>();
         static SerializeYamlFn<T> serializer = [](const T* t) {
-            return YAML::Node(*t);
+            return to_yaml(*t);
         };
         bool success = get_serializers_yaml().insert(
                 {type_hash, (const SerializeYamlFn<>&) serializer}).second;
@@ -318,6 +328,9 @@ inline void StlAllocator<T>::construct(T* p) {
         new (p) T;
     }
 }
+
 } // namespace structstore
+
+#include <structstore/stst_stl_types.hpp>
 
 #endif
