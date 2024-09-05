@@ -134,6 +134,4 @@ install(EXPORT StructStoreTargets
 
 if (NOT DEFINED PY_BUILD_CMAKE_PACKAGE_VERSION)
     set(STRUCTSTORE_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/include)
-
-    add_subdirectory(examples)
 endif ()

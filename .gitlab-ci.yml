@@ -1,0 +1,18 @@
+variables:
+  image: archlinux:latest
+  pacman_deps: cmake ninja gcc yaml-cpp python-pipx
+
+stages:
+  - test
+
+test:
+  stage: test
+  image: ${image}
+  script:
+    - pacman -Sy --noconfirm --needed ${pacman_deps}
+    - pipx install poetry && export PATH="$PATH:/root/.local/bin"
+    - poetry install --no-root
+    - source $(poetry env info --path)/bin/activate
+    - mkdir build && cd build && cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release && cd ..
+    - cmake --build build --target install
+    - pip install .
