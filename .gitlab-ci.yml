@@ -1,18 +1,33 @@
 variables:
   image: archlinux:latest
-  pacman_deps: cmake ninja gcc yaml-cpp python-pipx
+  pacman_deps_cpp: cmake ninja gcc yaml-cpp namcap
+  pacman_deps_py: python-poetry
 
 stages:
+  - build
   - test
 
-test:
-  stage: test
+build_cpp:
+  stage: build
+  image: ${image}
+  artifacts:
+    - build/structstore-*.pkg.tar
+  script:
+    - pacman -Sy --noconfirm --needed ${pacman_deps_cpp}
+    - mkdir build && cd build && ln -s ../PKGBUILD ./
+    - git clone .. src/structstore
+    - makepkg --noextract --holdver
+    - namcap structstore-*.pkg.tar
+
+build_python:
+  stage: build
   image: ${image}
   script:
     - pacman -Sy --noconfirm --needed ${pacman_deps}
-    - pipx install poetry && export PATH="$PATH:/root/.local/bin"
     - poetry install --no-root
     - source $(poetry env info --path)/bin/activate
     - mkdir build && cd build && cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release && cd ..
     - cmake --build build --target install
     - pip install .
+    - mkdir build_test && cd build_test && cmake ../examples -GNinja -DCMAKE_BUILD_TYPE=Release && cd ..
+    - cmake --build build

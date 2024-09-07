@@ -34,7 +34,7 @@ find_python = true
 build_args = ['-j']
 build_tool_args = []
 install_args = ['--verbose']
-install_components = ['python_modules']
+install_components = ['install_modules']
 env = { }
 
 [tool.py-build-cmake.linux.cmake] # Linux-specific options
@@ -63,3 +63,5 @@ python = ">=3.9"
 py-build-cmake = "^0.1.8"
 nanobind = "^2.1.0"
 nanobind-stubgen = "^0.1.5"
+numpy = "<2"
+build = "^1.2.2"

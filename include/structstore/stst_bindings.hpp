@@ -177,7 +177,7 @@ public:
     }
 
     template<typename T>
-    static void register_structstore_bindings(nb::class_<T>& cls) {
+    static void register_structstore_py(nb::class_<T>& cls) {
         cls.def_prop_ro("__slots__", [](T& t) {
             auto& store = t.get_store();
             return __slots__(store);
@@ -231,7 +231,7 @@ nb::class_<T> register_struct_type_and_bindings(nb::module_& m, const std::strin
     auto nb_cls = nb::class_<T>(m, name.c_str());
     nb_cls.def(nb::init());
     bindings::register_basic_bindings<T>(nb_cls);
-    bindings::register_structstore_bindings(nb_cls);
+    bindings::register_structstore_py(nb_cls);
     return nb_cls;
 }
 

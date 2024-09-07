@@ -130,7 +130,7 @@ NB_MODULE(MODULE_NAME, m) {
             }, nb::arg().none(), nb::arg().none(), nb::arg().none());
 
     nb::class_<StructStore> cls = nb::class_<StructStore>{m, "StructStore"};
-    bindings::register_structstore_bindings(cls);
+    bindings::register_structstore_py(cls);
 
     nb::enum_<CleanupMode>(m, "CleanupMode")
             .value("NEVER", NEVER)
@@ -139,7 +139,7 @@ NB_MODULE(MODULE_NAME, m) {
             .export_values();
 
     auto shcls = nb::class_<StructStoreShared>(m, "StructStoreShared");
-    bindings::register_structstore_bindings(shcls);
+    bindings::register_structstore_py(shcls);
     shcls.def("__init__",
               [](StructStoreShared* s, const std::string& path, size_t size, bool reinit, bool use_file,
                  CleanupMode cleanup, uintptr_t target_addr) {
