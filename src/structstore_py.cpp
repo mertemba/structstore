@@ -1,5 +1,5 @@
 #include "structstore/structstore.hpp"
-#include "structstore/stst_bindings.hpp"
+#include "structstore/stst_py.hpp"
 
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
@@ -10,11 +10,11 @@ using namespace structstore;
 
 namespace nb = nanobind;
 
-static bool registered_common_bindings = []() {
+static bool registered_common_py = []() {
     typing::register_common_types();
-    bindings::register_basic_bindings<int, nb::int_>();
-    bindings::register_basic_bindings<double, nb::float_>();
-    bindings::register_basic_bindings<bool, nb::bool_>();
+    bindings::register_basic_py<int, nb::int_>();
+    bindings::register_basic_py<double, nb::float_>();
+    bindings::register_basic_py<bool, nb::bool_>();
 
     // structstore::string
     bindings::register_to_python_fn<structstore::string>(

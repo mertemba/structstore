@@ -1,5 +1,5 @@
 #include "structstore/structstore.hpp"
-#include "structstore/stst_bindings.hpp"
+#include "structstore/stst_py.hpp"
 
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>

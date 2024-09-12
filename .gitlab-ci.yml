@@ -1,7 +1,7 @@
 variables:
   image: archlinux:latest
   pacman_deps_cpp: cmake ninja gcc yaml-cpp namcap
-  pacman_deps_py: python-poetry
+  pacman_deps_py: python-pip
 
 stages:
   - build
@@ -24,8 +24,10 @@ build_python:
   image: ${image}
   script:
     - pacman -Sy --noconfirm --needed ${pacman_deps}
-    - poetry install --no-root
-    - source $(poetry env info --path)/bin/activate
+    - venvdir="$PWD/venv"
+    - python -m venv "${venvdir}"
+    - source "${venvdir}/bin/activate"
+    - pip install -r requirements.txt
     - mkdir build && cd build && cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release && cd ..
     - cmake --build build --target install
     - pip install .

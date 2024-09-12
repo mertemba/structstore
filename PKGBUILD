@@ -2,7 +2,7 @@
 
 pkgbase=structstore
 pkgname=(structstore structstore_py)
-pkgver=0.1.9.r18.gbe22f23
+pkgver=0.2.0
 pkgrel=1
 pkgdesc='Structured object storage, dynamically typed, to be shared between processes'
 arch=('x86_64')
@@ -10,7 +10,7 @@ url='https://github.com/mertemba/structstore'
 license=('BSD-3-Clause')
 depends=()
 structstore_py_depends=('python')
-makedepends=('cmake' 'ninja' 'gcc' 'yaml-cpp' 'python' 'python-poetry')
+makedepends=('cmake' 'ninja' 'gcc' 'yaml-cpp' 'python' 'python-pip')
 source=("git+https://github.com/mertemba/structstore.git")
 sha256sums=('SKIP')
 
@@ -22,15 +22,13 @@ pkgver() {
 
 build() {
     cd "${srcdir}/${pkgbase}"
-    poetry config virtualenvs.in-project true
-    poetry lock --no-update
-    poetry install --no-root
-    poetry env info --path
-    source $(poetry env info --path)/bin/activate
+    venvdir="${srcdir}/venv"
+    python -m venv "${venvdir}"
+    source "${venvdir}/bin/activate"
+    pip install -r requirements.txt
     cmake -B build -S "." \
         -G Ninja \
-        -DSTRUCTSTORE_WITH_PYTHON=ON \
-        -DSTRUCTSTORE_WITH_PY_BUILD_CMAKE=OFF \
+        -DBUILD_WITH_PYTHON=ON \
         -DCMAKE_BUILD_TYPE:STRING='None' \
         -DCMAKE_INSTALL_PREFIX:PATH='/usr' \
         -Wno-dev
@@ -43,16 +41,18 @@ check() {
 
 package_structstore() {
     cd "${srcdir}/${pkgbase}"
-    source $(poetry env info --path)/bin/activate
+    venvdir="${srcdir}/venv"
+    source "${venvdir}/bin/activate"
     cmake -B build -S "." \
-        -DSTRUCTSTORE_WITH_PYTHON=OFF
+        -DBUILD_WITH_PYTHON=OFF
     DESTDIR="$pkgdir" cmake --install build
 }
 
 package_structstore_py() {
     cd "${srcdir}/${pkgbase}"
-    source $(poetry env info --path)/bin/activate
+    venvdir="${srcdir}/venv"
+    source "${venvdir}/bin/activate"
     cmake -B build -S "." \
-        -DSTRUCTSTORE_WITH_PYTHON=ON
+        -DBUILD_WITH_PYTHON=ON
     DESTDIR="$pkgdir" cmake --install build
 }
