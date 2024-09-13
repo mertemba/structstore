@@ -22,7 +22,7 @@ name = 'structstore'
 directory = 'src'
 
 [tool.py-build-cmake.sdist]
-include = ['CMakeLists.txt', 'cmake/*', 'include/structstore/*.hpp', 'src/*.cpp']
+include = ['CMakeLists.txt', 'cmake/*', 'src/include/structstore/*.hpp', 'src/*.cpp']
 exclude = []
 
 [tool.py-build-cmake.cmake]
@@ -35,7 +35,7 @@ build_args = ['-j']
 build_tool_args = []
 install_args = ['--verbose']
 install_components = ['install_modules']
-env = { }
+env = { 'BUILD_WITH_PY_BUILD_CMAKE' = 'ON' }
 
 [tool.py-build-cmake.linux.cmake] # Linux-specific options
 generator = 'Ninja Multi-Config'

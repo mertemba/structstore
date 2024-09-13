@@ -9,7 +9,7 @@ arch=('x86_64')
 url='https://github.com/mertemba/structstore'
 license=('BSD-3-Clause')
 depends=()
-structstore_py_depends=('python')
+structstore_py_depends=('python' 'structstore')
 makedepends=('cmake' 'ninja' 'gcc' 'yaml-cpp' 'python' 'python-pip')
 source=("git+https://github.com/mertemba/structstore.git")
 sha256sums=('SKIP')
@@ -44,6 +44,7 @@ package_structstore() {
     venvdir="${srcdir}/venv"
     source "${venvdir}/bin/activate"
     cmake -B build -S "." \
+        -DCMAKE_INSTALL_MESSAGE=NEVER \
         -DBUILD_WITH_PYTHON=OFF
     DESTDIR="$pkgdir" cmake --install build
 }
@@ -53,6 +54,11 @@ package_structstore_py() {
     venvdir="${srcdir}/venv"
     source "${venvdir}/bin/activate"
     cmake -B build -S "." \
+        -DCMAKE_INSTALL_MESSAGE=NEVER \
         -DBUILD_WITH_PYTHON=ON
     DESTDIR="$pkgdir" cmake --install build
+
+    # keep only files that are not already included in base package
+    find "$pkgdir" -type f | sed "s@$pkgdir@@" | grep -v "$pkgname" \
+        | while IFS='' read f; do rm "$pkgdir/$f"; done
 }

@@ -230,8 +230,8 @@ nb::class_<T> register_struct_type_and_py(nb::module_& m, const std::string& nam
 
     auto nb_cls = nb::class_<T>(m, name.c_str());
     nb_cls.def(nb::init());
-    bindings::register_basic_py<T>(nb_cls);
-    bindings::register_structstore_py(nb_cls);
+    py::register_basic_py<T>(nb_cls);
+    py::register_structstore_py(nb_cls);
     return nb_cls;
 }
 

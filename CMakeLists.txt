@@ -50,7 +50,7 @@ endif()
 # source files
 
 file(GLOB STRUCTSTORE_INC_FILES
-        ${PROJECT_SOURCE_DIR}/include/*.hpp)
+        ${PROJECT_SOURCE_DIR}/src/include/*.hpp)
 
 set(STRUCTSTORE_SRC_FILES
         ${PROJECT_SOURCE_DIR}/src/stst_containers.cpp
@@ -65,8 +65,7 @@ add_library(structstore_lib SHARED
     ${STRUCTSTORE_INC_FILES}
     ${STRUCTSTORE_SRC_FILES})
 set_target_properties(structstore_lib PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib
-    ARCHIVE_OUTPUT_NAME structstore)
+    LIBRARY_OUTPUT_NAME structstore)
 set(STRUCTSTORE_DEP_TARGETS structstore_lib)
 
 # targets that will not be linked against: none
@@ -94,11 +93,10 @@ if(${BUILD_WITH_PYTHON})
             ${STRUCTSTORE_INC_FILES}
             ${PROJECT_SOURCE_DIR}/src/stst_py.cpp)
     set_target_properties(structstore_py_lib PROPERTIES
-            ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib
-            ARCHIVE_OUTPUT_NAME structstore)
-    target_link_libraries(structstore_py_lib PUBLIC
-            structstore_lib
-            nanobind-static)
+            LIBRARY_OUTPUT_NAME structstore_py)
+    target_link_libraries(structstore_py_lib
+            PUBLIC structstore_lib
+            PRIVATE nanobind-static)
     list(APPEND STRUCTSTORE_DEP_TARGETS structstore_py_lib)
 
     # targets that will not be linked against: default python bindings
@@ -106,7 +104,6 @@ if(${BUILD_WITH_PYTHON})
     nanobind_add_module(structstore_py src/structstore_py.cpp NB_STATIC)
     target_link_libraries(structstore_py PUBLIC structstore_py_lib)
     set_target_properties(structstore_py PROPERTIES
-            LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib
             LIBRARY_OUTPUT_NAME _structstore_py)
     target_compile_definitions(structstore_py PRIVATE
             MODULE_NAME=$<TARGET_FILE_BASE_NAME:structstore_py>
@@ -120,16 +117,16 @@ if(${BUILD_WITH_PYTHON})
         target_link_options(structstore_py PRIVATE "LINKER:--exclude-libs,ALL")
     endif()
     set_target_properties(structstore_py PROPERTIES INSTALL_RPATH "\\\$ORIGIN")
-    list(APPEND STRUCTSTORE_NONDEP_TARGETS structstore_py_lib)
+    list(APPEND STRUCTSTORE_NONDEP_TARGETS structstore_py)
 endif()
 
 foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
     target_compile_features(${TARGET} PUBLIC cxx_std_17)
     target_compile_options(${TARGET} PUBLIC -fPIC)
     target_compile_options(${TARGET} PUBLIC -Wall -Wextra -pedantic)
-    target_include_directories(${TARGET} PRIVATE 
+    target_include_directories(${TARGET} PRIVATE
             ${YAML_CPP_INCLUDE_DIRS}
-            ${PROJECT_SOURCE_DIR}/include)
+            ${PROJECT_SOURCE_DIR}/src/include)
     target_link_libraries(${TARGET} PUBLIC
             ${YAML_CPP_LIBRARIES}
             rt)
@@ -137,25 +134,25 @@ endforeach()
 
 # install
 
-install(TARGETS ${STRUCTSTORE_DEP_TARGETS} nanobind-static
+install(TARGETS ${STRUCTSTORE_DEP_TARGETS}
         EXPORT StructStoreTargets
         COMPONENT install_modules
-        DESTINATION ${CMAKE_INSTALL_LIBDIR})
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/structstore)
 install(TARGETS ${STRUCTSTORE_NONDEP_TARGETS}
         COMPONENT install_modules
-        DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/include
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/structstore)
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/include/structstore
         COMPONENT install_modules
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 if(${BUILD_WITH_PYTHON})
     include(cmake/NanobindStubgen.cmake)
     nanobind_stubgen(structstore_py)
-    nanobind_stubgen_install(structstore_py ${CMAKE_INSTALL_LIBDIR})
+    nanobind_stubgen_install(structstore_py ${CMAKE_INSTALL_LIBDIR}/structstore)
 endif()
 
 # inspired by https://stackoverflow.com/a/49857699
-export(TARGETS ${STRUCTSTORE_DEP_TARGETS} nanobind-static
+export(TARGETS ${STRUCTSTORE_DEP_TARGETS}
         FILE "${PROJECT_BINARY_DIR}/StructStoreTargets.cmake")
 export(PACKAGE StructStore)
 configure_file(${PROJECT_SOURCE_DIR}/cmake/StructStoreConfig.cmake.in
@@ -173,4 +170,4 @@ install(EXPORT StructStoreTargets
 install(FILES
         "${PROJECT_SOURCE_DIR}/LICENSE"
         COMPONENT install_modules
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/structstore)
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/structstore)

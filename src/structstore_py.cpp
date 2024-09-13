@@ -12,16 +12,16 @@ namespace nb = nanobind;
 
 static bool registered_common_py = []() {
     typing::register_common_types();
-    bindings::register_basic_py<int, nb::int_>();
-    bindings::register_basic_py<double, nb::float_>();
-    bindings::register_basic_py<bool, nb::bool_>();
+    py::register_basic_py<int, nb::int_>();
+    py::register_basic_py<double, nb::float_>();
+    py::register_basic_py<bool, nb::bool_>();
 
     // structstore::string
-    bindings::register_to_python_fn<structstore::string>(
+    py::register_to_python_fn<structstore::string>(
             [](const StructStoreField& field, bool recursive) -> nb::object {
                 return nb::str(field.get<structstore::string>().c_str());
             });
-    bindings::register_from_python_fn<structstore::string>([](FieldAccess access, const nanobind::handle& value) {
+    py::register_from_python_fn<structstore::string>([](FieldAccess access, const nanobind::handle& value) {
         if (nb::isinstance<nb::str>(value)) {
             access.get<structstore::string>() = nb::cast<std::string>(value);
             return true;
@@ -30,8 +30,8 @@ static bool registered_common_py = []() {
     });
 
     // structstore::StructStore
-    bindings::register_from_python_fn<StructStore>([](FieldAccess access, const nanobind::handle& value) {
-        if (bindings::object_from_python<StructStore>(access, value)) {
+    py::register_from_python_fn<StructStore>([](FieldAccess access, const nanobind::handle& value) {
+        if (py::object_from_python<StructStore>(access, value)) {
             return true;
         }
         if (nb::hasattr(value, "__dict__")) {
@@ -75,8 +75,8 @@ static bool registered_common_py = []() {
     });
 
     // structstore::List
-    bindings::register_from_python_fn<List>([](FieldAccess access, const nanobind::handle& value) {
-        if (bindings::object_from_python<List>(access, value)) {
+    py::register_from_python_fn<List>([](FieldAccess access, const nanobind::handle& value) {
+        if (py::object_from_python<List>(access, value)) {
             return true;
         }
         if (nb::isinstance<nb::list>(value) || nb::isinstance<nb::tuple>(value)) {
@@ -93,7 +93,7 @@ static bool registered_common_py = []() {
     });
 
     // structstore::Matrix
-    bindings::register_to_python_fn<structstore::Matrix>(
+    py::register_to_python_fn<structstore::Matrix>(
             [](const StructStoreField& field, bool recursive) -> nb::object {
                 Matrix& m = field.get<Matrix>();
                 if (recursive) {
@@ -103,7 +103,7 @@ static bool registered_common_py = []() {
                     return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()));
                 }
             });
-    bindings::register_from_python_fn<Matrix>([](FieldAccess access, const nanobind::handle& value) {
+    py::register_from_python_fn<Matrix>([](FieldAccess access, const nanobind::handle& value) {
         if (nb::ndarray_check(value)) {
             auto array = nb::cast<nb::ndarray<const double, nb::c_contig>>(value);
             if (array.ndim() > Matrix::MAX_DIMS) {
@@ -121,7 +121,7 @@ static bool registered_common_py = []() {
 NB_MODULE(MODULE_NAME, m) {
     m.attr("__version__") = VERSION_INFO;
 
-    bindings::SimpleNamespace = nb::module_::import_("types").attr("SimpleNamespace");
+    py::SimpleNamespace = nb::module_::import_("types").attr("SimpleNamespace");
 
     nb::class_<ScopedLock>(m, "ScopedLock")
             .def("__enter__", [](ScopedLock&) {})
@@ -130,7 +130,7 @@ NB_MODULE(MODULE_NAME, m) {
             }, nb::arg().none(), nb::arg().none(), nb::arg().none());
 
     nb::class_<StructStore> cls = nb::class_<StructStore>{m, "StructStore"};
-    bindings::register_structstore_py(cls);
+    py::register_structstore_py(cls);
 
     nb::enum_<CleanupMode>(m, "CleanupMode")
             .value("NEVER", NEVER)
@@ -139,7 +139,7 @@ NB_MODULE(MODULE_NAME, m) {
             .export_values();
 
     auto shcls = nb::class_<StructStoreShared>(m, "StructStoreShared");
-    bindings::register_structstore_py(shcls);
+    py::register_structstore_py(shcls);
     shcls.def("__init__",
               [](StructStoreShared* s, const std::string& path, size_t size, bool reinit, bool use_file,
                  CleanupMode cleanup, uintptr_t target_addr) {

@@ -11,7 +11,9 @@ build_cpp:
   stage: build
   image: ${image}
   artifacts:
-    - build/structstore-*.pkg.tar
+    paths:
+      - build/structstore-*.pkg.tar
+    expire_in: 1 hour
   script:
     - pacman -Sy --noconfirm --needed ${pacman_deps_cpp}
     - mkdir build && cd build && ln -s ../PKGBUILD ./
