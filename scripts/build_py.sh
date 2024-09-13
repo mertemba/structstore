@@ -1,11 +1,13 @@
-#!/bin/bash -e
+#!/bin/bash -ex
 
-mkdir build_py
-cd build_py
+srcdir="$PWD"
+pkgdir="/tmp/structstore_build"
+mkdir "$pkgdir"
+cd "$pkgdir"
 
-venvdir="$PWD/venv"
-python -m venv "${venvdir}"
-source "${venvdir}/bin/activate"
-pip install -r ../requirements.txt
+venvdir="$pkgdir/venv"
+python -m venv "$venvdir"
+source "$venvdir/bin/activate"
+pip install -r "$srcdir/requirements.txt"
 
-pyproject-build ..
+pyproject-build "$srcdir"

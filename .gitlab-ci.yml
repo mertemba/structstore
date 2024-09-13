@@ -1,7 +1,8 @@
 variables:
   image: archlinux:latest
-  pacman_deps_cpp: cmake ninja gcc yaml-cpp namcap
-  pacman_deps_py: python-pip
+  pacman_deps: cmake ninja gcc yaml-cpp
+  pacman_deps_makepkg: rsync debugedit fakeroot git namcap
+  pacman_deps_py: python python-pip
 
 stages:
   - build
@@ -10,28 +11,32 @@ stages:
 build_cpp:
   stage: build
   image: ${image}
-  artifacts:
-    paths:
-      - build/structstore-*.pkg.tar
-    expire_in: 1 hour
-  script:
-    - pacman -Sy --noconfirm --needed ${pacman_deps_cpp}
-    - mkdir build && cd build && ln -s ../PKGBUILD ./
-    - git clone .. src/structstore
-    - makepkg --noextract --holdver
-    - namcap structstore-*.pkg.tar
-
-build_python:
-  stage: build
-  image: ${image}
   script:
     - pacman -Sy --noconfirm --needed ${pacman_deps}
-    - venvdir="$PWD/venv"
-    - python -m venv "${venvdir}"
-    - source "${venvdir}/bin/activate"
-    - pip install -r requirements.txt
-    - mkdir build && cd build && cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release && cd ..
-    - cmake --build build --target install
-    - pip install .
-    - mkdir build_test && cd build_test && cmake ../examples -GNinja -DCMAKE_BUILD_TYPE=Release && cd ..
-    - cmake --build build
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c ./scripts/build.sh
+
+build_makepkg:
+  stage: build
+  image: ${image}
+  artifacts:
+    paths:
+      - structstore{,_py}-*.pkg.tar.zst
+    expire_in: 1 hour
+  script:
+    - pacman -Sy --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_makepkg}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c ./scripts/makepkg.sh
+    - cp /tmp/structstore_build/structstore{,_py}-*.pkg.tar.zst ./
+
+build_py:
+  stage: build
+  image: ${image}
+  artifacts:
+    paths:
+      - dist/structstore-*.{tar.gz,whl}
+    expire_in: 1 hour
+  script:
+    - pacman -Sy --noconfirm --needed ${pacman_deps} ${pacman_deps_py}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c ./scripts/build_py.sh

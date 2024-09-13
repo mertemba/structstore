@@ -171,3 +171,10 @@ install(FILES
         "${PROJECT_SOURCE_DIR}/LICENSE"
         COMPONENT install_modules
         DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/structstore)
+
+if(${BUILD_WITH_PYTHON})
+    install(FILES
+            "${PROJECT_SOURCE_DIR}/LICENSE"
+            COMPONENT install_modules
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/structstore_py)
+endif()
