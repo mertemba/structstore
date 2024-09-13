@@ -22,7 +22,7 @@ name = 'structstore'
 directory = 'src'
 
 [tool.py-build-cmake.sdist]
-include = ['CMakeLists.txt', 'cmake/*', 'include/structstore/*.hpp', 'src/*.cpp']
+include = ['CMakeLists.txt', 'cmake/*', 'src/include/structstore/*.hpp', 'src/*.cpp']
 exclude = []
 
 [tool.py-build-cmake.cmake]
@@ -34,8 +34,8 @@ find_python = true
 build_args = ['-j']
 build_tool_args = []
 install_args = ['--verbose']
-install_components = ['python_modules']
-env = { }
+install_components = ['install_modules']
+env = { 'BUILD_WITH_PY_BUILD_CMAKE' = 'ON' }
 
 [tool.py-build-cmake.linux.cmake] # Linux-specific options
 generator = 'Ninja Multi-Config'
@@ -59,7 +59,9 @@ name = ''
 version = '0'
 
 [tool.poetry.dependencies]
-python = ">=3.9"
+python = ">=3.9,<4.0"
 py-build-cmake = "^0.1.8"
 nanobind = "^2.1.0"
 nanobind-stubgen = "^0.1.5"
+numpy = "<2"
+build = "^1.2.2"

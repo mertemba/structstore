@@ -1,42 +1,56 @@
 cmake_minimum_required(VERSION 3.10)
-project(structstore VERSION 0.1.9)
+project(structstore VERSION 0.2.0)
 
-set(PY_VERSION_SUFFIX "")
-set(PY_FULL_VERSION ${PROJECT_VERSION}${PY_VERSION_SUFFIX})
+# build options
 
-# make sure that the Python and CMake versions match
-if (DEFINED PY_BUILD_CMAKE_PACKAGE_VERSION)
-    if (NOT "${PY_BUILD_CMAKE_PACKAGE_VERSION}" MATCHES "^${PY_FULL_VERSION}$")
-        message(FATAL_ERROR "Version number does not match "
-                "(${PY_BUILD_CMAKE_PACKAGE_VERSION} - ${PY_FULL_VERSION}).")
-    endif ()
-endif ()
+option(BUILD_WITH_PYTHON
+    "Build StructStore with Python bindings" OFF)
+option(BUILD_WITH_PY_BUILD_CMAKE
+    "Build StructStore with py-build-cmake" OFF)
 
-# set variables
+if(${BUILD_WITH_PYTHON})
+    message(STATUS "Building with Python bindings")
+endif()
+if(${BUILD_WITH_PY_BUILD_CMAKE})
+    message(STATUS "Building with py-build-cmake")
+endif()
 
-if (DEFINED PY_BUILD_CMAKE_MODULE_NAME)
-    set(STRUCTSTORE_INSTALL_DIR ${PY_BUILD_CMAKE_MODULE_NAME})
-else ()
-    set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
-    set(STRUCTSTORE_INSTALL_DIR install)
-endif ()
+if(${BUILD_WITH_PY_BUILD_CMAKE})
+    if(NOT ${BUILD_WITH_PYTHON})
+        message(FATAL_ERROR "BUILD_WITH_PY_BUILD_CMAKE enabled "
+            "but BUILD_WITH_PYTHON disabled.")
+    endif()
+endif()
+
+if(${BUILD_WITH_PY_BUILD_CMAKE})
+    if(NOT "${CMAKE_INSTALL_PREFIX}" MATCHES "")
+        message(FATAL_ERROR "BUILD_WITH_PY_BUILD_CMAKE enabled "
+            "but CMAKE_INSTALL_PREFIX set.")
+    endif()
+    set(PATH CMAKE_INSTALL_PREFIX ${PY_BUILD_CMAKE_MODULE_NAME})
+endif()
 
 # dependencies
 
-find_package(Python 3.9 COMPONENTS Interpreter Development REQUIRED)
-
-execute_process(
-        COMMAND "${Python_EXECUTABLE}" -c "import nanobind; print(nanobind.cmake_dir())"
-        OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_DIR)
-list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
-find_package(nanobind CONFIG REQUIRED)
+include(CheckCCompilerFlag)
+include(GenerateExportHeader)
+include(GNUInstallDirs)
 
 find_package(yaml-cpp REQUIRED)
+
+if(${BUILD_WITH_PYTHON})
+    find_package(Python 3.9 COMPONENTS Interpreter Development REQUIRED)
+    execute_process(
+            COMMAND "${Python_EXECUTABLE}" -c "import nanobind; print(nanobind.cmake_dir())"
+            OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_DIR)
+    list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
+    find_package(nanobind CONFIG REQUIRED)
+endif()
 
 # source files
 
 file(GLOB STRUCTSTORE_INC_FILES
-        ${PROJECT_SOURCE_DIR}/include/*.hpp)
+        ${PROJECT_SOURCE_DIR}/src/include/*.hpp)
 
 set(STRUCTSTORE_SRC_FILES
         ${PROJECT_SOURCE_DIR}/src/stst_containers.cpp
@@ -45,78 +59,100 @@ set(STRUCTSTORE_SRC_FILES
         ${PROJECT_SOURCE_DIR}/src/stst_structstore.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_typing.cpp)
 
-set(STRUCTSTORE_INC_DIRS
-        ${YAML_CPP_INCLUDE_DIRS}
-        ${PROJECT_SOURCE_DIR}/include)
-
-# targets: library and python bindings
-
-add_library(structstore_lib_cpponly SHARED
-        ${STRUCTSTORE_INC_FILES}
-        ${STRUCTSTORE_SRC_FILES})
-set_target_properties(structstore_lib_cpponly PROPERTIES
-        ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib
-        ARCHIVE_OUTPUT_NAME structstore)
+# targets that will be linked against: library
 
 add_library(structstore_lib SHARED
-        ${STRUCTSTORE_INC_FILES}
-        ${PROJECT_SOURCE_DIR}/src/stst_bindings.cpp)
+    ${STRUCTSTORE_INC_FILES}
+    ${STRUCTSTORE_SRC_FILES})
 set_target_properties(structstore_lib PROPERTIES
-        ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib
-        ARCHIVE_OUTPUT_NAME structstore)
-target_link_libraries(structstore_lib PUBLIC
-        structstore_lib_cpponly
-        nanobind-static)
+    LIBRARY_OUTPUT_NAME structstore)
+set(STRUCTSTORE_DEP_TARGETS structstore_lib)
 
-nanobind_add_module(structstore_bindings src/structstore_bindings.cpp NB_STATIC)
-target_link_libraries(structstore_bindings PUBLIC structstore_lib)
-set_target_properties(structstore_bindings PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib
-        LIBRARY_OUTPUT_NAME _structstore_bindings)
-target_compile_definitions(structstore_bindings PRIVATE
-        MODULE_NAME=$<TARGET_FILE_BASE_NAME:structstore_bindings>
-        VERSION_INFO="${PY_FULL_VERSION}"
-)
-# hide all symbols by default (including external libraries on Linux)
-set_target_properties(structstore_bindings PROPERTIES
-        CXX_VISIBILITY_PRESET "hidden"
-        VISIBILITY_INLINES_HIDDEN true)
-if (CMAKE_SYSTEM_NAME MATCHES "Linux")
-    target_link_options(structstore_bindings PRIVATE "LINKER:--exclude-libs,ALL")
-endif ()
-set_target_properties(structstore_bindings PROPERTIES
-        INSTALL_RPATH "\\\$ORIGIN")
+# targets that will not be linked against: none
 
-foreach (TARGET structstore_lib_cpponly structstore_lib structstore_bindings)
+set(STRUCTSTORE_NONDEP_TARGETS "")
+
+
+# python specifics
+
+if(${BUILD_WITH_PY_BUILD_CMAKE})
+    set(PY_VERSION_SUFFIX "")
+    set(PY_FULL_VERSION ${PROJECT_VERSION}${PY_VERSION_SUFFIX})
+
+    # make sure that the Python and CMake versions match
+    if(NOT "${PY_BUILD_CMAKE_PACKAGE_VERSION}" MATCHES "^${PY_FULL_VERSION}$")
+        message(FATAL_ERROR "Version number does not match "
+                "(${PY_BUILD_CMAKE_PACKAGE_VERSION} - ${PY_FULL_VERSION}).")
+    endif()
+endif()
+
+if(${BUILD_WITH_PYTHON})
+    # targets that will be linked against: python bindings helper library
+
+    add_library(structstore_py_lib SHARED
+            ${STRUCTSTORE_INC_FILES}
+            ${PROJECT_SOURCE_DIR}/src/stst_py.cpp)
+    set_target_properties(structstore_py_lib PROPERTIES
+            LIBRARY_OUTPUT_NAME structstore_py)
+    target_link_libraries(structstore_py_lib
+            PUBLIC structstore_lib
+            PRIVATE nanobind-static)
+    list(APPEND STRUCTSTORE_DEP_TARGETS structstore_py_lib)
+
+    # targets that will not be linked against: default python bindings
+
+    nanobind_add_module(structstore_py src/structstore_py.cpp NB_STATIC)
+    target_link_libraries(structstore_py PUBLIC structstore_py_lib)
+    set_target_properties(structstore_py PROPERTIES
+            LIBRARY_OUTPUT_NAME _structstore_py)
+    target_compile_definitions(structstore_py PRIVATE
+            MODULE_NAME=$<TARGET_FILE_BASE_NAME:structstore_py>
+            VERSION_INFO="${PY_FULL_VERSION}"
+    )
+    # hide all symbols by default(including external libraries on Linux)
+    set_target_properties(structstore_py PROPERTIES
+            CXX_VISIBILITY_PRESET "hidden"
+            VISIBILITY_INLINES_HIDDEN true)
+    if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+        target_link_options(structstore_py PRIVATE "LINKER:--exclude-libs,ALL")
+    endif()
+    set_target_properties(structstore_py PROPERTIES INSTALL_RPATH "\\\$ORIGIN")
+    list(APPEND STRUCTSTORE_NONDEP_TARGETS structstore_py)
+endif()
+
+foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
     target_compile_features(${TARGET} PUBLIC cxx_std_17)
     target_compile_options(${TARGET} PUBLIC -fPIC)
     target_compile_options(${TARGET} PUBLIC -Wall -Wextra -pedantic)
-    target_include_directories(${TARGET}
-            PRIVATE ${STRUCTSTORE_INC_DIRS})
+    target_include_directories(${TARGET} PRIVATE
+            ${YAML_CPP_INCLUDE_DIRS}
+            ${PROJECT_SOURCE_DIR}/src/include)
     target_link_libraries(${TARGET} PUBLIC
             ${YAML_CPP_LIBRARIES}
             rt)
-endforeach ()
+endforeach()
 
 # install
 
-install(TARGETS structstore_lib_cpponly structstore_lib nanobind-static
+install(TARGETS ${STRUCTSTORE_DEP_TARGETS}
         EXPORT StructStoreTargets
-        COMPONENT python_modules
-        DESTINATION ${STRUCTSTORE_INSTALL_DIR})
-install(TARGETS structstore_bindings
-        COMPONENT python_modules
-        DESTINATION ${STRUCTSTORE_INSTALL_DIR})
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/include
-        COMPONENT python_modules
-        DESTINATION ${STRUCTSTORE_INSTALL_DIR})
+        COMPONENT install_modules
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/structstore)
+install(TARGETS ${STRUCTSTORE_NONDEP_TARGETS}
+        COMPONENT install_modules
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/structstore)
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/include/structstore
+        COMPONENT install_modules
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-include(cmake/NanobindStubgen.cmake)
-nanobind_stubgen(structstore_bindings)
-nanobind_stubgen_install(structstore_bindings ${STRUCTSTORE_INSTALL_DIR})
+if(${BUILD_WITH_PYTHON})
+    include(cmake/NanobindStubgen.cmake)
+    nanobind_stubgen(structstore_py)
+    nanobind_stubgen_install(structstore_py ${CMAKE_INSTALL_LIBDIR}/structstore)
+endif()
 
 # inspired by https://stackoverflow.com/a/49857699
-export(TARGETS structstore_lib_cpponly structstore_lib nanobind-static
+export(TARGETS ${STRUCTSTORE_DEP_TARGETS}
         FILE "${PROJECT_BINARY_DIR}/StructStoreTargets.cmake")
 export(PACKAGE StructStore)
 configure_file(${PROJECT_SOURCE_DIR}/cmake/StructStoreConfig.cmake.in
@@ -126,14 +162,19 @@ configure_file(${PROJECT_SOURCE_DIR}/cmake/StructStoreConfigVersion.cmake.in
 install(FILES
         "${PROJECT_BINARY_DIR}/StructStoreConfig.cmake"
         "${PROJECT_BINARY_DIR}/StructStoreConfigVersion.cmake"
-        COMPONENT python_modules
-        DESTINATION ${STRUCTSTORE_INSTALL_DIR}/cmake)
+        COMPONENT install_modules
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/structstore)
 install(EXPORT StructStoreTargets
-        COMPONENT python_modules
-        DESTINATION ${STRUCTSTORE_INSTALL_DIR}/cmake)
+        COMPONENT install_modules
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/structstore)
+install(FILES
+        "${PROJECT_SOURCE_DIR}/LICENSE"
+        COMPONENT install_modules
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/structstore)
 
-if (NOT DEFINED PY_BUILD_CMAKE_PACKAGE_VERSION)
-    set(STRUCTSTORE_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/include)
-
-    add_subdirectory(examples)
-endif ()
+if(${BUILD_WITH_PYTHON})
+    install(FILES
+            "${PROJECT_SOURCE_DIR}/LICENSE"
+            COMPONENT install_modules
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/structstore_py)
+endif()

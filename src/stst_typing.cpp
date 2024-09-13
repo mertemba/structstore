@@ -46,10 +46,10 @@ uint64_t typing::get_type_hash<void>() {
 static bool register_common_types_() {
     // empty
     typing::register_type<void>("<empty>");
-    typing::register_serializer_text<void>([](std::ostream& os, const void* data) -> std::ostream& {
+    typing::register_serializer_text<void>([](std::ostream& os, const void*) -> std::ostream& {
         return os << "<empty>";
     });
-    typing::register_serializer_yaml<void>([](const void* data) {
+    typing::register_serializer_yaml<void>([](const void*) {
         return YAML::Node(YAML::Null);
     });
 

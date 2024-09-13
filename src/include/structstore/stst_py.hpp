@@ -1,5 +1,5 @@
-#ifndef STST_BINDINGS_HPP
-#define STST_BINDINGS_HPP
+#ifndef STST_PY_HPP
+#define STST_PY_HPP
 
 #include "structstore/stst_alloc.hpp"
 #include "structstore/stst_containers.hpp"
@@ -35,7 +35,7 @@ nb::object to_python(const StructStoreField& field, bool recursive);
 
 void from_python(FieldAccess access, const nb::handle& value, const std::string& field_name);
 
-class bindings {
+class py {
 private:
     static nb::object __slots__(StructStore& store);
 
@@ -93,7 +93,7 @@ public:
     }
 
     template<typename T_cpp, typename T_py>
-    static void register_basic_bindings() {
+    static void register_basic_py() {
         static_assert(!std::is_pointer<T_cpp>::value);
         register_to_python_fn<T_cpp>([](const StructStoreField& field, bool recursive) -> nb::object {
             return T_py(field.get<T_cpp>());
@@ -108,7 +108,7 @@ public:
     }
 
     template<typename T>
-    static void register_basic_bindings(nb::class_<T>& cls) {
+    static void register_basic_py(nb::class_<T>& cls) {
         uint64_t type_hash = typing::get_type_hash<T>();
         static_assert(!std::is_pointer<T>::value);
         register_to_python_fn<T>([](const StructStoreField& field, bool /*recursive*/) -> nb::object {
@@ -142,7 +142,7 @@ public:
     }
 
     template<typename T_cpp>
-    static void register_ptr_bindings(const nb::handle& T_ptr_py, const nb::handle& T_py) {
+    static void register_ptr_py(const nb::handle& T_ptr_py, const nb::handle& T_py) {
         static_assert(std::is_pointer<T_cpp>::value);
         register_to_python_fn<T_cpp>([](const StructStoreField& field, bool recursive) -> nb::object {
             return nb::cast(field.get<T_cpp>(), nb::rv_policy::reference);
@@ -177,7 +177,7 @@ public:
     }
 
     template<typename T>
-    static void register_structstore_bindings(nb::class_<T>& cls) {
+    static void register_structstore_py(nb::class_<T>& cls) {
         cls.def_prop_ro("__slots__", [](T& t) {
             auto& store = t.get_store();
             return __slots__(store);
@@ -217,7 +217,7 @@ public:
 };
 
 template<typename T>
-nb::class_<T> register_struct_type_and_bindings(nb::module_& m, const std::string& name) {
+nb::class_<T> register_struct_type_and_py(nb::module_& m, const std::string& name) {
     static_assert(std::is_base_of<Struct, T>::value,
                   "template parameter is not derived from structstore::Struct");
     typing::register_type<T>(name);
@@ -230,8 +230,8 @@ nb::class_<T> register_struct_type_and_bindings(nb::module_& m, const std::strin
 
     auto nb_cls = nb::class_<T>(m, name.c_str());
     nb_cls.def(nb::init());
-    bindings::register_basic_bindings<T>(nb_cls);
-    bindings::register_structstore_bindings(nb_cls);
+    py::register_basic_py<T>(nb_cls);
+    py::register_structstore_py(nb_cls);
     return nb_cls;
 }
 
