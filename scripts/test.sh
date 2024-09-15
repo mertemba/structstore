@@ -19,5 +19,4 @@ fi
 
 cmake "$srcdir/tests" -GNinja -DCMAKE_BUILD_TYPE=Debug $cmake_options
 ninja
-
-# todo: run tests
+ctest --output-on-failure

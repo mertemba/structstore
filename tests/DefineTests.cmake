@@ -11,6 +11,7 @@ foreach(TEST_TARGET ${TEST_TARGETS})
     target_compile_options(${TEST_TARGET} PUBLIC -Wall -Wextra -pedantic)
     target_include_directories(${TEST_TARGET} PRIVATE ${STRUCTSTORE_INCLUDE_DIR})
     target_link_libraries(${TEST_TARGET} PRIVATE structstore_lib)
+    add_test(NAME ${TEST_TARGET} COMMAND ${TEST_TARGET})
 endforeach()
 
 # nanobind_add_module(example_bindings example_bindings.cpp)

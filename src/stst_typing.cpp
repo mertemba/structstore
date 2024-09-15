@@ -62,6 +62,10 @@ static bool register_common_types_() {
     typing::register_default_destructor<structstore::string>();
     typing::register_default_serializer_text<structstore::string>();
     typing::register_default_serializer_yaml<structstore::string>();
+    typing::register_check<structstore::string>([](MiniMalloc& mm_alloc, const structstore::string* str) {
+        try_with_info("string: ", mm_alloc.assert_owned(str););
+        try_with_info("string data: ", mm_alloc.assert_owned(str->data()););
+    });
 
     return true;
 }

@@ -32,6 +32,10 @@ void StructStore::register_type() {
     typing::register_default_destructor<StructStore>();
     typing::register_default_serializer_text<StructStore>();
     typing::register_default_serializer_yaml<StructStore>();
+    typing::register_check<StructStore>([](MiniMalloc& mm_alloc, const StructStore* store) {
+        try_with_info("StructStore: ", mm_alloc.assert_owned(store););
+        try_with_info("StructStore content: ", store->check(););
+    });
 };
 
 template<>
