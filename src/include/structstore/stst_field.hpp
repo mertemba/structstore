@@ -137,6 +137,8 @@ public:
     }
 };
 
+class StructStoreShared;
+
 class FieldView {
     StructStoreField field;
 
@@ -155,6 +157,9 @@ public:
         field.clear_unmanaged();
     }
 };
+
+template<>
+FieldView::FieldView(structstore::StructStoreShared& data);
 }
 
 #endif

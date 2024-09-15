@@ -47,7 +47,9 @@ void Matrix::register_type() {
     typing::register_default_serializer_text<Matrix>();
     typing::register_check<Matrix>([](MiniMalloc& mm_alloc, const Matrix* matrix) {
         try_with_info("Matrix*: ", mm_alloc.assert_owned(matrix););
-        try_with_info("Matrix data: ", mm_alloc.assert_owned(matrix->_data););
+        if (matrix->_data) {
+            try_with_info("Matrix data: ", mm_alloc.assert_owned(matrix->_data););
+        }
     });
 }
 

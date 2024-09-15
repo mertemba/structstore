@@ -6,7 +6,7 @@ mkdir "$pkgdir"
 cd "$pkgdir"
 
 cmake_options=""
-if [ ! -z "$BUILD_WITH_PYTHON" ]; then
+if [ ! -z "$BUILD_WITH_VENV" ]; then
     cmake_options="$cmake_options -DBUILD_WITH_PYTHON=ON"
     venvdir="$pkgdir/venv"
     python -m venv "$venvdir"
@@ -20,3 +20,6 @@ fi
 cmake "$srcdir/tests" -GNinja -DCMAKE_BUILD_TYPE=Debug $cmake_options
 ninja
 ctest --output-on-failure
+if [ ! -z "$BUILD_WITH_PYTHON" ]; then
+    pytest "$srcdir/tests"
+fi

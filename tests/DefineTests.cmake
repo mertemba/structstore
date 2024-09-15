@@ -2,8 +2,8 @@ enable_testing()
 find_package(GTest REQUIRED)
 
 set(TEST_TARGETS "")
-list(APPEND TEST_TARGETS basic_0)
-list(APPEND TEST_TARGETS basic_1)
+list(APPEND TEST_TARGETS test_basic_0)
+list(APPEND TEST_TARGETS test_basic_1)
 
 foreach(TEST_TARGET ${TEST_TARGETS})
     add_executable(${TEST_TARGET} ${STRUCTSTORE_TESTS_DIR}/${TEST_TARGET}.cpp)
