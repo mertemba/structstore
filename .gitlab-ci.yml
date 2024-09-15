@@ -12,7 +12,7 @@ build_cpp:
   stage: build
   image: ${image}
   script:
-    - pacman -Sy --noconfirm --needed ${pacman_deps}
+    - pacman -Syu --noconfirm --needed ${pacman_deps}
     - chmod a+rX -R .
     - su nobody -s /bin/bash -c ./scripts/build.sh
 
@@ -24,7 +24,7 @@ build_makepkg:
       - structstore{,_py}-*.pkg.tar.zst
     expire_in: 1 hour
   script:
-    - pacman -Sy --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_makepkg}
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_makepkg}
     - chmod a+rX -R .
     - su nobody -s /bin/bash -c ./scripts/makepkg.sh
     - cp /tmp/structstore_build/structstore{,_py}-*.pkg.tar.zst ./
@@ -37,6 +37,6 @@ build_py:
       - dist/structstore-*.{tar.gz,whl}
     expire_in: 1 hour
   script:
-    - pacman -Sy --noconfirm --needed ${pacman_deps} ${pacman_deps_py}
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py}
     - chmod a+rX -R .
     - su nobody -s /bin/bash -c ./scripts/build_py.sh
