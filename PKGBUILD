@@ -46,7 +46,6 @@ package_structstore() {
     venvdir="${srcdir}/venv"
     source "${venvdir}/bin/activate"
     cmake -B build -S "." \
-        -DCMAKE_INSTALL_MESSAGE=NEVER \
         -DBUILD_WITH_PYTHON=OFF
     DESTDIR="$pkgdir" cmake --install build
 }
@@ -56,7 +55,6 @@ package_structstore_py() {
     venvdir="${srcdir}/venv"
     source "${venvdir}/bin/activate"
     cmake -B build -S "." \
-        -DCMAKE_INSTALL_MESSAGE=NEVER \
         -DBUILD_WITH_PYTHON=ON
     DESTDIR="$pkgdir" cmake --install build
 

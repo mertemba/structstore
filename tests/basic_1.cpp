@@ -49,7 +49,7 @@ int main() {
     settings.num = 42;
     settings.subsettings.subnum = 43;
 
-    stst::StructStore store;
+    stst::StructStore store(stst::static_alloc);
     to_store(store, settings);
     std::cout << store << std::endl;
 

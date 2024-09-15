@@ -35,7 +35,7 @@ build_args = ['-j']
 build_tool_args = []
 install_args = ['--verbose']
 install_components = ['install_modules']
-env = { 'BUILD_WITH_PY_BUILD_CMAKE' = 'ON' }
+options = { 'BUILD_WITH_PYTHON' = 'ON', 'BUILD_WITH_PY_BUILD_CMAKE' = 'ON' }
 
 [tool.py-build-cmake.linux.cmake] # Linux-specific options
 generator = 'Ninja Multi-Config'

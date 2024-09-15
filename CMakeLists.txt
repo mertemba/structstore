@@ -7,6 +7,8 @@ option(BUILD_WITH_PYTHON
     "Build StructStore with Python bindings" OFF)
 option(BUILD_WITH_PY_BUILD_CMAKE
     "Build StructStore with py-build-cmake" OFF)
+option(BUILD_WITH_TESTING
+    "Build StructStore with testing enabled" OFF)
 
 if(${BUILD_WITH_PYTHON})
     message(STATUS "Building with Python bindings")
@@ -27,7 +29,6 @@ if(${BUILD_WITH_PY_BUILD_CMAKE})
         message(FATAL_ERROR "BUILD_WITH_PY_BUILD_CMAKE enabled "
             "but CMAKE_INSTALL_PREFIX set.")
     endif()
-    set(PATH CMAKE_INSTALL_PREFIX ${PY_BUILD_CMAKE_MODULE_NAME})
 endif()
 
 # dependencies
@@ -124,9 +125,9 @@ foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
     target_compile_features(${TARGET} PUBLIC cxx_std_17)
     target_compile_options(${TARGET} PUBLIC -fPIC)
     target_compile_options(${TARGET} PUBLIC -Wall -Wextra -pedantic)
-    target_include_directories(${TARGET} PRIVATE
-            ${YAML_CPP_INCLUDE_DIRS}
-            ${PROJECT_SOURCE_DIR}/src/include)
+    target_include_directories(${TARGET}
+            PUBLIC ${YAML_CPP_INCLUDE_DIRS}
+            PRIVATE ${PROJECT_SOURCE_DIR}/src/include)
     target_link_libraries(${TARGET} PUBLIC
             ${YAML_CPP_LIBRARIES}
             rt)
@@ -134,21 +135,35 @@ endforeach()
 
 # install
 
+set(STRUCTSTORE_INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR}/structstore)
+set(STRUCTSTORE_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
+set(STRUCTSTORE_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake/structstore)
+set(STRUCTSTORE_INSTALL_LICENSEDIR ${CMAKE_INSTALL_DATADIR}/licenses/structstore)
+set(STRUCTSTORE_INSTALL_LICENSEDIR_PY ${CMAKE_INSTALL_DATADIR}/licenses/structstore_py)
+
+if(${BUILD_WITH_PY_BUILD_CMAKE})
+    set(STRUCTSTORE_INSTALL_LIBDIR ${PY_BUILD_CMAKE_MODULE_NAME})
+    set(STRUCTSTORE_INSTALL_INCLUDEDIR ${PY_BUILD_CMAKE_MODULE_NAME}/include)
+    set(STRUCTSTORE_INSTALL_CMAKEDIR ${PY_BUILD_CMAKE_MODULE_NAME}/cmake)
+    set(STRUCTSTORE_INSTALL_LICENSEDIR ${PY_BUILD_CMAKE_MODULE_NAME})
+    set(STRUCTSTORE_INSTALL_LICENSEDIR_PY ${PY_BUILD_CMAKE_MODULE_NAME})
+endif()
+
 install(TARGETS ${STRUCTSTORE_DEP_TARGETS}
         EXPORT StructStoreTargets
         COMPONENT install_modules
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/structstore)
+        DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR})
 install(TARGETS ${STRUCTSTORE_NONDEP_TARGETS}
         COMPONENT install_modules
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/structstore)
+        DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR})
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/include/structstore
         COMPONENT install_modules
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+        DESTINATION ${STRUCTSTORE_INSTALL_INCLUDEDIR})
 
 if(${BUILD_WITH_PYTHON})
     include(cmake/NanobindStubgen.cmake)
     nanobind_stubgen(structstore_py)
-    nanobind_stubgen_install(structstore_py ${CMAKE_INSTALL_LIBDIR}/structstore)
+    nanobind_stubgen_install(structstore_py ${STRUCTSTORE_INSTALL_LIBDIR})
 endif()
 
 # inspired by https://stackoverflow.com/a/49857699
@@ -163,18 +178,26 @@ install(FILES
         "${PROJECT_BINARY_DIR}/StructStoreConfig.cmake"
         "${PROJECT_BINARY_DIR}/StructStoreConfigVersion.cmake"
         COMPONENT install_modules
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/structstore)
+        DESTINATION ${STRUCTSTORE_INSTALL_CMAKEDIR})
 install(EXPORT StructStoreTargets
         COMPONENT install_modules
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/structstore)
+        DESTINATION ${STRUCTSTORE_INSTALL_CMAKEDIR})
 install(FILES
         "${PROJECT_SOURCE_DIR}/LICENSE"
         COMPONENT install_modules
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/structstore)
+        DESTINATION ${STRUCTSTORE_INSTALL_LICENSEDIR})
 
 if(${BUILD_WITH_PYTHON})
     install(FILES
             "${PROJECT_SOURCE_DIR}/LICENSE"
             COMPONENT install_modules
-            DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/structstore_py)
+            DESTINATION ${STRUCTSTORE_INSTALL_LICENSEDIR_PY})
+endif()
+
+# tests
+
+if(${BUILD_WITH_TESTING})
+    set(STRUCTSTORE_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/src/include)
+    set(STRUCTSTORE_TESTS_DIR ${PROJECT_SOURCE_DIR}/tests)
+    include(${PROJECT_SOURCE_DIR}/tests/DefineTests.cmake)
 endif()

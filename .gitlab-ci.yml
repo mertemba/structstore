@@ -1,8 +1,9 @@
 variables:
   image: archlinux:latest
   pacman_deps: cmake ninja gcc yaml-cpp
-  pacman_deps_makepkg: rsync debugedit fakeroot git namcap
+  pacman_deps_makepkg: rsync fakeroot git namcap
   pacman_deps_py: python python-pip
+  pacman_deps_test: gtest
 
 stages:
   - build
@@ -16,7 +17,33 @@ build_cpp:
     - chmod a+rX -R .
     - su nobody -s /bin/bash -c ./scripts/build.sh
 
-build_makepkg:
+test_cpp:
+  stage: test
+  image: ${image}
+  needs: [build_cpp]
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_test}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "BUILD_WITH_TESTING=1 ./scripts/build.sh"
+
+build_py:
+  stage: build
+  image: ${image}
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 ./scripts/build.sh"
+
+test_py:
+  stage: test
+  image: ${image}
+  needs: [build_py]
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 BUILD_WITH_TESTING=1 ./scripts/build.sh"
+
+build_archlinux:
   stage: build
   image: ${image}
   artifacts:
@@ -29,7 +56,27 @@ build_makepkg:
     - su nobody -s /bin/bash -c ./scripts/makepkg.sh
     - cp /tmp/structstore_build/structstore{,_py}-*.pkg.tar.zst ./
 
-build_py:
+test_archlinux_cpp:
+  stage: test
+  image: ${image}
+  needs: [build_archlinux]
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_test}
+    - pacman -U --noconfirm ./structstore-*.pkg.tar.zst
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c ./scripts/test.sh
+
+test_archlinux_py:
+  stage: test
+  image: ${image}
+  needs: [build_archlinux]
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
+    - pacman -U --noconfirm ./structstore{,_py}-*.pkg.tar.zst
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 ./scripts/test.sh"
+
+build_pywheel:
   stage: build
   image: ${image}
   artifacts:
@@ -40,3 +87,12 @@ build_py:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py}
     - chmod a+rX -R .
     - su nobody -s /bin/bash -c ./scripts/build_py.sh
+
+test_pywheel:
+  stage: test
+  image: ${image}
+  needs: [build_pywheel]
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 ./scripts/test.sh"

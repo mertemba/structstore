@@ -27,8 +27,11 @@ def __main__():
     state.value = 3.14
     state.mystr = 'foo'
     state.flag = True
+    state.none = None
     state.lst = [1, 2, 3, 5, 8]
-    state.vec = np.array([1.0, 2.0, 3.0, 4.0])
+    state.tuple = (0.0, 0.0)
+    state.vec = np.ndarray(shape=(0, 2), dtype=np.float64)
+    state.sub = dict(vec=np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32))
     state.mat = np.array([[1.0, 2.0], [3.0, 4.0]])
     print(state.deepcopy())
 
