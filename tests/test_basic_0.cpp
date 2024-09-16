@@ -26,7 +26,7 @@ struct Settings {
 };
 
 int main() {
-    stst::StructStore store;
+    stst::StructStore store(stst::static_alloc);
     int& num = store["num"];
     num = 5;
     std::cout << "store: " << store << std::endl;
@@ -40,7 +40,7 @@ int main() {
     stst::StructStoreShared shdata_store("/shdata_store");
     std::cout << "shared data: " << *shdata_store << std::endl;
     shdata_store->get<int>("num") = 52;
-    shdata_store[H("num")] = 53;
+    shdata_store["num"] = 53;
 
     stst::StructStoreShared shsettings_store("/shsettings_store");
     Settings shsettings{*shsettings_store};

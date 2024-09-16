@@ -1,4 +1,5 @@
 #include "structstore/stst_field.hpp"
+#include "structstore/stst_shared.hpp"
 
 using namespace structstore;
 
@@ -14,3 +15,6 @@ YAML::Node structstore::to_yaml(const StructStoreField& field) {
     typing::SerializeYamlFn<> serializer = typing::get_serializer_yaml(field.get_type_hash());
     return serializer(field.data);
 }
+
+template<>
+FieldView::FieldView(StructStoreShared& store) : field{&store->get_store()} {}

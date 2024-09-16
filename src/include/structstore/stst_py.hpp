@@ -108,8 +108,30 @@ public:
     }
 
     template<typename T>
+    static void register_basic_py_funcs(nb::class_<T>& cls) {
+        static_assert(!std::is_pointer<T>::value);
+        cls.def("to_yaml", [=](T& t) {
+            return YAML::Dump(to_yaml(*FieldView{t}));
+        });
+        cls.def("__repr__", [=](T& t) {
+            return (std::ostringstream() << *FieldView{t}).str();
+        });
+        cls.def("copy", [=](T& t) {
+            return structstore::to_python(*FieldView{t}, false);
+        });
+        cls.def("deepcopy", [=](T& t) {
+            return structstore::to_python(*FieldView{t}, true);
+        });
+        cls.def("__copy__", [=](T& t) {
+            return structstore::to_python(*FieldView{t}, false);
+        });
+        cls.def("__deepcopy__", [=](T& t, nb::handle&) {
+            return structstore::to_python(*FieldView{t}, true);
+        });
+    }
+
+    template<typename T>
     static void register_basic_py(nb::class_<T>& cls) {
-        uint64_t type_hash = typing::get_type_hash<T>();
         static_assert(!std::is_pointer<T>::value);
         register_to_python_fn<T>([](const StructStoreField& field, bool /*recursive*/) -> nb::object {
             return nb::cast(field.get<T>(), nb::rv_policy::reference);
@@ -121,32 +143,13 @@ public:
             }
             return false;
         });
-        cls.def("to_yaml", [=](T& t) {
-            return YAML::Dump(to_yaml(*FieldView{t, type_hash}));
-        });
-        cls.def("__repr__", [=](T& t) {
-            return (std::ostringstream() << *FieldView{t, type_hash}).str();
-        });
-        cls.def("copy", [=](T& t) {
-            return structstore::to_python(*FieldView{t, type_hash}, false);
-        });
-        cls.def("deepcopy", [=](T& t) {
-            return structstore::to_python(*FieldView{t, type_hash}, true);
-        });
-        cls.def("__copy__", [=](T& t) {
-            return structstore::to_python(*FieldView{t, type_hash}, false);
-        });
-        cls.def("__deepcopy__", [=](T& t, nb::handle&) {
-            return structstore::to_python(*FieldView{t, type_hash}, true);
-        });
+        register_basic_py_funcs<T>(cls);
     }
 
     template<typename T_cpp>
     static void register_ptr_py(const nb::handle& T_ptr_py, const nb::handle& T_py) {
         static_assert(std::is_pointer<T_cpp>::value);
-        register_to_python_fn<T_cpp>([](const StructStoreField& field, bool recursive) -> nb::object {
-            return nb::cast(field.get<T_cpp>(), nb::rv_policy::reference);
-        });
+        register_basic_to_python<T_cpp>();
         register_from_python_fn<T_cpp>([T_ptr_py, T_py](FieldAccess access, const nb::handle& value) {
             if (value.type().equal(T_ptr_py) || (!access.get_field().empty() && value.type().equal(T_py))) {
                 access.get<T_cpp>() = nb::cast<T_cpp>(value);
@@ -178,6 +181,8 @@ public:
 
     template<typename T>
     static void register_structstore_py(nb::class_<T>& cls) {
+        register_basic_py_funcs<T>(cls);
+
         cls.def_prop_ro("__slots__", [](T& t) {
             auto& store = t.get_store();
             return __slots__(store);

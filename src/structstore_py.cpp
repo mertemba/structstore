@@ -130,7 +130,11 @@ NB_MODULE(MODULE_NAME, m) {
             }, nb::arg().none(), nb::arg().none(), nb::arg().none());
 
     nb::class_<StructStore> cls = nb::class_<StructStore>{m, "StructStore"};
+    cls.def("__init__", [](StructStore* store) {
+        new(store)StructStore(static_alloc);
+    });
     py::register_structstore_py(cls);
+    py::register_basic_to_python<StructStore>();
 
     nb::enum_<CleanupMode>(m, "CleanupMode")
             .value("NEVER", NEVER)
