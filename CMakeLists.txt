@@ -117,7 +117,6 @@ if(${BUILD_WITH_PYTHON})
     if(CMAKE_SYSTEM_NAME MATCHES "Linux")
         target_link_options(structstore_py PRIVATE "LINKER:--exclude-libs,ALL")
     endif()
-    set_target_properties(structstore_py PROPERTIES INSTALL_RPATH "\\\$ORIGIN")
     list(APPEND STRUCTSTORE_NONDEP_TARGETS structstore_py)
 endif()
 
@@ -136,24 +135,28 @@ endforeach()
 # install
 
 set(STRUCTSTORE_INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR}/structstore)
+set(STRUCTSTORE_INSTALL_LIBDIR_PY ${CMAKE_INSTALL_LIBDIR}/python3.12/site-packages/structstore)
 set(STRUCTSTORE_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
 set(STRUCTSTORE_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake/structstore)
 set(STRUCTSTORE_INSTALL_LICENSEDIR ${CMAKE_INSTALL_DATADIR}/licenses/structstore)
 set(STRUCTSTORE_INSTALL_LICENSEDIR_PY ${CMAKE_INSTALL_DATADIR}/licenses/structstore_py)
 
+if(${BUILD_WITH_PYTHON})
+    set_target_properties(structstore_py PROPERTIES INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${STRUCTSTORE_INSTALL_LIBDIR})
+endif()
+
 if(${BUILD_WITH_PY_BUILD_CMAKE})
     set(STRUCTSTORE_INSTALL_LIBDIR ${PY_BUILD_CMAKE_MODULE_NAME})
+    set(STRUCTSTORE_INSTALL_LIBDIR_PY ${PY_BUILD_CMAKE_MODULE_NAME})
     set(STRUCTSTORE_INSTALL_INCLUDEDIR ${PY_BUILD_CMAKE_MODULE_NAME}/include)
     set(STRUCTSTORE_INSTALL_CMAKEDIR ${PY_BUILD_CMAKE_MODULE_NAME}/cmake)
     set(STRUCTSTORE_INSTALL_LICENSEDIR ${PY_BUILD_CMAKE_MODULE_NAME})
     set(STRUCTSTORE_INSTALL_LICENSEDIR_PY ${PY_BUILD_CMAKE_MODULE_NAME})
+    set_target_properties(structstore_py PROPERTIES INSTALL_RPATH "\\\$ORIGIN")
 endif()
 
-install(TARGETS ${STRUCTSTORE_DEP_TARGETS}
+install(TARGETS structstore_lib
         EXPORT StructStoreTargets
-        COMPONENT install_modules
-        DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR})
-install(TARGETS ${STRUCTSTORE_NONDEP_TARGETS}
         COMPONENT install_modules
         DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR})
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/include/structstore
@@ -161,9 +164,20 @@ install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/include/structstore
         DESTINATION ${STRUCTSTORE_INSTALL_INCLUDEDIR})
 
 if(${BUILD_WITH_PYTHON})
+    install(TARGETS structstore_py_lib
+            EXPORT StructStoreTargets
+            COMPONENT install_modules
+            DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR})
+    install(TARGETS structstore_py
+            COMPONENT install_modules
+            DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR_PY})
+    install(FILES ${PROJECT_SOURCE_DIR}/src/structstore/__init__.py
+            COMPONENT install_modules
+            DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR_PY})
+
     include(cmake/NanobindStubgen.cmake)
     nanobind_stubgen(structstore_py)
-    nanobind_stubgen_install(structstore_py ${STRUCTSTORE_INSTALL_LIBDIR})
+    nanobind_stubgen_install(structstore_py ${STRUCTSTORE_INSTALL_LIBDIR_PY})
 endif()
 
 # inspired by https://stackoverflow.com/a/49857699
