@@ -10,7 +10,7 @@ foreach(TEST_TARGET ${TEST_TARGETS})
     target_compile_features(${TEST_TARGET} PUBLIC cxx_std_17)
     target_compile_options(${TEST_TARGET} PUBLIC -Wall -Wextra -pedantic)
     target_include_directories(${TEST_TARGET} PRIVATE ${STRUCTSTORE_INCLUDE_DIR})
-    target_link_libraries(${TEST_TARGET} PRIVATE structstore_lib)
+    target_link_libraries(${TEST_TARGET} PRIVATE structstore_lib ${GTEST_BOTH_LIBRARIES})
     add_test(NAME ${TEST_TARGET} COMMAND ${TEST_TARGET})
 endforeach()
 

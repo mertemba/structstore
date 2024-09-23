@@ -4,7 +4,7 @@ srcdir="$PWD"
 pkgdir="/tmp/structstore_build"
 
 BUILD_WITH_TESTING=1 "$srcdir"/scripts/build.sh
-ctest --output-on-failure "$pkgdir"
+(cd "$pkgdir" && ctest --output-on-failure)
 
 if [ ! -z "$BUILD_WITH_PYTHON" ]; then
     # build wheel
