@@ -10,26 +10,7 @@ stages:
   - build
   - test
 
-build_cpp:
-  stage: build
-  image: ${image}
-  script:
-    - pacman -Syu --noconfirm --needed ${pacman_deps}
-    - chmod a+rX -R .
-    - su nobody -s /bin/bash -c ./scripts/build.sh
-
-test_cpp:
-  stage: test
-  image: ${image}
-  needs: [build_cpp]
-  script:
-    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_test}
-    - chmod a+rX -R .
-    - su nobody -s /bin/bash -c "BUILD_WITH_TESTING=1 ./scripts/build.sh"
-    - cd /tmp/structstore_build
-    - su nobody -s /bin/bash -c "ctest --output-on-failure"
-
-build_py:
+build_local:
   stage: build
   image: ${image}
   script:
@@ -37,14 +18,16 @@ build_py:
     - chmod a+rX -R .
     - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 ./scripts/build.sh"
 
-test_py:
+test_local:
   stage: test
   image: ${image}
-  needs: [build_py]
+  needs: [build_local]
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
     - chmod a+rX -R .
-    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 BUILD_WITH_TESTING=1 ./scripts/build.sh"
+    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 BUILD_WITH_TESTING=1 BUILD_WITH_COVERAGE=1 ./scripts/build.sh"
+    - cd /tmp/structstore_build
+    - su nobody -s /bin/bash -c "ctest --output-on-failure"
     # todo: make package available and run python tests
 
 build_archlinux:

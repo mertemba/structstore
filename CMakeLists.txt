@@ -9,6 +9,8 @@ option(BUILD_WITH_PY_BUILD_CMAKE
     "Build StructStore with py-build-cmake" OFF)
 option(BUILD_WITH_TESTING
     "Build StructStore with testing enabled" OFF)
+option(BUILD_WITH_COVERAGE
+    "Build StructStore with coverage analysis enabled" OFF)
 
 if(${BUILD_WITH_PYTHON})
     message(STATUS "Building with Python bindings")
@@ -131,6 +133,15 @@ foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
             ${YAML_CPP_LIBRARIES}
             rt)
 endforeach()
+
+# coverage
+
+if(${BUILD_WITH_COVERAGE})
+    foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
+        target_compile_options(${TARGET} PRIVATE --coverage -fprofile-arcs -ftest-coverage -g -O0 -fno-lto)
+        target_link_libraries(${TARGET} PRIVATE gcov -fprofile-arcs -ftest-coverage -fno-lto)
+    endforeach()
+endif()
 
 # install
 
