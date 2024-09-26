@@ -3,7 +3,7 @@ variables:
   pacman_deps: cmake ninja gcc yaml-cpp
   pacman_deps_makepkg: rsync fakeroot git namcap
   pacman_deps_py: python python-pip
-  pacman_deps_test: gtest
+  pacman_deps_test: gtest gcovr
   pacman_deps_pytest: python-pytest python-numpy
 
 stages:
@@ -27,6 +27,16 @@ test_devel:
   stage: test
   image: ${image}
   needs: [build_devel]
+  artifacts:
+    expire_in: 2 days
+    paths:
+      - build/coverage.xml
+      - build/coverage_details
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: build/coverage.xml
+  coverage: "/^lines: \\d+.\\d+%/"
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
     - chmod a+rX -R .

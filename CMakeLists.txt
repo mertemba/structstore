@@ -112,6 +112,7 @@ if(${BUILD_WITH_PYTHON})
             MODULE_NAME=$<TARGET_FILE_BASE_NAME:structstore_py>
             VERSION_INFO="${PY_FULL_VERSION}"
     )
+    target_compile_options(nanobind-static PRIVATE -Wno-shadow -Wno-pedantic)
     # hide all symbols by default(including external libraries on Linux)
     set_target_properties(structstore_py PROPERTIES
             CXX_VISIBILITY_PRESET "hidden"
