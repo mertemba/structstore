@@ -1,4 +1,7 @@
-pkgdir="/tmp/structstore_build"
+! test -z "$srcdir"
+
+builddir="$srcdir/build"
+venvdir="$builddir/venv"
 
 cmake_options=""
 if [ ! -z "$BUILD_WITH_PYTHON" ]; then

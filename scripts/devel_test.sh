@@ -1,0 +1,18 @@
+#!/bin/bash -ex
+
+srcdir="$PWD"
+
+# this defines builddir and cmake_options
+source "$srcdir/scripts/build_config.sh"
+
+test -d build
+source "$venvdir/bin/activate"
+
+# build, just to be sure everything is up-to-date
+cmake --build "$builddir"
+cmake --install "$builddir"
+
+# test
+ctest --test-dir build --output-on-failure
+export PYTHONPATH="$PYTHONPATH:$srcdir/install/lib/python3.12/site-packages"
+pytest "$srcdir/tests"

@@ -1,11 +1,11 @@
 #!/bin/bash -ex
 
 srcdir="$PWD"
-pkgdir="/tmp/structstore_build"
-mkdir "$pkgdir"
-cd "$pkgdir"
+builddir="$srcdir/build"
+mkdir "$builddir"
+cd "$builddir"
 
-venvdir="$pkgdir/venv"
+venvdir="$builddir/venv"
 python -m venv "$venvdir"
 source "$venvdir/bin/activate"
 pip install -r "$srcdir/requirements.txt"

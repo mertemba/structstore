@@ -2,17 +2,14 @@
 
 srcdir="$PWD"
 
-# this defines pkgdir and cmake_options
-source scripts/build_config.sh
+# this defines builddir and cmake_options
+source "$srcdir/scripts/build_config.sh"
 
-mkdir -p "$pkgdir"
-cd "$pkgdir"
+mkdir -p "$builddir"
+cd "$builddir"
 
 if [ ! -z "$BUILD_WITH_VENV" ]; then
-    venvdir="$pkgdir/venv"
-    python -m venv "$venvdir"
-    source "$venvdir/bin/activate"
-    pip install -r "$srcdir/requirements.txt"
+    source "$srcdir/scripts/setup_venv.sh"
     if [ ! -z "$INSTALL_PY_WHEEL" ]; then
         pip install "$srcdir"/dist/structstore-*.whl
     fi
