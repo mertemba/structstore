@@ -63,7 +63,7 @@ test_archlinux_py:
     - chmod a+rX -R .
     - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 ./scripts/test.sh"
 
-build_pywheel:
+build_pyproj:
   stage: build
   image: ${image}
   artifacts:
@@ -73,13 +73,22 @@ build_pywheel:
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py}
     - chmod a+rX -R .
-    - su nobody -s /bin/bash -c ./scripts/build_py.sh
+    - su nobody -s /bin/bash -c ./scripts/build_pyproj.sh
 
-test_pywheel:
+test_py_tarball:
   stage: test
   image: ${image}
-  needs: [build_pywheel]
+  needs: [build_pyproj]
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
     - chmod a+rX -R .
-    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 BUILD_WITH_VENV=1 ./scripts/test.sh"
+    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 BUILD_WITH_VENV=1 INSTALL_PY_TARBALL=1 ./scripts/test.sh"
+
+test_py_wheel:
+  stage: test
+  image: ${image}
+  needs: [build_pyproj]
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 BUILD_WITH_VENV=1 INSTALL_PY_WHEEL=1 ./scripts/test.sh"
