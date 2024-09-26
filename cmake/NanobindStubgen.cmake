@@ -13,6 +13,6 @@ function(nanobind_stubgen_install target destination)
     install(FILES
             $<TARGET_FILE_DIR:${target}>/$<TARGET_FILE_BASE_NAME:${target}>.pyi
             RENAME __init__.pyi
-            COMPONENT python_modules
+            COMPONENT install_modules
             DESTINATION ${destination}/$<TARGET_FILE_BASE_NAME:${target}>)
 endfunction()

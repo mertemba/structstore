@@ -4,7 +4,7 @@ find_dependency(yaml-cpp REQUIRED)
 check_required_components(StructStore)
 
 get_filename_component(STRUCTSTORE_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
-set(STRUCTSTORE_INCLUDE_DIRS
+set(STRUCTSTORE_INCLUDE_DIR
     "${STRUCTSTORE_CMAKE_DIR}/../include"
     ${YAML_CPP_LIBRARIES})
 

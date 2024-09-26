@@ -158,7 +158,7 @@ public:
         return sh_data_ptr->data;
     }
 
-    explicit operator StructStore&() {
+    StructStore& get_store() {
         assert_valid();
         return sh_data_ptr->data;
     }

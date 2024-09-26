@@ -3,13 +3,18 @@
 
 #include "structstore/stst_structstore.hpp"
 #include "structstore/stst_field.hpp"
+#include "structstore/stst_typing.hpp"
 
 namespace structstore {
 
 class List {
     MiniMalloc& mm_alloc;
-    structstore::vector<StructStoreField> data;
+    ::structstore::vector<StructStoreField> data;
     mutable SpinMutex mutex;
+
+    static void register_type();
+
+    friend void typing::register_common_types();
 
 public:
     class Iterator {
@@ -37,7 +42,7 @@ public:
         }
     };
 
-    List() : mm_alloc(*(MiniMalloc*) nullptr), data(StlAllocator<StructStoreField>(mm_alloc)) {
+    List() : mm_alloc(*(MiniMalloc*) nullptr), data(StlAllocator<StructStoreField>(static_alloc)) {
         throw std::runtime_error("List should not be constructed without an allocator");
     }
 
@@ -47,11 +52,19 @@ public:
         clear();
     }
 
-    List(const List&) = delete;
+    List(const List& other) : List() {
+        *this = other;
+    }
 
     List(List&&) = delete;
 
-    List& operator=(const List&) = delete;
+    List& operator=(const List& other) {
+        if (other.data.empty()) {
+            clear();
+            return *this;
+        }
+        throw std::runtime_error("copy assignment of structstore::List is not supported");
+    }
 
     List& operator=(List&&) = delete;
 
@@ -90,8 +103,6 @@ public:
         return {*this, data.size()};
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const List& self);
-
     SpinMutex& get_mutex() {
         return mutex;
     }
@@ -122,7 +133,19 @@ public:
     [[nodiscard]] auto read_lock() const {
         return ScopedLock(mutex);
     }
+
+    template<typename T>
+    friend std::ostream& structstore::to_text(std::ostream&, const T&);
+
+    template<typename T>
+    friend YAML::Node structstore::to_yaml(const T&);
 };
+
+template<>
+std::ostream& to_text(std::ostream&, const List&);
+
+template<>
+YAML::Node to_yaml(const List&);
 
 template<>
 void List::push_back<const char*>(const char* const& value);
@@ -136,6 +159,10 @@ protected:
     size_t _ndim;
     size_t _shape[MAX_DIMS] = {};
     double* _data;
+
+    static void register_type();
+
+    friend void typing::register_common_types();
 
 public:
     Matrix(MiniMalloc& mm_alloc) : Matrix(0, 0, mm_alloc) {}
@@ -162,14 +189,12 @@ public:
     }
 
     Matrix& operator=(Matrix&& other) {
-        if (&mm_alloc == &other.mm_alloc) {
-            std::swap(_ndim, other._ndim);
-            std::swap(_shape, other._shape);
-            std::swap(_data, other._data);
-        } else {
-            const Matrix& other_ = other;
-            *this = other_;
+        if (&mm_alloc != &other.mm_alloc) {
+            throw std::runtime_error("move assignment of structstore::Matrix between different StructStores is not supported");
         }
+        std::swap(_ndim, other._ndim);
+        std::swap(_shape, other._shape);
+        std::swap(_data, other._data);
         return *this;
     }
 
@@ -217,7 +242,11 @@ public:
         }
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const Matrix& self);
+    template<typename T>
+    friend std::ostream& structstore::to_text(std::ostream&, const T&);
+
+    template<typename T>
+    friend YAML::Node structstore::to_yaml(const T&);
 };
 
 }

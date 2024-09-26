@@ -1,0 +1,106 @@
+variables:
+  image: archlinux:latest
+  pacman_deps: cmake ninja gcc yaml-cpp
+  pacman_deps_makepkg: rsync fakeroot git namcap
+  pacman_deps_py: python python-pip
+  pacman_deps_test: gtest gcovr
+  pacman_deps_pytest: python-pytest python-numpy
+
+stages:
+  - build
+  - test
+
+build_devel:
+  stage: build
+  image: ${image}
+  artifacts:
+    paths:
+      - build
+    expire_in: 1 hour
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "./scripts/devel_setup.sh"
+    - su nobody -s /bin/bash -c "cmake --build build"
+
+test_devel:
+  stage: test
+  image: ${image}
+  needs: [build_devel]
+  artifacts:
+    expire_in: 2 days
+    paths:
+      - build/coverage.xml
+      - build/coverage_details
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: build/coverage.xml
+  coverage: "/^lines: \\d+.\\d+%/"
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "./scripts/devel_test.sh"
+
+build_archlinux:
+  stage: build
+  image: ${image}
+  artifacts:
+    paths:
+      - structstore{,_py}-*.pkg.tar.zst
+    expire_in: 1 hour
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_makepkg}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c ./scripts/makepkg.sh
+    - cp /tmp/structstore_build/structstore{,_py}-*.pkg.tar.zst ./
+
+test_archlinux_cpp:
+  stage: test
+  image: ${image}
+  needs: [build_archlinux]
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_test}
+    - pacman -U --noconfirm ./structstore-*.pkg.tar.zst
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c ./scripts/test.sh
+
+test_archlinux_py:
+  stage: test
+  image: ${image}
+  needs: [build_archlinux]
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test} ${pacman_deps_pytest}
+    - pacman -U --noconfirm ./structstore{,_py}-*.pkg.tar.zst
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 ./scripts/test.sh"
+
+build_pyproj:
+  stage: build
+  image: ${image}
+  artifacts:
+    paths:
+      - dist/structstore-*.{tar.gz,whl}
+    expire_in: 1 hour
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c ./scripts/build_pyproj.sh
+
+test_py_tarball:
+  stage: test
+  image: ${image}
+  needs: [build_pyproj]
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 BUILD_WITH_VENV=1 INSTALL_PY_TARBALL=1 ./scripts/test.sh"
+
+test_py_wheel:
+  stage: test
+  image: ${image}
+  needs: [build_pyproj]
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 BUILD_WITH_VENV=1 INSTALL_PY_WHEEL=1 ./scripts/test.sh"

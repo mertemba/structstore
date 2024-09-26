@@ -1,5 +1,4 @@
-#include <iostream>
-#include <thread>
+#include <gtest/gtest.h>
 
 #include <structstore/structstore.hpp>
 
@@ -44,19 +43,31 @@ void from_store(stst::StructStore& store, Settings& settings) {
     from_store(store["subsettings"], settings.subsettings);
 }
 
-int main() {
+TEST(StructStoreTestBasic, structInStaticStore) {
+    Settings settings;
+
+    stst::StructStore store(stst::static_alloc);
+    to_store(store, settings);
+    std::stringstream str;
+    str << store;
+    EXPECT_EQ(str.str(), "{\"num\":5,\"value\":3.14,\"flag\":1,\"str\":foo,\"subsettings\":{\"subnum\":42,\"substr\":bar,},}");
+}
+
+TEST(StructStoreTestBasic, structInSharedStore) {
     Settings settings;
     settings.num = 42;
     settings.subsettings.subnum = 43;
-
-    stst::StructStore store;
-    to_store(store, settings);
-    std::cout << store << std::endl;
 
     stst::StructStoreShared shsettings_store("/shsettings_store");
     to_store(*shsettings_store, settings);
 
     Settings settings2;
     from_store(*shsettings_store, settings2);
-    return 0;
+    EXPECT_EQ(settings.num, settings2.num);
+    EXPECT_EQ(settings.subsettings.subnum, settings2.subsettings.subnum);
+}
+
+int main(int argc, char** argv) {
+    testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }
