@@ -1,9 +1,9 @@
 #!/bin/bash -ex
 
 srcdir="$PWD"
-pkgdir="/tmp/structstore_build"
-mkdir "$pkgdir"
-cd "$pkgdir"
+builddir="/tmp/structstore_build"
+mkdir "$builddir"
+cd "$builddir"
 cp "$srcdir/PKGBUILD" ./
 mkdir src
 rsync -a --exclude build "$srcdir" src/

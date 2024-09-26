@@ -3,47 +3,44 @@ variables:
   pacman_deps: cmake ninja gcc yaml-cpp
   pacman_deps_makepkg: rsync fakeroot git namcap
   pacman_deps_py: python python-pip
-  pacman_deps_test: gtest
+  pacman_deps_test: gtest gcovr
   pacman_deps_pytest: python-pytest python-numpy
 
 stages:
   - build
   - test
 
-build_cpp:
+build_devel:
   stage: build
   image: ${image}
-  script:
-    - pacman -Syu --noconfirm --needed ${pacman_deps}
-    - chmod a+rX -R .
-    - su nobody -s /bin/bash -c ./scripts/build.sh
-
-test_cpp:
-  stage: test
-  image: ${image}
-  needs: [build_cpp]
-  script:
-    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_test}
-    - chmod a+rX -R .
-    - su nobody -s /bin/bash -c "BUILD_WITH_TESTING=1 ./scripts/build.sh"
-
-build_py:
-  stage: build
-  image: ${image}
-  script:
-    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py}
-    - chmod a+rX -R .
-    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 ./scripts/build.sh"
-
-test_py:
-  stage: test
-  image: ${image}
-  needs: [build_py]
+  artifacts:
+    paths:
+      - build
+    expire_in: 1 hour
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
     - chmod a+rX -R .
-    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 BUILD_WITH_TESTING=1 ./scripts/build.sh"
-    # todo: make package available and run python tests
+    - su nobody -s /bin/bash -c "./scripts/devel_setup.sh"
+    - su nobody -s /bin/bash -c "cmake --build build"
+
+test_devel:
+  stage: test
+  image: ${image}
+  needs: [build_devel]
+  artifacts:
+    expire_in: 2 days
+    paths:
+      - build/coverage.xml
+      - build/coverage_details
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: build/coverage.xml
+  coverage: "/^lines: \\d+.\\d+%/"
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "./scripts/devel_test.sh"
 
 build_archlinux:
   stage: build
@@ -78,7 +75,7 @@ test_archlinux_py:
     - chmod a+rX -R .
     - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 ./scripts/test.sh"
 
-build_pywheel:
+build_pyproj:
   stage: build
   image: ${image}
   artifacts:
@@ -88,13 +85,22 @@ build_pywheel:
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py}
     - chmod a+rX -R .
-    - su nobody -s /bin/bash -c ./scripts/build_py.sh
+    - su nobody -s /bin/bash -c ./scripts/build_pyproj.sh
 
-test_pywheel:
+test_py_tarball:
   stage: test
   image: ${image}
-  needs: [build_pywheel]
+  needs: [build_pyproj]
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
     - chmod a+rX -R .
-    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 BUILD_WITH_VENV=1 ./scripts/test.sh"
+    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 BUILD_WITH_VENV=1 INSTALL_PY_TARBALL=1 ./scripts/test.sh"
+
+test_py_wheel:
+  stage: test
+  image: ${image}
+  needs: [build_pyproj]
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 BUILD_WITH_VENV=1 INSTALL_PY_WHEEL=1 ./scripts/test.sh"

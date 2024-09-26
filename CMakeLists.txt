@@ -9,6 +9,8 @@ option(BUILD_WITH_PY_BUILD_CMAKE
     "Build StructStore with py-build-cmake" OFF)
 option(BUILD_WITH_TESTING
     "Build StructStore with testing enabled" OFF)
+option(BUILD_WITH_COVERAGE
+    "Build StructStore with coverage analysis enabled" OFF)
 
 if(${BUILD_WITH_PYTHON})
     message(STATUS "Building with Python bindings")
@@ -110,6 +112,7 @@ if(${BUILD_WITH_PYTHON})
             MODULE_NAME=$<TARGET_FILE_BASE_NAME:structstore_py>
             VERSION_INFO="${PY_FULL_VERSION}"
     )
+    target_compile_options(nanobind-static PRIVATE -Wno-shadow -Wno-pedantic)
     # hide all symbols by default(including external libraries on Linux)
     set_target_properties(structstore_py PROPERTIES
             CXX_VISIBILITY_PRESET "hidden"
@@ -131,6 +134,15 @@ foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
             ${YAML_CPP_LIBRARIES}
             rt)
 endforeach()
+
+# coverage
+
+if(${BUILD_WITH_COVERAGE})
+    foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
+        target_compile_options(${TARGET} PRIVATE --coverage -fprofile-arcs -ftest-coverage -g -O0 -fno-lto)
+        target_link_libraries(${TARGET} PRIVATE gcov -fprofile-arcs -ftest-coverage -fno-lto)
+    endforeach()
+endif()
 
 # install
 

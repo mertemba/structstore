@@ -1,4 +1,4 @@
-#include <iostream>
+#include <gtest/gtest.h>
 
 #include <structstore/structstore.hpp>
 
@@ -25,26 +25,17 @@ struct Settings {
     explicit Settings(stst::StructStore& store) : store(store) {}
 };
 
-int main() {
+TEST(StructStoreTestBasic, refStructInLocalStore) {
     stst::StructStore store(stst::static_alloc);
     int& num = store["num"];
     num = 5;
-    std::cout << "store: " << store << std::endl;
+    std::stringstream str;
+    str << store;
+    EXPECT_EQ(str.str(), "{\"num\":5,}");
 
     Settings settings{store};
     settings.num = 42;
     settings.subsettings.subnum = 43;
-    std::cout << "subsettings: " << store["subsettings"] << std::endl;
-    std::cout << "settings: " << store << std::endl;
-
-    stst::StructStoreShared shdata_store("/shdata_store");
-    std::cout << "shared data: " << *shdata_store << std::endl;
-    shdata_store->get<int>("num") = 52;
-    shdata_store["num"] = 53;
-
-    stst::StructStoreShared shsettings_store("/shsettings_store");
-    Settings shsettings{*shsettings_store};
-    std::cout << "semi-dynamic struct: " << *shsettings_store << std::endl;
 
     stst::List& list = store["list"];
     list.push_back(5);
@@ -52,13 +43,39 @@ int main() {
     for (int& i: list) {
         ++i;
     }
+    EXPECT_EQ(list.size(), 2);
+
     stst::List& strlist = store["strlist"];
     strlist.push_back((const char*) "foo");
     for (stst::string& str: strlist) {
         str += "bar";
     }
-    std::cout << store << std::endl;
-    std::cout << to_yaml(store) << std::endl;
+    EXPECT_EQ(strlist.size(), 1);
+    EXPECT_EQ(strlist[0].get<stst::string>().size(), 6);
 
-    return 0;
+    std::string yaml_str = (std::stringstream() << to_yaml(store)).str();
+    EXPECT_EQ(yaml_str, "num: 42\nvalue: 3.1400000000000001\nflag: true\nstr: foo\nsubsettings:\n  subnum: 43\n  substr: bar\nlist:\n  - 6\n  - 43\nstrlist:\n  - foobar");
+}
+
+TEST(StructStoreTestBasic, refStructInSharedStore) {
+    stst::StructStoreShared shdata_store("/shdata_store");
+    std::stringstream str;
+    str << *shdata_store;
+    EXPECT_EQ(str.str(), "{}");
+
+    shdata_store->get<int>("num") = 52;
+    EXPECT_EQ(shdata_store["num"].get<int>(), 52);
+}
+
+TEST(StructStoreTestBasic, sharedStore) {
+    stst::StructStoreShared shsettings_store("/shsettings_store");
+    Settings shsettings{*shsettings_store};
+    std::stringstream str;
+    str << *shsettings_store;
+    EXPECT_EQ(str.str(), "{\"num\":5,\"value\":3.14,\"flag\":1,\"str\":foo,\"subsettings\":{\"subnum\":42,\"substr\":bar,},}");
+}
+
+int main(int argc, char** argv) {
+    testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }
