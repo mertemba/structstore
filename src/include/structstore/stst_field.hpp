@@ -118,7 +118,7 @@ public:
     }
 
     template<typename T>
-    operator T&() {
+    operator T&() const {
         return get<T>();
     }
 

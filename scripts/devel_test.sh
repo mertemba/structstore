@@ -14,7 +14,6 @@ cmake --install "$builddir"
 
 # test
 ctest --test-dir build --output-on-failure
-export PYTHONPATH="$PYTHONPATH:$srcdir/install/lib/python3.12/site-packages"
 pytest "$srcdir/tests"
 
 # coverage analysis

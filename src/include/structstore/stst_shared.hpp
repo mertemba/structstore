@@ -165,12 +165,12 @@ public:
 
     FieldAccess operator[](HashString name) {
         assert_valid();
-        return sh_data_ptr->data[name];
+        return sh_data_ptr->data.at(name);
     }
 
     FieldAccess operator[](const char* name) {
         assert_valid();
-        return sh_data_ptr->data[name];
+        return sh_data_ptr->data.at(name);
     }
 
     ~StructStoreShared() {

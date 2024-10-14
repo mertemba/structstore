@@ -10,7 +10,6 @@
 
 #include <functional>
 #include <iostream>
-#include <stdexcept>
 #include <unordered_map>
 
 #include <nanobind/make_iterator.h>
@@ -31,14 +30,8 @@ namespace structstore {
 
 namespace nb = nanobind;
 
-nb::object to_python(const StructStoreField& field, bool recursive);
-
-void from_python(FieldAccess access, const nb::handle& value, const std::string& field_name);
-
 class py {
 private:
-    static nb::object __slots__(StructStore& store);
-
     static nb::object get_field(StructStore& store, const std::string& name);
 
     static void set_field(StructStore& store, const std::string& name, const nb::object& value);
@@ -60,8 +53,14 @@ private:
 public:
     static nb::object SimpleNamespace;
 
+    enum class ToPythonMode {
+        CAST,
+        CONVERT,
+        CONVERT_RECURSIVE,
+    };
+
     using FromPythonFn = std::function<bool(FieldAccess, const nb::handle&)>;
-    using ToPythonFn = std::function<nb::object(const StructStoreField&, bool recursive)>;
+    using ToPythonFn = std::function<nb::object(const StructStoreField&, ToPythonMode mode)>;
 
     static std::unordered_map<uint64_t, FromPythonFn>& get_from_python_fns();
 
@@ -85,22 +84,23 @@ public:
         }
     }
 
-    template<typename T_cpp>
-    static void register_basic_to_python() {
-        register_to_python_fn<T_cpp>([](const StructStoreField& field, bool recursive) -> nb::object {
-            return nb::cast(field.get<T_cpp>(), nb::rv_policy::reference);
-        });
-    }
-
     template<typename T_cpp, typename T_py>
-    static void register_basic_py() {
+    static void register_basic_type() {
         static_assert(!std::is_pointer<T_cpp>::value);
-        register_to_python_fn<T_cpp>([](const StructStoreField& field, bool recursive) -> nb::object {
-            return T_py(field.get<T_cpp>());
+        register_to_python_fn<T_cpp>([](const StructStoreField& field, ToPythonMode) -> nb::object {
+            if constexpr (std::is_same<T_cpp, structstore::string>::value) {
+                return T_py(field.get<T_cpp>().c_str());
+            } else {
+                return T_py(field.get<T_cpp>());
+            }
         });
         register_from_python_fn<T_cpp>([](FieldAccess access, const nb::handle& value) {
             if (nb::isinstance<T_py>(value)) {
-                access.get<T_cpp>() = nb::cast<T_cpp>(value);
+                if constexpr (std::is_same<T_cpp, structstore::string>::value) {
+                    access.get<T_cpp>() = nb::cast<std::string>(value);
+                } else {
+                    access.get<T_cpp>() = nb::cast<T_cpp>(value);
+                }
                 return true;
             }
             return false;
@@ -108,7 +108,7 @@ public:
     }
 
     template<typename T>
-    static void register_basic_py_funcs(nb::class_<T>& cls) {
+    static void register_complex_type_funcs(nb::class_<T>& cls) {
         static_assert(!std::is_pointer<T>::value);
         cls.def("to_yaml", [=](T& t) {
             return YAML::Dump(to_yaml(*FieldView{t}));
@@ -117,39 +117,30 @@ public:
             return (std::ostringstream() << *FieldView{t}).str();
         });
         cls.def("copy", [=](T& t) {
-            return structstore::to_python(*FieldView{t}, false);
+            return to_python(*FieldView{t}, ToPythonMode::CONVERT);
         });
         cls.def("deepcopy", [=](T& t) {
-            return structstore::to_python(*FieldView{t}, true);
+            return to_python(*FieldView{t}, ToPythonMode::CONVERT_RECURSIVE);
         });
         cls.def("__copy__", [=](T& t) {
-            return structstore::to_python(*FieldView{t}, false);
+            return to_python(*FieldView{t}, ToPythonMode::CONVERT);
         });
         cls.def("__deepcopy__", [=](T& t, nb::handle&) {
-            return structstore::to_python(*FieldView{t}, true);
+            return to_python(*FieldView{t}, ToPythonMode::CONVERT_RECURSIVE);
         });
     }
 
     template<typename T>
-    static void register_basic_py(nb::class_<T>& cls) {
-        static_assert(!std::is_pointer<T>::value);
-        register_to_python_fn<T>([](const StructStoreField& field, bool /*recursive*/) -> nb::object {
-            return nb::cast(field.get<T>(), nb::rv_policy::reference);
-        });
-        register_from_python_fn<T>([cls](FieldAccess access, const nb::handle& value) {
-            if (value.type().equal(cls)) {
-                access.get<T>() = nb::cast<T&>(value);
-                return true;
-            }
-            return false;
-        });
-        register_basic_py_funcs<T>(cls);
+    static nb::class_<T> register_complex_type(nb::handle scope) {
+        auto cls = nb::class_<T>(scope, typing::get_type_name(typing::get_type_hash<T>()).c_str());
+        register_complex_type_funcs(cls);
+        return cls;
     }
 
     template<typename T_cpp>
-    static void register_ptr_py(const nb::handle& T_ptr_py, const nb::handle& T_py) {
+    static void register_ptr_type(const nb::handle& T_ptr_py, const nb::handle& T_py) {
         static_assert(std::is_pointer<T_cpp>::value);
-        register_basic_to_python<T_cpp>();
+        // todo: register to_python_fn
         register_from_python_fn<T_cpp>([T_ptr_py, T_py](FieldAccess access, const nb::handle& value) {
             if (value.type().equal(T_ptr_py) || (!access.get_field().empty() && value.type().equal(T_py))) {
                 access.get<T_cpp>() = nb::cast<T_cpp>(value);
@@ -180,12 +171,16 @@ public:
     }
 
     template<typename T>
-    static void register_structstore_py(nb::class_<T>& cls) {
-        register_basic_py_funcs<T>(cls);
+    static void register_structstore_funcs(nb::class_<T>& cls) {
+        register_complex_type_funcs<T>(cls);
 
-        cls.def_prop_ro("__slots__", [](T& t) {
+        cls.def("__getstate__", [](T& t) {
+            _to_python(t.get_store(), py::ToPythonMode::CONVERT_RECURSIVE);
+        });
+
+        cls.def("__setstate__", [](T& t, nb::handle value) {
             auto& store = t.get_store();
-            return __slots__(store);
+            _from_python(store, store.mm_alloc, value, "<root>");
         });
 
         cls.def("__getattr__", [](T& t, const std::string& name) {
@@ -219,26 +214,45 @@ public:
             return store.check();
         });
     }
+
+    static nb::object to_python(const StructStoreField& field, ToPythonMode mode);
+
+    static void from_python(FieldAccess access, const nb::handle& value, const std::string& field_name);
+
+protected:
+    template<typename T>
+    static void _from_python(T& t, MiniMalloc& mm_alloc,
+                             const nb::handle& value,
+                             const std::string& field_name) {
+        from_python(*AccessView{t, mm_alloc}, value, field_name);
+    }
+
+    template<typename T>
+    static nb::object _to_python(T& t, ToPythonMode mode) {
+        return to_python(*FieldView{t}, mode);
+    }
+
+public:
+    template<typename T>
+    static nb::class_<T> register_struct_type(nb::module_& m, const std::string& name) {
+        static_assert(std::is_base_of<Struct, T>::value,
+                      "template parameter is not derived from structstore::Struct");
+        typing::register_type<T>(name);
+        typing::register_mm_alloc_constructor<T>();
+        typing::register_default_destructor<T>();
+        typing::register_default_serializer_text<T>();
+        typing::register_check<T>([](MiniMalloc&, const T* t) {
+            get_store(*t).check();
+        });
+
+        auto nb_cls = nb::class_<T>(m, name.c_str());
+        // nb_cls.def(nb::init());
+        nb_cls.def("__init__", [=](T* t) { try_with_info("in constructor of " << name << ": ", new (t) T();); });
+        py::register_complex_type<T>(nb_cls);
+        py::register_structstore_funcs(nb_cls);
+        return nb_cls;
+    }
 };
-
-template<typename T>
-nb::class_<T> register_struct_type_and_py(nb::module_& m, const std::string& name) {
-    static_assert(std::is_base_of<Struct, T>::value,
-                  "template parameter is not derived from structstore::Struct");
-    typing::register_type<T>(name);
-    typing::register_mm_alloc_constructor<T>();
-    typing::register_default_destructor<T>();
-    typing::register_default_serializer_text<T>();
-    typing::register_check<T>([](MiniMalloc&, const T* t) {
-        get_store(*t).check();
-    });
-
-    auto nb_cls = nb::class_<T>(m, name.c_str());
-    nb_cls.def(nb::init());
-    py::register_basic_py<T>(nb_cls);
-    py::register_structstore_py(nb_cls);
-    return nb_cls;
-}
 
 } // namespace structstore
 

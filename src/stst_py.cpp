@@ -24,14 +24,14 @@ std::unordered_map<uint64_t, py::ToPythonFn>& py::get_to_python_fns() {
     return *to_python_fns;
 }
 
-nb::object structstore::to_python(const StructStoreField& field, bool recursive) {
+nb::object py::to_python(const StructStoreField& field, ToPythonMode mode) {
     if (field.empty()) {
         return nb::none();
     }
     uint64_t type_hash = field.get_type_hash();
     try {
         py::ToPythonFn to_python_fn = py::get_to_python_fns().at(type_hash);
-        return to_python_fn(field, recursive);
+        return to_python_fn(field, mode);
     } catch (const std::out_of_range&) {
         std::ostringstream str;
         str << "error at get_to_python_fns().at() for type '" << typing::get_type_name(type_hash) << "'";
@@ -40,7 +40,7 @@ nb::object structstore::to_python(const StructStoreField& field, bool recursive)
 }
 
 __attribute__((__visibility__("default")))
-void structstore::from_python(FieldAccess access, const nb::handle& value, const std::string& field_name) {
+void py::from_python(FieldAccess access, const nb::handle& value, const std::string& field_name) {
     if (value.is_none()) {
         access.clear();
         return;
@@ -65,21 +65,13 @@ void structstore::from_python(FieldAccess access, const nb::handle& value, const
     throw nb::type_error(msg.str().c_str());
 }
 
-nb::object py::__slots__(StructStore& store) {
-    auto ret = nb::list();
-    for (const auto& str: store.get_slots()) {
-        ret.append(str.str);
-    }
-    return ret;
-}
-
 nb::object py::get_field(StructStore& store, const std::string& name) {
     auto lock = store.read_lock();
     StructStoreField* field = store.try_get_field(HashString{name.c_str()});
     if (field == nullptr) {
         throw nb::attribute_error();
     }
-    return to_python(*field, false);
+    return to_python(*field, ToPythonMode::CAST);
 }
 
 void py::set_field(StructStore& store, const std::string& name, const nb::object& value) {

@@ -9,6 +9,7 @@
 #include "structstore/stst_utils.hpp"
 
 #include <iostream>
+#include <type_traits>
 #include <unordered_map>
 
 #include <yaml-cpp/yaml.h>
@@ -43,6 +44,7 @@ public:
 
     template<typename T>
     T& get() {
+        static_assert(!std::is_same<typename std::remove_cv<T>::type, StructStoreField>::value);
         if (!field.empty()) {
             // field already exists, directly return
             return field.get<T>();
@@ -115,11 +117,23 @@ public:
     }
 };
 
+template<>
+inline FieldAccess::operator StructStoreField&() {
+    return get_field();
+}
+
+template<>
+inline FieldAccess::operator const StructStoreField&() {
+    return get_field();
+}
+
 class StructStoreShared;
 
 class List;
 
 class Struct;
+
+class py;
 
 class StructStore;
 
@@ -137,6 +151,8 @@ class StructStore {
     friend class structstore::List;
 
     friend class structstore::Struct;
+
+    friend class structstore::py;
 
     static void register_type();
 
@@ -319,7 +335,7 @@ FieldAccess& FieldAccess::operator=<const char*>(const char* const& value);
 template<>
 FieldAccess& FieldAccess::operator=<std::string>(const std::string& value);
 
-class bindings;
+class py;
 
 class Struct;
 
@@ -328,7 +344,7 @@ static const StructStore& get_store(const Struct&);
 static StructStore& get_store(Struct&);
 
 class Struct {
-    friend class structstore::bindings;
+    friend class structstore::py;
 
     friend class structstore::StructStore;
 
