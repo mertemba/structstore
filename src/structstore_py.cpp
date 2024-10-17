@@ -36,19 +36,16 @@ NB_MODULE(MODULE_NAME, m) {
         new (store) StructStore(static_alloc);
     });
     py::register_structstore_funcs(cls);
-    py::register_to_python_fn<structstore::StructStore>(
+    py::register_to_python_fn<StructStore>(
             [](const StructStoreField& field, py::ToPythonMode mode) -> nb::object {
                 auto& store = field.get<StructStore>();
-                if (mode == py::ToPythonMode::CAST) {
-                    return nb::cast(store, nb::rv_policy::reference);
-                }
                 auto dict = nb::dict();
                 for (HashString str: store.get_slots()) {
-                    auto key = nb::cast(std::string(str.str));
-                    if (mode == py::ToPythonMode::CONVERT_RECURSIVE) {
-                        dict[key] = py::to_python(store.at(str), py::ToPythonMode::CONVERT_RECURSIVE);
+                    auto key = nb::cast<std::string>(str.str);
+                    if (mode == py::ToPythonMode::RECURSIVE) {
+                        dict[key] = py::to_python(store.at(str), py::ToPythonMode::RECURSIVE);
                     } else { // non-recursive convert
-                        dict[key] = py::to_python(store.at(str), py::ToPythonMode::CAST);
+                        dict[key] = py::to_python_cast(store.at(str));
                     }
                 }
                 return dict;
@@ -156,15 +153,12 @@ NB_MODULE(MODULE_NAME, m) {
     py::register_to_python_fn<List>(
             [](const StructStoreField& field, py::ToPythonMode mode) -> nb::object {
                 auto& list = field.get<List>();
-                if (mode == py::ToPythonMode::CAST) {
-                    return nb::cast(list, nb::rv_policy::reference);
-                }
                 auto ret = nb::list();
                 for (StructStoreField& field_: list) {
-                    if (mode == py::ToPythonMode::CONVERT_RECURSIVE) {
-                        ret.append(py::to_python(field_, py::ToPythonMode::CONVERT_RECURSIVE));
+                    if (mode == py::ToPythonMode::RECURSIVE) {
+                        ret.append(py::to_python(field_, py::ToPythonMode::RECURSIVE));
                     } else { // non-recursive convert
-                        ret.append(py::to_python(field_, py::ToPythonMode::CAST));
+                        ret.append(py::to_python_cast(field_));
                     }
                 }
                 return ret;
@@ -212,21 +206,21 @@ NB_MODULE(MODULE_NAME, m) {
     list_cls.def("pop", [](List& list, size_t index) {
         auto lock = list.write_lock();
         // todo: this returns a recursive copy, is this wanted?
-        auto res = py::to_python(list[index].get_field(), py::ToPythonMode::CONVERT_RECURSIVE);
+        auto res = py::to_python(list[index].get_field(), py::ToPythonMode::RECURSIVE);
         list.erase(index);
         return res;
     });
     list_cls.def("__add__", [=](List& list, nb::list& value) {
         auto lock = list.read_lock();
         // todo: this returns a recursive copy, is this wanted?
-        return py::to_python(*FieldView{list}, py::ToPythonMode::CONVERT_RECURSIVE) + value;
+        return py::to_python(*FieldView{list}, py::ToPythonMode::RECURSIVE) + value;
     });
     list_cls.def("__iadd__", [=](List& list, nb::list& value) {
         auto lock = list.write_lock();
         for (const auto& val: value) {
             py::from_python(list.push_back(), val, std::to_string(list.size() - 1));
         }
-        return py::to_python(*FieldView{list}, py::ToPythonMode::CAST);
+        return py::to_python_cast(*FieldView{list});
     });
     list_cls.def("__setitem__", [](List& list, size_t index, nb::handle& value) {
         auto lock = list.write_lock();
@@ -234,7 +228,7 @@ NB_MODULE(MODULE_NAME, m) {
     }, nb::arg("index"), nb::arg("value").none());
     list_cls.def("__getitem__", [](List& list, size_t index) {
         auto lock = list.read_lock();
-        return py::to_python(list[index].get_field(), py::ToPythonMode::CAST);
+        return py::to_python_cast(list[index].get_field());
     });
     list_cls.def("__delitem__", [](List& list, size_t index) {
         auto lock = list.write_lock();
@@ -255,9 +249,7 @@ NB_MODULE(MODULE_NAME, m) {
     py::register_to_python_fn<Matrix>(
             [](const StructStoreField& field, py::ToPythonMode mode) -> nb::object {
                 Matrix& m = field.get<Matrix>();
-                if (mode == py::ToPythonMode::CAST) {
-                    return nb::cast(&m, nb::rv_policy::reference);
-                } else if (mode == py::ToPythonMode::CONVERT_RECURSIVE) {
+                if (mode == py::ToPythonMode::RECURSIVE) {
                     return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()),
                                     nb::rv_policy::copy);
                 } else { // non-recursive convert
@@ -285,7 +277,7 @@ public:
     NB_TYPE_CASTER(structstore::StructStoreField, const_name("StructStoreField"))
 
     static handle from_cpp(structstore::StructStoreField& src, rv_policy, cleanup_list*) {
-        return py::to_python(src, py::ToPythonMode::CAST).release();
+        return py::to_python_cast(src).release();
     }
 };
 }

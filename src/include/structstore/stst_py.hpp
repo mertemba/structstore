@@ -54,17 +54,19 @@ public:
     static nb::object SimpleNamespace;
 
     enum class ToPythonMode {
-        CAST,
-        CONVERT,
-        CONVERT_RECURSIVE,
+        NON_RECURSIVE,
+        RECURSIVE,
     };
 
     using FromPythonFn = std::function<bool(FieldAccess, const nb::handle&)>;
     using ToPythonFn = std::function<nb::object(const StructStoreField&, ToPythonMode mode)>;
+    using ToPythonCastFn = std::function<nb::object(const StructStoreField&)>;
 
     static std::unordered_map<uint64_t, FromPythonFn>& get_from_python_fns();
 
     static std::unordered_map<uint64_t, ToPythonFn>& get_to_python_fns();
+
+    static std::unordered_map<uint64_t, ToPythonCastFn>& get_to_python_cast_fns();
 
     template<typename T>
     static void register_from_python_fn(const FromPythonFn& from_python_fn) {
@@ -75,8 +77,23 @@ public:
         }
     }
 
+protected:
+    template<typename T>
+    static void register_to_python_cast_fn() {
+        uint64_t type_hash = typing::get_type_hash<T>();
+        auto to_python_cast_fn = [](const StructStoreField& field) -> nb::object {
+            return nb::cast(field.get<T>(), nb::rv_policy::reference);
+        };
+        bool success = get_to_python_cast_fns().insert({type_hash, to_python_cast_fn}).second;
+        if (!success) {
+            throw typing::already_registered_type_error(type_hash);
+        }
+    }
+
+public:
     template<typename T>
     static void register_to_python_fn(const ToPythonFn& to_python_fn) {
+        register_to_python_cast_fn<T>();
         uint64_t type_hash = typing::get_type_hash<T>();
         bool success = get_to_python_fns().insert({type_hash, to_python_fn}).second;
         if (!success) {
@@ -110,29 +127,29 @@ public:
     template<typename T>
     static void register_complex_type_funcs(nb::class_<T>& cls) {
         static_assert(!std::is_pointer<T>::value);
-        cls.def("to_yaml", [=](T& t) {
+        cls.def("to_yaml", [](T& t) {
             return YAML::Dump(to_yaml(*FieldView{t}));
         });
-        cls.def("__repr__", [=](T& t) {
+        cls.def("__repr__", [](T& t) {
             return (std::ostringstream() << *FieldView{t}).str();
         });
-        cls.def("copy", [=](T& t) {
-            return to_python(*FieldView{t}, ToPythonMode::CONVERT);
+        cls.def("copy", [](T& t) {
+            return to_python(*FieldView{t}, ToPythonMode::NON_RECURSIVE);
         });
-        cls.def("deepcopy", [=](T& t) {
-            return to_python(*FieldView{t}, ToPythonMode::CONVERT_RECURSIVE);
+        cls.def("deepcopy", [](T& t) {
+            return to_python(*FieldView{t}, ToPythonMode::RECURSIVE);
         });
-        cls.def("__copy__", [=](T& t) {
-            return to_python(*FieldView{t}, ToPythonMode::CONVERT);
+        cls.def("__copy__", [](T& t) {
+            return to_python(*FieldView{t}, ToPythonMode::NON_RECURSIVE);
         });
-        cls.def("__deepcopy__", [=](T& t, nb::handle&) {
-            return to_python(*FieldView{t}, ToPythonMode::CONVERT_RECURSIVE);
+        cls.def("__deepcopy__", [](T& t, nb::handle&) {
+            return to_python(*FieldView{t}, ToPythonMode::RECURSIVE);
         });
     }
 
     template<typename T>
     static nb::class_<T> register_complex_type(nb::handle scope) {
-        auto cls = nb::class_<T>(scope, typing::get_type_name(typing::get_type_hash<T>()).c_str());
+        auto cls = nb::class_<T>(scope, typing::get_type_name<T>().c_str());
         register_complex_type_funcs(cls);
         return cls;
     }
@@ -152,17 +169,18 @@ public:
 
     template<typename T_cpp>
     static bool object_from_python(FieldAccess access, const nb::handle& value) {
+        T_cpp* value_cpp = nullptr;
         try {
-            T_cpp& value_cpp = nb::cast<T_cpp&>(value, false);
-            T_cpp& field_cpp = access.get<T_cpp>();
-            if (&value_cpp == &field_cpp) {
-                return true;
-            }
-            field_cpp = value_cpp;
-            return true;
+            value_cpp = &nb::cast<T_cpp&>(value, false);
         } catch (const nb::cast_error&) {
+            return false;
         }
-        return false;
+        T_cpp& field_cpp = access.get<T_cpp>();
+        if (value_cpp == &field_cpp) {
+            return true;
+        }
+        field_cpp = *value_cpp;
+        return true;
     }
 
     template<typename T_cpp>
@@ -174,14 +192,21 @@ public:
     static void register_structstore_funcs(nb::class_<T>& cls) {
         register_complex_type_funcs<T>(cls);
 
-        cls.def("__getstate__", [](T& t) {
-            _to_python(t.get_store(), py::ToPythonMode::CONVERT_RECURSIVE);
+        cls.def("__getstate__", [](StructStore& store) {
+            nb::object dict = _to_python(store, py::ToPythonMode::RECURSIVE);
+            return dict;
         });
 
-        cls.def("__setstate__", [](T& t, nb::handle value) {
-            auto& store = t.get_store();
-            _from_python(store, store.mm_alloc, value, "<root>");
-        });
+        if constexpr (std::is_same<T, StructStore>::value) {
+            cls.def("__setstate__", [](StructStore& store, nb::handle value) {
+                new (&store) StructStore(static_alloc);
+                _from_python(store, store.mm_alloc, value, "<root>");
+            });
+        } else {
+            cls.def("__setstate__", [](T&, nb::handle) {
+                throw std::runtime_error("cannot unpickle type " + typing::get_type_name<T>());
+            });
+        }
 
         cls.def("__getattr__", [](T& t, const std::string& name) {
             auto& store = t.get_store();
@@ -216,6 +241,8 @@ public:
     }
 
     static nb::object to_python(const StructStoreField& field, ToPythonMode mode);
+
+    static nb::object to_python_cast(const StructStoreField& field);
 
     static void from_python(FieldAccess access, const nb::handle& value, const std::string& field_name);
 

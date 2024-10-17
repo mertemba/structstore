@@ -14,7 +14,7 @@ cmake --install "$builddir"
 
 # test
 ctest --test-dir build --output-on-failure
-pytest "$srcdir/tests"
+pytest -vv "$srcdir/tests"
 
 # coverage analysis
 gcovr --cobertura-pretty --exclude-unreachable-branches --print-summary \

@@ -24,6 +24,12 @@ std::unordered_map<uint64_t, py::ToPythonFn>& py::get_to_python_fns() {
     return *to_python_fns;
 }
 
+__attribute__((__visibility__("default")))
+std::unordered_map<uint64_t, py::ToPythonCastFn>& py::get_to_python_cast_fns() {
+    static auto* to_python_cast_fns = new std::unordered_map<uint64_t, py::ToPythonCastFn>();
+    return *to_python_cast_fns;
+}
+
 nb::object py::to_python(const StructStoreField& field, ToPythonMode mode) {
     if (field.empty()) {
         return nb::none();
@@ -35,6 +41,21 @@ nb::object py::to_python(const StructStoreField& field, ToPythonMode mode) {
     } catch (const std::out_of_range&) {
         std::ostringstream str;
         str << "error at get_to_python_fns().at() for type '" << typing::get_type_name(type_hash) << "'";
+        throw std::runtime_error(str.str());
+    }
+}
+
+nb::object py::to_python_cast(const StructStoreField& field) {
+    if (field.empty()) {
+        return nb::none();
+    }
+    uint64_t type_hash = field.get_type_hash();
+    try {
+        py::ToPythonCastFn to_python_cast_fn = py::get_to_python_cast_fns().at(type_hash);
+        return to_python_cast_fn(field);
+    } catch (const std::out_of_range&) {
+        std::ostringstream str;
+        str << "error at get_to_python_cast_fns().at() for type '" << typing::get_type_name(type_hash) << "'";
         throw std::runtime_error(str.str());
     }
 }
@@ -71,7 +92,7 @@ nb::object py::get_field(StructStore& store, const std::string& name) {
     if (field == nullptr) {
         throw nb::attribute_error();
     }
-    return to_python(*field, ToPythonMode::CAST);
+    return to_python_cast(*field);
 }
 
 void py::set_field(StructStore& store, const std::string& name, const nb::object& value) {

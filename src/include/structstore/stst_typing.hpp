@@ -122,6 +122,11 @@ public:
     }
 
     template<typename T>
+    static const std::string& get_type_name() {
+        return get_type_name(get_type_hash<T>());
+    }
+
+    template<typename T>
     static void register_default_constructor() {
         uint64_t type_hash = typing::get_type_hash<T>();
         static ConstructorFn<T> default_constructor = [](MiniMalloc&, T* t) {
