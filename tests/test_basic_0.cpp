@@ -85,6 +85,18 @@ TEST(StructStoreTestBasic, cmpEqual) {
     EXPECT_NE(store1, store2);
 }
 
+TEST(StructStoreTestBasic, cmpEqualShared) {
+    stst::StructStoreShared store1("/shsettings_store1");
+    Settings settings1{*store1};
+    stst::StructStoreShared store2("/shsettings_store2");
+    Settings settings2{*store2};
+    EXPECT_EQ(*store1, *store2);
+    EXPECT_EQ(store1, store2);
+    settings2.subsettings.substr += '.';
+    EXPECT_NE(*store1, *store2);
+    EXPECT_NE(store1, store2);
+}
+
 int main(int argc, char** argv) {
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

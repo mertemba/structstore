@@ -145,6 +145,12 @@ public:
         cls.def("__deepcopy__", [](T& t, nb::handle&) {
             return to_python(*FieldView{t}, ToPythonMode::RECURSIVE);
         });
+        cls.def("__eq__", [](T& t, nb::handle& other) {
+            if (const T* other_ = try_cast<T>(other)) {
+                return t == *other_;
+            }
+            return false;
+        });
     }
 
     template<typename T>
@@ -168,11 +174,18 @@ public:
     }
 
     template<typename T_cpp>
-    static bool object_from_python(FieldAccess access, const nb::handle& value) {
-        T_cpp* value_cpp = nullptr;
+    static T_cpp* try_cast(const nb::handle& value) {
         try {
-            value_cpp = &nb::cast<T_cpp&>(value, false);
+            return &nb::cast<T_cpp&>(value, false);
         } catch (const nb::cast_error&) {
+            return nullptr;
+        }
+    }
+
+    template<typename T_cpp>
+    static bool copy_cast_from_python(FieldAccess access, const nb::handle& value) {
+        T_cpp* value_cpp = try_cast<T_cpp>(value);
+        if (value_cpp == nullptr) {
             return false;
         }
         T_cpp& field_cpp = access.get<T_cpp>();
@@ -181,11 +194,6 @@ public:
         }
         field_cpp = *value_cpp;
         return true;
-    }
-
-    template<typename T_cpp>
-    static void register_object_from_python() {
-        register_from_python_fn<T_cpp>(object_from_python<T_cpp>);
     }
 
     template<typename T>

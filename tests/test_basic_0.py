@@ -54,6 +54,12 @@ class TestBasic0(unittest.TestCase):
             "tuple": [0, 0],
         }
 
+        state2 = structstore.StructStore()
+        state2.state = state.deepcopy()
+        assert state2.state == state
+        state.sub.vec.copy()[0] += 1.0
+        assert state2.state != state
+
         shmem = structstore.StructStoreShared("/dyn_shdata_store", 16384)
         with shmem.lock():
             shmem.state = State(5, 3.14, "foo", True, Substate(42), [0, 1])

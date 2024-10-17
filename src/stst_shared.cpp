@@ -308,3 +308,9 @@ void StructStoreShared::from_buffer(void* buffer, size_t bufsize) {
     }
     std::memcpy(sh_data_ptr, buffer, ((SharedData*) buffer)->size);
 }
+
+bool StructStoreShared::operator==(const StructStoreShared& other) const {
+    assert_valid();
+    other.assert_valid();
+    return sh_data_ptr->data == other.sh_data_ptr->data;
+}

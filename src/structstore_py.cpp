@@ -51,7 +51,7 @@ NB_MODULE(MODULE_NAME, m) {
                 return dict;
             });
     py::register_from_python_fn<StructStore>([](FieldAccess access, const nanobind::handle& value) {
-        if (py::object_from_python<StructStore>(access, value)) {
+        if (py::copy_cast_from_python<StructStore>(access, value)) {
             return true;
         }
         if (nb::hasattr(value, "__dict__")) {
@@ -164,7 +164,7 @@ NB_MODULE(MODULE_NAME, m) {
                 return ret;
             });
     py::register_from_python_fn<List>([](FieldAccess access, const nanobind::handle& value) {
-        if (py::object_from_python<List>(access, value)) {
+        if (py::copy_cast_from_python<List>(access, value)) {
             return true;
         }
         if (nb::isinstance<nb::list>(value) || nb::isinstance<nb::tuple>(value)) {
@@ -257,6 +257,9 @@ NB_MODULE(MODULE_NAME, m) {
                 }
             });
     py::register_from_python_fn<Matrix>([](FieldAccess access, const nanobind::handle& value) {
+        if (py::copy_cast_from_python<Matrix>(access, value)) {
+            return true;
+        }
         if (nb::ndarray_check(value)) {
             auto array = nb::cast<nb::ndarray<const double, nb::c_contig>>(value);
             if (array.ndim() > Matrix::MAX_DIMS) {

@@ -192,6 +192,12 @@ public:
     void to_buffer(void* buffer, size_t bufsize) const;
 
     void from_buffer(void* buffer, size_t bufsize);
+
+    bool operator==(const StructStoreShared& other) const;
+
+    inline bool operator!=(const StructStoreShared& other) const {
+        return !(*this == other);
+    }
 };
 
 }  // namespace structstore
