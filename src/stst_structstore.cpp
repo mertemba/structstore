@@ -36,6 +36,7 @@ void StructStore::register_type() {
         try_with_info("StructStore: ", mm_alloc.assert_owned(store););
         try_with_info("StructStore content: ", store->check(););
     });
+    typing::register_default_cmp_equal_fn<StructStore>();
 };
 
 template<>

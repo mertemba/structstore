@@ -135,6 +135,21 @@ public:
             try_with_info("in field data content: ", check(mm_alloc, data););
         }
     }
+
+    bool operator==(const StructStoreField& other) const {
+        if (data == nullptr) {
+            return other.data == nullptr;
+        }
+        if (type_hash != other.type_hash) {
+            return false;
+        }
+        auto cmp_equal_fn = typing::get_cmp_equal(type_hash);
+        return cmp_equal_fn(data, other.data);
+    }
+
+    bool operator!=(const StructStoreField& other) const {
+        return !(*this == other);
+    }
 };
 
 class StructStoreShared;

@@ -38,6 +38,11 @@ std::unordered_map<uint64_t, typing::CheckFn<>>& typing::get_checks() {
     return *checks;
 }
 
+std::unordered_map<uint64_t, typing::CmpEqualFn<>>& typing::get_cmp_equal_fns() {
+    static auto* cmp_equal_fns = new std::unordered_map<uint64_t, typing::CmpEqualFn<>>();
+    return *cmp_equal_fns;
+}
+
 template<>
 uint64_t typing::get_type_hash<void>() {
     return 0;
@@ -66,6 +71,7 @@ static bool register_common_types_() {
         try_with_info("string: ", mm_alloc.assert_owned(str););
         try_with_info("string data: ", mm_alloc.assert_owned(str->data()););
     });
+    typing::register_default_cmp_equal_fn<structstore::string>();
 
     return true;
 }

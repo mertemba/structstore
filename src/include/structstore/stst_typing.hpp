@@ -42,6 +42,9 @@ public:
     template <typename T = void>
     using CheckFn = std::function<void(MiniMalloc &, const T *)>;
 
+    template<typename T = void>
+    using CmpEqualFn = std::function<bool(const T*, const T*)>;
+
 private:
     static std::unordered_map<std::type_index, uint64_t>& get_type_hashes();
 
@@ -56,6 +59,8 @@ private:
     static std::unordered_map<uint64_t, SerializeYamlFn<>>& get_serializers_yaml();
 
     static std::unordered_map<uint64_t, CheckFn<>> &get_checks();
+
+    static std::unordered_map<uint64_t, CmpEqualFn<>>& get_cmp_equal_fns();
 
 public:
     static void register_common_types();
@@ -259,6 +264,18 @@ public:
       }
     }
 
+    template<typename T>
+    static void register_default_cmp_equal_fn() {
+        uint64_t type_hash = typing::get_type_hash<T>();
+        static CmpEqualFn<T> default_cmp_equal = [](const T* t, const T* other) {
+            return *t == *other;
+        };
+        bool success = get_cmp_equal_fns().insert({type_hash, (const CmpEqualFn<>&) default_cmp_equal}).second;
+        if (!success) {
+            throw already_registered_type_error(type_hash);
+        }
+    }
+
     static ConstructorFn<>& get_constructor(uint64_t type_hash) {
         try {
             return get_constructors().at(type_hash);
@@ -299,14 +316,26 @@ public:
         }
     }
 
-    static const CheckFn<> &get_check(uint64_t type_hash) {
-      try {
-        return get_checks().at(type_hash);
-      } catch (const std::out_of_range &) {
-        std::ostringstream str;
-        str << "error at get_check() for type '" << get_type_name(type_hash) << "'";
-        throw std::runtime_error(str.str());
-      }
+    static const CheckFn<>& get_check(uint64_t type_hash) {
+        try {
+            return get_checks().at(type_hash);
+        } catch (const std::out_of_range&) {
+            std::ostringstream str;
+            str << "error at get_check() for type '" << get_type_name(type_hash)
+                << "'";
+            throw std::runtime_error(str.str());
+        }
+    }
+
+    static const CmpEqualFn<>& get_cmp_equal(uint64_t type_hash) {
+        try {
+            return get_cmp_equal_fns().at(type_hash);
+        } catch (const std::out_of_range&) {
+            std::ostringstream str;
+            str << "error at get_cmp_equal() for type '" << get_type_name(type_hash)
+                << "'";
+            throw std::runtime_error(str.str());
+        }
     }
 
     template<typename T>
@@ -317,6 +346,7 @@ public:
         typing::register_default_serializer_text<T>();
         typing::register_default_serializer_yaml<T>();
         typing::register_default_check<T>();
+        typing::register_default_cmp_equal_fn<T>();
     }
 
 };

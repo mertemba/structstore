@@ -75,6 +75,16 @@ TEST(StructStoreTestBasic, sharedStore) {
     EXPECT_EQ(str.str(), "{\"num\":5,\"value\":3.14,\"flag\":1,\"str\":foo,\"subsettings\":{\"subnum\":42,\"substr\":bar,},}");
 }
 
+TEST(StructStoreTestBasic, cmpEqual) {
+    stst::StructStore store1(stst::static_alloc);
+    Settings settings1{store1};
+    stst::StructStore store2(stst::static_alloc);
+    Settings settings2{store2};
+    EXPECT_EQ(store1, store2);
+    settings2.subsettings.substr += '.';
+    EXPECT_NE(store1, store2);
+}
+
 int main(int argc, char** argv) {
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

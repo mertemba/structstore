@@ -139,6 +139,12 @@ public:
 
     template<typename T>
     friend YAML::Node structstore::to_yaml(const T&);
+
+    bool operator==(const List& other) const;
+
+    inline bool operator!=(const List& other) const {
+        return !(*this == other);
+    }
 };
 
 template<>
@@ -247,6 +253,12 @@ public:
 
     template<typename T>
     friend YAML::Node structstore::to_yaml(const T&);
+
+    bool operator==(const Matrix& other) const;
+
+    inline bool operator!=(const Matrix& other) const {
+        return !(*this == other);
+    }
 };
 
 }

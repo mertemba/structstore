@@ -15,6 +15,7 @@ void List::register_type() {
             try_with_info("in List iter: ", field.check(mm_alloc););
         }
     });
+    typing::register_default_cmp_equal_fn<List>();
 }
 
 template<>
@@ -40,6 +41,10 @@ void List::push_back<const char*>(const char* const& value) {
     push_back().get<structstore::string>() = value;
 }
 
+bool List::operator==(const List& other) const {
+    return data == other.data;
+}
+
 void Matrix::register_type() {
     typing::register_type<Matrix>("structstore::Matrix");
     typing::register_mm_alloc_constructor<Matrix>();
@@ -51,6 +56,7 @@ void Matrix::register_type() {
             try_with_info("Matrix data: ", mm_alloc.assert_owned(matrix->_data););
         }
     });
+    typing::register_default_cmp_equal_fn<Matrix>();
 }
 
 template<>
@@ -64,4 +70,23 @@ std::ostream& structstore::to_text(std::ostream& os, const Matrix& matrix) {
         os << matrix._data[i] << ",";
     }
     return os << "]";
+}
+
+bool Matrix::operator==(const Matrix& other) const {
+    if (_ndim != other._ndim) {
+        return false;
+    }
+    size_t size = 1;
+    for (size_t i = 0; i < _ndim; ++i) {
+        if (_shape[i] != other._shape[i]) {
+            return false;
+        }
+        size *= _shape[i];
+    }
+    for (size_t i = 0; i < size; ++i) {
+        if (_data[i] != other._data[i]) {
+            return false;
+        }
+    }
+    return true;
 }

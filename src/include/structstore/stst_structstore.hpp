@@ -93,7 +93,9 @@ public:
     }
 
     void check() const {
-        try_with_info("at FieldAccess: ", field.check(mm_alloc););
+        if (managed) {
+            try_with_info("at FieldAccess: ", field.check(mm_alloc););
+        }
     }
 };
 
@@ -326,6 +328,14 @@ public:
                           value.check(mm_alloc););
         }
       }
+    }
+
+    bool operator==(const StructStore& other) const {
+        return slots == other.slots && fields == other.fields;
+    }
+
+    bool operator!=(const StructStore& other) const {
+        return !(*this == other);
     }
 };
 
