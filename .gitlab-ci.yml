@@ -5,28 +5,16 @@ variables:
   pacman_deps_py: python python-pip
   pacman_deps_test: gtest gcovr
   pacman_deps_pytest: python-pytest python-numpy
+  pacman_deps_clang: clang
 
 stages:
   - build
   - test
 
-build_devel:
-  stage: build
-  image: ${image}
-  artifacts:
-    paths:
-      - build
-    expire_in: 1 hour
-  script:
-    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
-    - chmod a+rX -R .
-    - su nobody -s /bin/bash -c "./scripts/devel_setup.sh"
-    - su nobody -s /bin/bash -c "cmake --build build"
-
-test_devel:
+test_devel_coverage:
   stage: test
   image: ${image}
-  needs: [build_devel]
+  needs: []
   artifacts:
     expire_in: 2 days
     paths:
@@ -40,11 +28,36 @@ test_devel:
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
     - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "BUILD_WITH_COVERAGE=ON ./scripts/devel_setup.sh"
+    - su nobody -s /bin/bash -c "cmake --build build"
+    - su nobody -s /bin/bash -c "./scripts/devel_test.sh"
+
+test_devel_sanitize:
+  stage: test
+  image: ${image}
+  needs: []
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "BUILD_WITH_SANITIZER=ON ./scripts/devel_setup.sh"
+    - su nobody -s /bin/bash -c "cmake --build build"
+    - su nobody -s /bin/bash -c "./scripts/devel_test.sh"
+
+test_devel_clang:
+  stage: test
+  image: ${image}
+  needs: []
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test} ${pacman_deps_clang}
+    - chmod a+rX -R .
+    - su nobody -s /bin/bash -c "CC=clang CXX=clang++ ./scripts/devel_setup.sh"
+    - su nobody -s /bin/bash -c "cmake --build build"
     - su nobody -s /bin/bash -c "./scripts/devel_test.sh"
 
 build_archlinux:
   stage: build
   image: ${image}
+  needs: []
   artifacts:
     paths:
       - structstore{,_py}-*.pkg.tar.zst
@@ -78,6 +91,7 @@ test_archlinux_py:
 build_pyproj:
   stage: build
   image: ${image}
+  needs: []
   artifacts:
     paths:
       - dist/structstore-*.{tar.gz,whl}

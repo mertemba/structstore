@@ -11,6 +11,8 @@ option(BUILD_WITH_TESTING
     "Build StructStore with testing enabled" OFF)
 option(BUILD_WITH_COVERAGE
     "Build StructStore with coverage analysis enabled" OFF)
+option(BUILD_WITH_SANITIZER
+    "Build StructStore with address sanitizer enabled" OFF)
 
 if(${BUILD_WITH_PYTHON})
     message(STATUS "Building with Python bindings")
@@ -144,6 +146,15 @@ if(${BUILD_WITH_COVERAGE})
     endforeach()
 endif()
 
+# sanitizer
+
+if(${BUILD_WITH_SANITIZER})
+    foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
+        target_compile_options(${TARGET} PRIVATE -fsanitize=address)
+        target_link_libraries(${TARGET} PRIVATE -fsanitize=address)
+    endforeach()
+endif()
+
 # install
 
 set(STRUCTSTORE_INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR}/structstore)
@@ -188,8 +199,10 @@ if(${BUILD_WITH_PYTHON})
             DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR_PY})
 
     include(cmake/NanobindStubgen.cmake)
-    nanobind_stubgen(structstore_py)
-    nanobind_stubgen_install(structstore_py ${STRUCTSTORE_INSTALL_LIBDIR_PY})
+    if(NOT ${BUILD_WITH_SANITIZER})
+        nanobind_stubgen(structstore_py)
+        nanobind_stubgen_install(structstore_py ${STRUCTSTORE_INSTALL_LIBDIR_PY})
+    endif()
 endif()
 
 # inspired by https://stackoverflow.com/a/49857699

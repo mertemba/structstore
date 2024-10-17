@@ -8,6 +8,9 @@ source "$srcdir/scripts/build_config.sh"
 test -d build
 source "$venvdir/bin/activate"
 
+# this is necessary because Python confuses ASan
+export ASAN_OPTIONS=verify_asan_link_order=0
+
 # build, just to be sure everything is up-to-date
 cmake --build "$builddir"
 cmake --install "$builddir"

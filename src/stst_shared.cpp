@@ -94,11 +94,16 @@ StructStoreShared::StructStoreShared(
             std::uniform_int_distribution<std::mt19937::result_type> dist(1, 1 << 30);
             target_addr = (void*) (((uint64_t) dist(rng)) << (47 - 30));
         }
+        auto map_flags = MAP_SHARED | MAP_FIXED_NOREPLACE;
+        #ifdef __SANITIZE_ADDRESS__
+        target_addr = nullptr;
+        map_flags = MAP_SHARED;
+        #endif
         sh_data_ptr = (SharedData*) mmap(
                 target_addr,
                 size,
                 PROT_READ | PROT_WRITE,
-                MAP_SHARED | MAP_FIXED_NOREPLACE,
+                map_flags,
                 fd.get(),
                 0);
 
@@ -146,11 +151,16 @@ StructStoreShared::StructStoreShared(int fd, bool init)
         std::uniform_int_distribution<std::mt19937::result_type> dist(1, 1 << 30);
         void* target_addr = (void*) (((uint64_t) dist(rng)) << (47 - 30));
         // map new memory
+        auto map_flags = MAP_SHARED | MAP_FIXED_NOREPLACE;
+        #ifdef __SANITIZE_ADDRESS__
+        target_addr = nullptr;
+        map_flags = MAP_SHARED;
+        #endif
         sh_data_ptr = (SharedData*) mmap(
                 target_addr,
                 size,
                 PROT_READ | PROT_WRITE,
-                MAP_SHARED | MAP_FIXED_NOREPLACE,
+                map_flags,
                 fd,
                 0);
 

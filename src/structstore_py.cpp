@@ -16,8 +16,6 @@ NB_MODULE(MODULE_NAME, m) {
 
     // API types:
 
-    py::SimpleNamespace = nb::module_::import_("types").attr("SimpleNamespace");
-
     nb::class_<ScopedLock>(m, "ScopedLock")
             .def("__enter__", [](ScopedLock&) {})
             .def("__exit__", [](ScopedLock& con_man, nb::handle, nb::handle, nb::handle) {

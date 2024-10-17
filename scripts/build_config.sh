@@ -13,3 +13,6 @@ fi
 if [ ! -z "$BUILD_WITH_COVERAGE" ]; then
     cmake_options="$cmake_options -DBUILD_WITH_COVERAGE=ON"
 fi
+if [ ! -z "$BUILD_WITH_SANITIZER" ]; then
+    cmake_options="$cmake_options -DBUILD_WITH_SANITIZER=ON"
+fi

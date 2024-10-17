@@ -51,8 +51,6 @@ private:
     static void clear(StructStore& store);
 
 public:
-    static nb::object SimpleNamespace;
-
     enum class ToPythonMode {
         NON_RECURSIVE,
         RECURSIVE,

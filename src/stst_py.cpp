@@ -10,8 +10,6 @@ using namespace structstore;
 
 namespace nb = nanobind;
 
-nb::object py::SimpleNamespace{};
-
 __attribute__((__visibility__("default")))
 std::unordered_map<uint64_t, py::FromPythonFn>& py::get_from_python_fns() {
     static auto* from_python_fns = new std::unordered_map<uint64_t, py::FromPythonFn>();
