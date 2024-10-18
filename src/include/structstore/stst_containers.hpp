@@ -18,6 +18,7 @@ class List {
 
 public:
     class Iterator {
+        // todo: store scoped lock
         const List& list;
         size_t index;
 
@@ -46,9 +47,12 @@ public:
         throw std::runtime_error("List should not be constructed without an allocator");
     }
 
-    explicit List(MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), data(StlAllocator<StructStoreField>(mm_alloc)) {}
+    explicit List(MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), data(StlAllocator<StructStoreField>(mm_alloc)) {
+        STST_LOG_DEBUG() << "constructing List at " << this;
+    }
 
     ~List() {
+        STST_LOG_DEBUG() << "destructing List at " << this;
         clear();
     }
 
@@ -69,6 +73,7 @@ public:
     List& operator=(List&&) = delete;
 
     FieldAccess push_back() {
+        STST_LOG_DEBUG() << "this: " << this << ", cur size: " << data.size();
         return {data.emplace_back(), mm_alloc};
     }
 

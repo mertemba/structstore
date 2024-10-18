@@ -20,6 +20,7 @@ void List::register_type() {
 
 template<>
 std::ostream& structstore::to_text(std::ostream& os, const List& list) {
+    STST_LOG_DEBUG() << "serializing list at " << &list;
     os << "[";
     for (const StructStoreField& field: list.data) {
         to_text(os, field) << ",";

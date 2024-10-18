@@ -6,14 +6,8 @@
 #include <cassert>
 #include <cmath>
 #include <cstring>
-#include <exception>
-#include <scoped_allocator>
 #include <sstream>
 #include <stdexcept>
-#include <string>
-#include <type_traits>
-#include <unordered_map>
-#include <vector>
 
 namespace structstore {
 
@@ -142,9 +136,12 @@ class MiniMalloc {
 
     size_index_type get_size_index_lower(size_type size) {
         size_index_type idx = get_size_index_upper(size);
+        assert(idx >= 0 && idx < SIZES_COUNT);
         while (size < sizes[idx]) {
             --idx;
+            assert(idx >= 0 && idx < SIZES_COUNT);
         }
+        assert(idx >= 0 && idx < SIZES_COUNT);
         return idx;
     }
 
@@ -198,6 +195,7 @@ class MiniMalloc {
         for (uint32_t bits = 1; bits <= 64; ++bits) {
             uint64_t size = ((uint64_t) (std::pow(2.0, bits / 4.0) + 0.001)) * ALIGN;
             size_index_type idx = get_size_index_upper(size);
+            assert(idx >= 0 && idx < SIZES_COUNT);
             sizes[idx] = size;
         }
 
@@ -235,6 +233,7 @@ class MiniMalloc {
         }
         size_index_type size_index = get_size_index_upper(size);
         if (size_index < SIZES_COUNT - 1) {
+            assert(size_index >= 0 && size_index < SIZES_COUNT);
             size = sizes[size_index];
         }
         memnode* node;

@@ -62,7 +62,8 @@ set(STRUCTSTORE_SRC_FILES
         ${PROJECT_SOURCE_DIR}/src/stst_field.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_shared.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_structstore.cpp
-        ${PROJECT_SOURCE_DIR}/src/stst_typing.cpp)
+        ${PROJECT_SOURCE_DIR}/src/stst_typing.cpp
+        ${PROJECT_SOURCE_DIR}/src/stst_utils.cpp)
 
 # targets that will be linked against: library
 

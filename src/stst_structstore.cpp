@@ -7,9 +7,10 @@ MiniMalloc structstore::static_alloc(malloc_size, std::malloc(malloc_size));
 
 template<>
 std::ostream& structstore::to_text(std::ostream& os, const StructStore& store) {
-    std::cout << "serializing StructStore at " << &store << std::endl;
+    STST_LOG_DEBUG() << "serializing StructStore at " << &store;
     os << "{";
     for (const auto& name: store.slots) {
+        STST_LOG_DEBUG() << "field " << (void*) &name << " is at " << &store.fields.at(name);
         os << '"' << name.str << "\":";
         to_text(os, store.fields.at(name)) << ",";
     }

@@ -9,7 +9,6 @@
 #include "structstore/stst_utils.hpp"
 
 #include <functional>
-#include <iostream>
 #include <unordered_map>
 
 #include <nanobind/make_iterator.h>
@@ -187,9 +186,12 @@ public:
             return false;
         }
         T_cpp& field_cpp = access.get<T_cpp>();
+        STST_LOG_DEBUG() << "at type " << typing::get_type_name<T_cpp>();
         if (value_cpp == &field_cpp) {
+            STST_LOG_DEBUG() << "copying to itself";
             return true;
         }
+        STST_LOG_DEBUG() << "copying " << typing::get_type_name<T_cpp>() << " from " << value_cpp << " to " << &field_cpp;
         field_cpp = *value_cpp;
         return true;
     }
@@ -240,7 +242,7 @@ public:
         });
 
         cls.def("check", [](T& t) {
-            std::cout << "checking from python ..." << std::endl;
+            STST_LOG_DEBUG() << "checking from python ...";
             auto& store = t.get_store();
             return store.check();
         });

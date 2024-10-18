@@ -2,11 +2,8 @@
 #define STST_FIELD_HPP
 
 #include "structstore/stst_alloc.hpp"
-#include "structstore/stst_hashstring.hpp"
 #include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
-
-#include <iostream>
 
 #include <yaml-cpp/yaml.h>
 
@@ -66,7 +63,9 @@ public:
     void clear(MiniMalloc& mm_alloc) {
         if (data) {
             const typing::DestructorFn<>& destructor = typing::get_destructor(type_hash);
+            STST_LOG_DEBUG() << "deconstructing field " << typing::get_type_name(type_hash) << " at " << data;
             destructor(mm_alloc, data);
+            STST_LOG_DEBUG() << "deallocating at " << data;
             mm_alloc.deallocate(data);
         }
         data = nullptr;
@@ -84,6 +83,7 @@ public:
         clear(mm_alloc);
         data = new_data;
         type_hash = typing::get_type_hash<T>();
+        STST_LOG_DEBUG() << "replacing field data with " << new_data << ", type " << typing::get_type_name(type_hash);
     }
 
     StructStoreField& operator=(StructStoreField&& other) noexcept {

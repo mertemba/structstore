@@ -65,12 +65,17 @@ void py::from_python(FieldAccess access, const nb::handle& value, const std::str
         return;
     }
     if (!access.get_field().empty()) {
+        STST_LOG_DEBUG() << "at field " << field_name << " of type " << typing::get_type_name(access.get_type_hash());
+#ifndef NDEBUG
+        access.check();
+#endif
         auto from_python_fn = py::get_from_python_fns().at(access.get_type_hash());
         bool success = from_python_fn(access, value);
         if (success) {
             return;
         }
     } else {
+        STST_LOG_DEBUG() << "at empty field " << field_name;
         for (const auto& [type_hash, from_python_fn]: py::get_from_python_fns()) {
             bool success = from_python_fn(access, value);
             if (success) {

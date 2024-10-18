@@ -10,7 +10,6 @@ using namespace structstore;
 
 namespace nb = nanobind;
 
-
 NB_MODULE(MODULE_NAME, m) {
     m.attr("__version__") = VERSION_INFO;
 
@@ -52,9 +51,11 @@ NB_MODULE(MODULE_NAME, m) {
         if (py::copy_cast_from_python<StructStore>(access, value)) {
             return true;
         }
+        // todo: strict check if this is one of dict, SimpleNamespace, StructStore
         if (nb::hasattr(value, "__dict__")) {
             auto dict = nb::dict(value.attr("__dict__"));
             StructStore& store = access.get<StructStore>();
+            STST_LOG_DEBUG() << "copying __dict__ to " << &store;
             store.clear();
             for (const auto& [key, val]: dict) {
                 std::string key_str = nb::cast<std::string>(key);
@@ -65,6 +66,7 @@ NB_MODULE(MODULE_NAME, m) {
         if (!access.get_field().empty() && nb::hasattr(value, "__slots__")) {
             auto slots = nb::iterable(value.attr("__slots__"));
             StructStore& store = access.get<StructStore>();
+            STST_LOG_DEBUG() << "copying __slots__ to " << &store;
             store.clear();
             for (const auto& key: slots) {
                 std::string key_str = nb::cast<std::string>(key);
@@ -75,6 +77,7 @@ NB_MODULE(MODULE_NAME, m) {
         if (nb::isinstance<nb::dict>(value)) {
             nb::dict dict = nb::cast<nb::dict>(value);
             StructStore& store = access.get<StructStore>();
+            STST_LOG_DEBUG() << "copying nb::dict to " << &store;
             store.clear();
             for (const auto& [key, val]: dict) {
                 if (!nb::isinstance<nb::str>(key)) {
@@ -226,6 +229,7 @@ NB_MODULE(MODULE_NAME, m) {
     }, nb::arg("index"), nb::arg("value").none());
     list_cls.def("__getitem__", [](List& list, size_t index) {
         auto lock = list.read_lock();
+        STST_LOG_DEBUG() << "getting list item of type " << typing::get_type_name(list[index].get_field().get_type_hash());
         return py::to_python_cast(list[index].get_field());
     });
     list_cls.def("__delitem__", [](List& list, size_t index) {

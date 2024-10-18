@@ -119,12 +119,14 @@ StructStoreShared::StructStoreShared(
         static_assert((sizeof(SharedData) % 8) == 0);
         std::memset(sh_data_ptr, 0, size);
         new(sh_data_ptr) SharedData(size, bufsize, (char*) sh_data_ptr + sizeof(SharedData));
+        STST_LOG_DEBUG() << "created shared StructStore at " << sh_data_ptr;
 
         // marks the store as ready to be used
         fchmod(fd.get(), 0660);
 
     } else {
         mmap_existing_fd();
+        STST_LOG_DEBUG() << "opened shared StructStore at " << sh_data_ptr;
     }
 }
 
@@ -224,6 +226,10 @@ void StructStoreShared::mmap_existing_fd() {
     }
 
     ++sh_data_ptr->usage_count;
+
+#ifndef NDEBUG
+    sh_data_ptr->data.check();
+#endif
 }
 
 bool StructStoreShared::revalidate(bool block) {

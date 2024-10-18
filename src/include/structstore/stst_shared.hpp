@@ -5,13 +5,12 @@
 #include "structstore/stst_structstore.hpp"
 
 #include <fcntl.h>
-#include <sys/stat.h>
+#include <stdexcept>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <atomic>
-#include <exception>
-#include <iostream>
 #include <random>
 
 namespace structstore {
@@ -174,6 +173,7 @@ public:
     }
 
     ~StructStoreShared() {
+        STST_LOG_DEBUG() << "deconstructing shared StructStore at " << sh_data_ptr;
         close();
     }
 

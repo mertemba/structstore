@@ -8,7 +8,6 @@
 #include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
 
-#include <iostream>
 #include <type_traits>
 #include <unordered_map>
 
@@ -54,7 +53,9 @@ public:
         }
         StlAllocator<T> tmp_alloc{mm_alloc};
         void* ptr = tmp_alloc.allocate(1);
+        STST_LOG_DEBUG() << "allocating at " << ptr;
         uint64_t type_hash = typing::get_type_hash<T>();
+        STST_LOG_DEBUG() << "constructing field " << typing::get_type_name(type_hash) << " at " << ptr;
         const typing::ConstructorFn<>& constructor = typing::get_constructor(type_hash);
         constructor(mm_alloc, ptr);
         field.replace_data<T>(ptr, mm_alloc);
@@ -178,7 +179,10 @@ private:
 
 public:
     explicit StructStore(MiniMalloc& mm_alloc)
-            : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {}
+        : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {
+        STST_LOG_DEBUG() << "constructing StructStore at " << this << " with alloc at " << &mm_alloc;
+        if (&mm_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is the static_alloc)";
+    }
 
     StructStore(const StructStore&) = delete;
 
@@ -195,10 +199,16 @@ public:
     StructStore& operator=(StructStore&&) = delete;
 
     ~StructStore() {
+        STST_LOG_DEBUG() << "deconstructing StructStore at " << this;
         clear();
     }
 
     void clear() {
+        STST_LOG_DEBUG() << "clearing StructStore at " << this << "with alloc at " << &mm_alloc;
+        if (&mm_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is using the static_alloc)";
+    #ifndef NDEBUG
+        check();
+    #endif
         for (auto& [key, value]: fields) {
             if (managed) {
                 value.clear(mm_alloc);
@@ -282,12 +292,18 @@ public:
                 throw std::runtime_error(str.str());
             }
         }
+        STST_LOG_DEBUG() << "registering unmanaged data at " << &t << "in StructStore at " << this << " with alloc at " << &mm_alloc;
+        if (&mm_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is the static_alloc)";
         HashString name_int = internal_string(name);
         auto ret = fields.emplace(name_int, StructStoreField{&t});
         if (!ret.second) {
             throw std::runtime_error("field name already exists");
         }
         slots.emplace_back(name_int);
+        STST_LOG_DEBUG() << "field " << name.str << " at " << &t;
+#ifndef NDEBUG
+        check();
+#endif
     }
 
     template<typename T>

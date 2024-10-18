@@ -74,6 +74,7 @@ public:
     template<typename T>
     static void register_type(const std::string& name) {
         uint64_t type_hash = const_hash(name.c_str());
+        STST_LOG_DEBUG() << "registering type '" << name << "' with hash '" << type_hash << "'";
         if (type_hash == 0) {
             std::ostringstream str;
             str << "hash collision between '" << name << "' and empty type";
