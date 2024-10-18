@@ -17,6 +17,11 @@ namespace structstore {
 
 extern std::random_device rnd_dev;
 
+class not_ready_error : public std::runtime_error {
+public:
+    not_ready_error(const char* what) : std::runtime_error(what) {}
+};
+
 enum CleanupMode {
     NEVER,
     IF_LAST,

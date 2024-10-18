@@ -70,9 +70,12 @@ StructStoreShared::StructStoreShared(
         if (fd.get() == -1) {
             throw std::runtime_error("opening shared memory failed");
         }
-    } else if (!created && fd_state.st_mode != 0100660) {
+    } else if (!created && fd_state.st_mode == 0100600) {
         // shared memory is not ready for opening yet
-        throw std::runtime_error("shared memory not initialized yet");
+        throw not_ready_error("shared memory not initialized yet");
+    } else if (!created && fd_state.st_mode != 0100660) {
+        // shared memory is somehow uninitialized
+        throw std::runtime_error("shared memory not initialized");
     }
 
     size_t size = sizeof(SharedData) + bufsize;
