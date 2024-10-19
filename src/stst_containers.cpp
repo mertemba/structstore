@@ -4,18 +4,15 @@
 using namespace structstore;
 
 void List::register_type() {
-    typing::register_type<List>("structstore::List");
-    typing::register_mm_alloc_constructor<List>();
-    typing::register_default_destructor<List>();
-    typing::register_default_serializer_text<List>();
-    typing::register_default_serializer_yaml<List>();
-    typing::register_check<List>([](MiniMalloc& mm_alloc, const List* list) {
-        try_with_info("List*: ", mm_alloc.assert_owned(list););
-        for (const StructStoreField& field: list->data) {
-            try_with_info("in List iter: ", field.check(mm_alloc););
-        }
-    });
-    typing::register_default_cmp_equal_fn<List>();
+    typing::register_type(typing::FieldType<List>{
+            .name = "structstore::List",
+            .constructor_fn = typing::mm_alloc_constructor_fn<List>,
+            .check_fn = [](MiniMalloc& mm_alloc, const List* list) {
+                try_with_info("List*: ", mm_alloc.assert_owned(list););
+                for (const StructStoreField& field: list->data) {
+                    try_with_info("in List iter: ", field.check(mm_alloc););
+                }
+            }});
 }
 
 template<>
@@ -47,17 +44,17 @@ bool List::operator==(const List& other) const {
 }
 
 void Matrix::register_type() {
-    typing::register_type<Matrix>("structstore::Matrix");
-    typing::register_mm_alloc_constructor<Matrix>();
-    typing::register_default_destructor<Matrix>();
-    typing::register_default_serializer_text<Matrix>();
-    typing::register_check<Matrix>([](MiniMalloc& mm_alloc, const Matrix* matrix) {
-        try_with_info("Matrix*: ", mm_alloc.assert_owned(matrix););
-        if (matrix->_data) {
-            try_with_info("Matrix data: ", mm_alloc.assert_owned(matrix->_data););
-        }
-    });
-    typing::register_default_cmp_equal_fn<Matrix>();
+    typing::register_type(typing::FieldType<Matrix>{
+            .name = "structstore::Matrix",
+            .constructor_fn = typing::mm_alloc_constructor_fn<Matrix>,
+            .serialize_yaml_fn = [](const Matrix*) -> YAML::Node {
+                throw std::runtime_error("serialize_yaml_fn not implemented for structstore::Matrix");
+            },
+            .check_fn = [](MiniMalloc& mm_alloc, const Matrix* matrix) {
+                try_with_info("Matrix*: ", mm_alloc.assert_owned(matrix););
+                if (matrix->_data) {
+                    try_with_info("Matrix data: ", mm_alloc.assert_owned(matrix->_data););
+                } }});
 }
 
 template<>

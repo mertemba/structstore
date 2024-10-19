@@ -272,13 +272,12 @@ public:
     static nb::class_<T> register_struct_type(nb::module_& m, const std::string& name) {
         static_assert(std::is_base_of<Struct, T>::value,
                       "template parameter is not derived from structstore::Struct");
-        typing::register_type<T>(name);
-        typing::register_mm_alloc_constructor<T>();
-        typing::register_default_destructor<T>();
-        typing::register_default_serializer_text<T>();
-        typing::register_check<T>([](MiniMalloc&, const T* t) {
-            get_store(*t).check();
-        });
+        typing::register_type(typing::FieldType<T>{
+                .name = name,
+                .constructor_fn = typing::mm_alloc_constructor_fn<T>,
+                .check_fn = [](MiniMalloc&, const T* t) {
+                    get_store(*t).check();
+                }});
 
         auto nb_cls = nb::class_<T>(m, name.c_str());
         // nb_cls.def(nb::init());
