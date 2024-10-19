@@ -32,22 +32,20 @@ NB_MODULE(MODULE_NAME, m) {
     cls.def("__init__", [](StructStore* store) {
         new (store) StructStore(static_alloc);
     });
-    py::register_structstore_funcs(cls);
-    py::register_to_python_fn<StructStore>(
-            [](const StructStoreField& field, py::ToPythonMode mode) -> nb::object {
-                auto& store = field.get<StructStore>();
-                auto dict = nb::dict();
-                for (HashString str: store.get_slots()) {
-                    auto key = nb::cast<std::string>(str.str);
-                    if (mode == py::ToPythonMode::RECURSIVE) {
-                        dict[key] = py::to_python(store.at(str), py::ToPythonMode::RECURSIVE);
-                    } else { // non-recursive convert
-                        dict[key] = py::to_python_cast(store.at(str));
-                    }
-                }
-                return dict;
-            });
-    py::register_from_python_fn<StructStore>([](FieldAccess access, const nanobind::handle& value) {
+    py::ToPythonFn structstore_to_python_fn = [](const StructStoreField& field, py::ToPythonMode mode) -> nb::object {
+        auto& store = field.get<StructStore>();
+        auto dict = nb::dict();
+        for (HashString str: store.get_slots()) {
+            auto key = nb::cast<std::string>(str.str);
+            if (mode == py::ToPythonMode::RECURSIVE) {
+                dict[key] = py::to_python(store.at(str), py::ToPythonMode::RECURSIVE);
+            } else { // non-recursive convert
+                dict[key] = py::to_python_cast(store.at(str));
+            }
+        }
+        return dict;
+    };
+    py::FromPythonFn structstore_from_python_fn = [](FieldAccess access, const nanobind::handle& value) {
         if (py::copy_cast_from_python<StructStore>(access, value)) {
             return true;
         }
@@ -93,7 +91,12 @@ NB_MODULE(MODULE_NAME, m) {
             return true;
         }
         return false;
-    });
+    };
+    py::register_type<StructStore>(py::PyType{
+            .from_python_fn = structstore_from_python_fn,
+            .to_python_fn = structstore_to_python_fn,
+            .to_python_cast_fn = py::default_to_python_cast_fn<StructStore>});
+    py::register_structstore_funcs(cls);
 
     auto shcls = nb::class_<StructStoreShared>(m, "StructStoreShared");
     py::register_structstore_funcs(shcls);
@@ -147,24 +150,37 @@ NB_MODULE(MODULE_NAME, m) {
     py::register_basic_type<int, nb::int_>();
     py::register_basic_type<double, nb::float_>();
     py::register_basic_type<bool, nb::bool_>();
-    py::register_basic_type<structstore::string, nb::str>();
+
+    // structstore::string
+    py::register_type<structstore::string>(py::PyType{
+            .from_python_fn = [](FieldAccess access, const nb::handle& value) {
+                if (nb::isinstance<nb::str>(value)) {
+                    access.get<structstore::string>() = nb::cast<std::string>(value);
+                    return true;
+                }
+                return false; },
+            .to_python_fn = [](const StructStoreField& field, py::ToPythonMode) -> nb::object {
+                return nb::str(field.get<structstore::string>().c_str());
+            },
+            .to_python_cast_fn = [](const StructStoreField& field) -> nb::object {
+                return nb::str(field.get<structstore::string>().c_str());
+            }});
 
     // structstore::List
-    auto list_cls = py::register_complex_type<List>(m);
-    py::register_to_python_fn<List>(
-            [](const StructStoreField& field, py::ToPythonMode mode) -> nb::object {
-                auto& list = field.get<List>();
-                auto ret = nb::list();
-                for (StructStoreField& field_: list) {
-                    if (mode == py::ToPythonMode::RECURSIVE) {
-                        ret.append(py::to_python(field_, py::ToPythonMode::RECURSIVE));
-                    } else { // non-recursive convert
-                        ret.append(py::to_python_cast(field_));
-                    }
-                }
-                return ret;
-            });
-    py::register_from_python_fn<List>([](FieldAccess access, const nanobind::handle& value) {
+    auto list_cls = nb::class_<List>(m, "StructStoreList");
+    py::ToPythonFn list_to_python_fn = [](const StructStoreField& field, py::ToPythonMode mode) -> nb::object {
+        auto& list = field.get<List>();
+        auto ret = nb::list();
+        for (StructStoreField& field_: list) {
+            if (mode == py::ToPythonMode::RECURSIVE) {
+                ret.append(py::to_python(field_, py::ToPythonMode::RECURSIVE));
+            } else { // non-recursive convert
+                ret.append(py::to_python_cast(field_));
+            }
+        }
+        return ret;
+    };
+    py::FromPythonFn list_from_python_fn = [](FieldAccess access, const nanobind::handle& value) {
         if (py::copy_cast_from_python<List>(access, value)) {
             return true;
         }
@@ -179,7 +195,13 @@ NB_MODULE(MODULE_NAME, m) {
             return true;
         }
         return false;
+    };
+    py::register_type<List>(py::PyType{
+            .from_python_fn = list_from_python_fn,
+            .to_python_fn = list_to_python_fn,
+            .to_python_cast_fn = py::default_to_python_cast_fn<List>,
     });
+    py::register_complex_type_funcs<List>(list_cls);
     list_cls.def("lock", [](List& list) {
         return ScopedLock(list.get_mutex());
     }, nb::rv_policy::move);
@@ -247,18 +269,17 @@ NB_MODULE(MODULE_NAME, m) {
 
 
     // structstore::Matrix
-    auto matrix_cls = py::register_complex_type<Matrix>(m);
-    py::register_to_python_fn<Matrix>(
-            [](const StructStoreField& field, py::ToPythonMode mode) -> nb::object {
-                Matrix& m = field.get<Matrix>();
-                if (mode == py::ToPythonMode::RECURSIVE) {
-                    return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()),
-                                    nb::rv_policy::copy);
-                } else { // non-recursive convert
-                    return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()));
-                }
-            });
-    py::register_from_python_fn<Matrix>([](FieldAccess access, const nanobind::handle& value) {
+    auto matrix_cls = nb::class_<Matrix>(m, "StructStoreMatrix");
+    py::ToPythonFn matrix_to_python_fn = [](const StructStoreField& field, py::ToPythonMode mode) -> nb::object {
+        Matrix& m = field.get<Matrix>();
+        if (mode == py::ToPythonMode::RECURSIVE) {
+            return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()),
+                            nb::rv_policy::copy);
+        } else { // non-recursive convert
+            return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()));
+        }
+    };
+    py::FromPythonFn matrix_from_python_fn = [](FieldAccess access, const nanobind::handle& value) {
         if (py::copy_cast_from_python<Matrix>(access, value)) {
             return true;
         }
@@ -271,7 +292,13 @@ NB_MODULE(MODULE_NAME, m) {
             return true;
         }
         return false;
+    };
+    py::register_type<Matrix>(py::PyType{
+            .from_python_fn = matrix_from_python_fn,
+            .to_python_fn = matrix_to_python_fn,
+            .to_python_cast_fn = py::default_to_python_cast_fn<Matrix>,
     });
+    py::register_complex_type_funcs<Matrix>(matrix_cls);
 }
 
 // required to make __iter__ method work

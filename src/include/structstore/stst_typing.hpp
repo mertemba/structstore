@@ -25,6 +25,8 @@ YAML::Node to_yaml(const T& t) {
     return YAML::Node(t);
 }
 
+struct Struct;
+
 class typing {
 public:
     template<typename T>
@@ -105,12 +107,12 @@ public:
     template<typename T = void>
     struct FieldType {
         const std::string name;
-        ConstructorFn<T> constructor_fn = default_constructor_fn<T>;
-        DestructorFn<T> destructor_fn = default_destructor_fn<T>;
-        SerializeTextFn<T> serialize_text_fn = default_serialize_text_fn<T>;
-        SerializeYamlFn<T> serialize_yaml_fn = default_serialize_yaml_fn<T>;
-        CheckFn<T> check_fn = default_check_fn<T>;
-        CmpEqualFn<T> cmp_equal_fn = default_cmp_equal_fn<T>;
+        const ConstructorFn<T> constructor_fn = default_constructor_fn<T>;
+        const DestructorFn<T> destructor_fn = default_destructor_fn<T>;
+        const SerializeTextFn<T> serialize_text_fn = default_serialize_text_fn<T>;
+        const SerializeYamlFn<T> serialize_yaml_fn = default_serialize_yaml_fn<T>;
+        const CheckFn<T> check_fn = default_check_fn<T>;
+        const CmpEqualFn<T> cmp_equal_fn = default_cmp_equal_fn<T>;
 
     protected:
         friend class typing;
@@ -208,6 +210,18 @@ public:
 
     static const CmpEqualFn<>& get_cmp_equal(uint64_t type_hash) {
         return get_field_type(type_hash).cmp_equal_fn;
+    }
+
+    template<typename T>
+    static void register_struct_type(const std::string& name) {
+        static_assert(std::is_base_of<structstore::Struct, T>::value,
+                      "template parameter is not derived from structstore::Struct");
+        register_type(typing::FieldType<T>{
+                .name = name,
+                .constructor_fn = typing::mm_alloc_constructor_fn<T>,
+                .check_fn = [](MiniMalloc&, const T* t) {
+                    get_store(*t).check();
+                }});
     }
 };
 
