@@ -115,7 +115,6 @@ if(${BUILD_WITH_PYTHON})
             MODULE_NAME=$<TARGET_FILE_BASE_NAME:structstore_py>
             VERSION_INFO="${PY_FULL_VERSION}"
     )
-    target_compile_options(nanobind-static PRIVATE -Wno-shadow -Wno-pedantic)
     # hide all symbols by default(including external libraries on Linux)
     set_target_properties(structstore_py PROPERTIES
             CXX_VISIBILITY_PRESET "hidden"
@@ -124,12 +123,20 @@ if(${BUILD_WITH_PYTHON})
         target_link_options(structstore_py PRIVATE "LINKER:--exclude-libs,ALL")
     endif()
     list(APPEND STRUCTSTORE_NONDEP_TARGETS structstore_py)
+
+    # mark nanobind headers as system includes to suppress warnings
+    get_target_property(NB_INC_DIRS nanobind-static INTERFACE_INCLUDE_DIRECTORIES)
+    target_include_directories(structstore_py_lib SYSTEM PRIVATE ${NB_INC_DIRS})
+    target_include_directories(structstore_py SYSTEM PRIVATE ${NB_INC_DIRS})
 endif()
 
 foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
     target_compile_features(${TARGET} PUBLIC cxx_std_17)
     target_compile_options(${TARGET} PUBLIC -fPIC)
-    target_compile_options(${TARGET} PUBLIC -Wall -Wextra -pedantic)
+    target_compile_options(${TARGET} PUBLIC -Wall -Wextra -pedantic -Werror)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(${TARGET} PUBLIC -Wno-class-memaccess)
+    endif()
     target_include_directories(${TARGET}
             PUBLIC ${YAML_CPP_INCLUDE_DIRS}
             PRIVATE ${PROJECT_SOURCE_DIR}/src/include)

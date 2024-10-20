@@ -41,7 +41,7 @@ public:
     using ToPythonCastFn = std::function<nb::object(const StructStoreField&)>;
 
 private:
-    struct PyType {
+    struct __attribute__((__visibility__("default"))) PyType {
         const FromPythonFn from_python_fn;
         const ToPythonFn to_python_fn;
         const ToPythonCastFn to_python_cast_fn;

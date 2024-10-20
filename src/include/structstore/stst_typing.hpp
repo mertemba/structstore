@@ -263,18 +263,6 @@ public:
     static const CmpEqualFn<>& get_cmp_equal(uint64_t type_hash) {
         return get_field_type(type_hash).cmp_equal_fn;
     }
-
-    template<typename T>
-    static void register_struct_type(const std::string& name) {
-        static_assert(std::is_base_of_v<structstore::Struct, T>,
-                      "template parameter is not derived from structstore::Struct");
-        register_type(typing::FieldType<T>{
-                .name = name,
-                .constructor_fn = typing::mm_alloc_constructor_fn<T>,
-                .check_fn = [](MiniMalloc&, const T* t) {
-                    get_store(*t).check();
-                }});
-    }
 };
 
 template<>
