@@ -5,18 +5,22 @@
 #include "structstore/stst_structstore.hpp"
 
 #include <fcntl.h>
-#include <sys/stat.h>
+#include <stdexcept>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <atomic>
-#include <exception>
-#include <iostream>
 #include <random>
 
 namespace structstore {
 
 extern std::random_device rnd_dev;
+
+class not_ready_error : public std::runtime_error {
+public:
+    not_ready_error(const char* what) : std::runtime_error(what) {}
+};
 
 enum CleanupMode {
     NEVER,
@@ -165,15 +169,16 @@ public:
 
     FieldAccess operator[](HashString name) {
         assert_valid();
-        return sh_data_ptr->data[name];
+        return sh_data_ptr->data.at(name);
     }
 
     FieldAccess operator[](const char* name) {
         assert_valid();
-        return sh_data_ptr->data[name];
+        return sh_data_ptr->data.at(name);
     }
 
     ~StructStoreShared() {
+        STST_LOG_DEBUG() << "deconstructing shared StructStore at " << sh_data_ptr;
         close();
     }
 
@@ -192,6 +197,12 @@ public:
     void to_buffer(void* buffer, size_t bufsize) const;
 
     void from_buffer(void* buffer, size_t bufsize);
+
+    bool operator==(const StructStoreShared& other) const;
+
+    inline bool operator!=(const StructStoreShared& other) const {
+        return !(*this == other);
+    }
 };
 
 }  // namespace structstore

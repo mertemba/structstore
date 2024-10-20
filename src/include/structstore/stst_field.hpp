@@ -2,11 +2,8 @@
 #define STST_FIELD_HPP
 
 #include "structstore/stst_alloc.hpp"
-#include "structstore/stst_hashstring.hpp"
 #include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
-
-#include <iostream>
 
 #include <yaml-cpp/yaml.h>
 
@@ -66,7 +63,9 @@ public:
     void clear(MiniMalloc& mm_alloc) {
         if (data) {
             const typing::DestructorFn<>& destructor = typing::get_destructor(type_hash);
+            STST_LOG_DEBUG() << "deconstructing field " << typing::get_type_name(type_hash) << " at " << data;
             destructor(mm_alloc, data);
+            STST_LOG_DEBUG() << "deallocating at " << data;
             mm_alloc.deallocate(data);
         }
         data = nullptr;
@@ -84,6 +83,7 @@ public:
         clear(mm_alloc);
         data = new_data;
         type_hash = typing::get_type_hash<T>();
+        STST_LOG_DEBUG() << "replacing field data with " << new_data << ", type " << typing::get_type_name(type_hash);
     }
 
     StructStoreField& operator=(StructStoreField&& other) noexcept {
@@ -118,7 +118,7 @@ public:
     }
 
     template<typename T>
-    operator T&() {
+    operator T&() const {
         return get<T>();
     }
 
@@ -134,6 +134,21 @@ public:
             const typing::CheckFn<>& check = typing::get_check(type_hash);
             try_with_info("in field data content: ", check(mm_alloc, data););
         }
+    }
+
+    bool operator==(const StructStoreField& other) const {
+        if (data == nullptr) {
+            return other.data == nullptr;
+        }
+        if (type_hash != other.type_hash) {
+            return false;
+        }
+        auto cmp_equal_fn = typing::get_cmp_equal(type_hash);
+        return cmp_equal_fn(data, other.data);
+    }
+
+    bool operator!=(const StructStoreField& other) const {
+        return !(*this == other);
     }
 };
 

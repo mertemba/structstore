@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(structstore VERSION 0.2.0)
+project(structstore VERSION 0.2.1)
 
 # build options
 
@@ -11,6 +11,8 @@ option(BUILD_WITH_TESTING
     "Build StructStore with testing enabled" OFF)
 option(BUILD_WITH_COVERAGE
     "Build StructStore with coverage analysis enabled" OFF)
+option(BUILD_WITH_SANITIZER
+    "Build StructStore with address sanitizer enabled" OFF)
 
 if(${BUILD_WITH_PYTHON})
     message(STATUS "Building with Python bindings")
@@ -60,7 +62,8 @@ set(STRUCTSTORE_SRC_FILES
         ${PROJECT_SOURCE_DIR}/src/stst_field.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_shared.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_structstore.cpp
-        ${PROJECT_SOURCE_DIR}/src/stst_typing.cpp)
+        ${PROJECT_SOURCE_DIR}/src/stst_typing.cpp
+        ${PROJECT_SOURCE_DIR}/src/stst_utils.cpp)
 
 # targets that will be linked against: library
 
@@ -112,7 +115,6 @@ if(${BUILD_WITH_PYTHON})
             MODULE_NAME=$<TARGET_FILE_BASE_NAME:structstore_py>
             VERSION_INFO="${PY_FULL_VERSION}"
     )
-    target_compile_options(nanobind-static PRIVATE -Wno-shadow -Wno-pedantic)
     # hide all symbols by default(including external libraries on Linux)
     set_target_properties(structstore_py PROPERTIES
             CXX_VISIBILITY_PRESET "hidden"
@@ -121,12 +123,20 @@ if(${BUILD_WITH_PYTHON})
         target_link_options(structstore_py PRIVATE "LINKER:--exclude-libs,ALL")
     endif()
     list(APPEND STRUCTSTORE_NONDEP_TARGETS structstore_py)
+
+    # mark nanobind headers as system includes to suppress warnings
+    get_target_property(NB_INC_DIRS nanobind-static INTERFACE_INCLUDE_DIRECTORIES)
+    target_include_directories(structstore_py_lib SYSTEM PRIVATE ${NB_INC_DIRS})
+    target_include_directories(structstore_py SYSTEM PRIVATE ${NB_INC_DIRS})
 endif()
 
 foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
     target_compile_features(${TARGET} PUBLIC cxx_std_17)
     target_compile_options(${TARGET} PUBLIC -fPIC)
-    target_compile_options(${TARGET} PUBLIC -Wall -Wextra -pedantic)
+    target_compile_options(${TARGET} PUBLIC -Wall -Wextra -pedantic -Werror)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(${TARGET} PUBLIC -Wno-class-memaccess)
+    endif()
     target_include_directories(${TARGET}
             PUBLIC ${YAML_CPP_INCLUDE_DIRS}
             PRIVATE ${PROJECT_SOURCE_DIR}/src/include)
@@ -141,6 +151,15 @@ if(${BUILD_WITH_COVERAGE})
     foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
         target_compile_options(${TARGET} PRIVATE --coverage -fprofile-arcs -ftest-coverage -g -O0 -fno-lto)
         target_link_libraries(${TARGET} PRIVATE gcov -fprofile-arcs -ftest-coverage -fno-lto)
+    endforeach()
+endif()
+
+# sanitizer
+
+if(${BUILD_WITH_SANITIZER})
+    foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
+        target_compile_options(${TARGET} PRIVATE -fsanitize=address)
+        target_link_libraries(${TARGET} PRIVATE -fsanitize=address)
     endforeach()
 endif()
 
@@ -188,8 +207,10 @@ if(${BUILD_WITH_PYTHON})
             DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR_PY})
 
     include(cmake/NanobindStubgen.cmake)
-    nanobind_stubgen(structstore_py)
-    nanobind_stubgen_install(structstore_py ${STRUCTSTORE_INSTALL_LIBDIR_PY})
+    if(NOT ${BUILD_WITH_SANITIZER})
+        nanobind_stubgen(structstore_py)
+        nanobind_stubgen_install(structstore_py ${STRUCTSTORE_INSTALL_LIBDIR_PY})
+    endif()
 endif()
 
 # inspired by https://stackoverflow.com/a/49857699

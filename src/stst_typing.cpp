@@ -8,34 +8,19 @@ std::unordered_map<std::type_index, uint64_t>& typing::get_type_hashes() {
     return *types;
 }
 
-std::unordered_map<uint64_t, std::string>& typing::get_type_names() {
-    static auto* type_names = new std::unordered_map<uint64_t, std::string>();
-    return *type_names;
+std::unordered_map<uint64_t, const typing::FieldType<>>& typing::get_field_types() {
+    static auto* field_types = new std::unordered_map<uint64_t, const typing::FieldType<>>();
+    return *field_types;
 }
 
-std::unordered_map<uint64_t, typing::ConstructorFn<>>& typing::get_constructors() {
-    static auto* constructors = new std::unordered_map<uint64_t, typing::ConstructorFn<>>();
-    return *constructors;
-}
-
-std::unordered_map<uint64_t, typing::DestructorFn<>>& typing::get_destructors() {
-    static auto* destructors = new std::unordered_map<uint64_t, typing::DestructorFn<>>();
-    return *destructors;
-}
-
-std::unordered_map<uint64_t, typing::SerializeTextFn<>>& typing::get_serializers_text() {
-    static auto* serializers_text = new std::unordered_map<uint64_t, typing::SerializeTextFn<>>();
-    return *serializers_text;
-}
-
-std::unordered_map<uint64_t, typing::SerializeYamlFn<>>& typing::get_serializers_yaml() {
-    static auto* serializers_yaml = new std::unordered_map<uint64_t, typing::SerializeYamlFn<>>();
-    return *serializers_yaml;
-}
-
-std::unordered_map<uint64_t, typing::CheckFn<>>& typing::get_checks() {
-    static auto* checks = new std::unordered_map<uint64_t, typing::CheckFn<>>();
-    return *checks;
+const typing::FieldType<void>& typing::get_field_type(uint64_t type_hash) {
+    try {
+        return get_field_types().at(type_hash);
+    } catch (const std::out_of_range&) {
+        std::ostringstream str;
+        str << "could not find type information for type hash " << type_hash;
+        throw std::runtime_error(str.str());
+    }
 }
 
 template<>
@@ -44,29 +29,11 @@ uint64_t typing::get_type_hash<void>() {
 }
 
 static bool register_common_types_() {
-    // empty
     typing::register_type<void>("<empty>");
-    typing::register_serializer_text<void>([](std::ostream& os, const void*) -> std::ostream& {
-        return os << "<empty>";
-    });
-    typing::register_serializer_yaml<void>([](const void*) {
-        return YAML::Node(YAML::Null);
-    });
-
-    typing::register_basic_type<int>("int");
-    typing::register_basic_type<double>("double");
-    typing::register_basic_type<bool>("bool");
-
+    typing::register_type<int>("int");
+    typing::register_type<double>("double");
+    typing::register_type<bool>("bool");
     typing::register_type<structstore::string>("structstore::string");
-    typing::register_stl_alloc_constructor<structstore::string>();
-    typing::register_default_destructor<structstore::string>();
-    typing::register_default_serializer_text<structstore::string>();
-    typing::register_default_serializer_yaml<structstore::string>();
-    typing::register_check<structstore::string>([](MiniMalloc& mm_alloc, const structstore::string* str) {
-        try_with_info("string: ", mm_alloc.assert_owned(str););
-        try_with_info("string data: ", mm_alloc.assert_owned(str->data()););
-    });
-
     return true;
 }
 
@@ -84,3 +51,16 @@ static bool registered_common_types = []() {
     typing::register_common_types();
     return true;
 }();
+
+template<>
+inline YAML::Node structstore::to_yaml(const string& str) {
+    return YAML::Node(str.c_str());
+}
+
+template<>
+void structstore::check(MiniMalloc& mm_alloc, const structstore::string& str) {
+    try_with_info("string: ", mm_alloc.assert_owned(&str););
+    if (!str.empty()) {
+        try_with_info("string data: ", mm_alloc.assert_owned(str.data()););
+    }
+}

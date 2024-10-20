@@ -70,9 +70,12 @@ StructStoreShared::StructStoreShared(
         if (fd.get() == -1) {
             throw std::runtime_error("opening shared memory failed");
         }
-    } else if (!created && fd_state.st_mode != 0100660) {
+    } else if (!created && fd_state.st_mode == 0100600) {
         // shared memory is not ready for opening yet
-        throw std::runtime_error("shared memory not initialized yet");
+        throw not_ready_error("shared memory not initialized yet");
+    } else if (!created && fd_state.st_mode != 0100660) {
+        // shared memory is somehow uninitialized
+        throw std::runtime_error("shared memory not initialized");
     }
 
     size_t size = sizeof(SharedData) + bufsize;
@@ -94,11 +97,16 @@ StructStoreShared::StructStoreShared(
             std::uniform_int_distribution<std::mt19937::result_type> dist(1, 1 << 30);
             target_addr = (void*) (((uint64_t) dist(rng)) << (47 - 30));
         }
+        auto map_flags = MAP_SHARED | MAP_FIXED_NOREPLACE;
+        #ifdef __SANITIZE_ADDRESS__
+        target_addr = nullptr;
+        map_flags = MAP_SHARED;
+        #endif
         sh_data_ptr = (SharedData*) mmap(
                 target_addr,
                 size,
                 PROT_READ | PROT_WRITE,
-                MAP_SHARED | MAP_FIXED_NOREPLACE,
+                map_flags,
                 fd.get(),
                 0);
 
@@ -114,12 +122,14 @@ StructStoreShared::StructStoreShared(
         static_assert((sizeof(SharedData) % 8) == 0);
         std::memset(sh_data_ptr, 0, size);
         new(sh_data_ptr) SharedData(size, bufsize, (char*) sh_data_ptr + sizeof(SharedData));
+        STST_LOG_DEBUG() << "created shared StructStore at " << sh_data_ptr;
 
         // marks the store as ready to be used
         fchmod(fd.get(), 0660);
 
     } else {
         mmap_existing_fd();
+        STST_LOG_DEBUG() << "opened shared StructStore at " << sh_data_ptr;
     }
 }
 
@@ -146,11 +156,16 @@ StructStoreShared::StructStoreShared(int fd, bool init)
         std::uniform_int_distribution<std::mt19937::result_type> dist(1, 1 << 30);
         void* target_addr = (void*) (((uint64_t) dist(rng)) << (47 - 30));
         // map new memory
+        auto map_flags = MAP_SHARED | MAP_FIXED_NOREPLACE;
+        #ifdef __SANITIZE_ADDRESS__
+        target_addr = nullptr;
+        map_flags = MAP_SHARED;
+        #endif
         sh_data_ptr = (SharedData*) mmap(
                 target_addr,
                 size,
                 PROT_READ | PROT_WRITE,
-                MAP_SHARED | MAP_FIXED_NOREPLACE,
+                map_flags,
                 fd,
                 0);
 
@@ -214,6 +229,10 @@ void StructStoreShared::mmap_existing_fd() {
     }
 
     ++sh_data_ptr->usage_count;
+
+#ifndef NDEBUG
+    sh_data_ptr->data.check();
+#endif
 }
 
 bool StructStoreShared::revalidate(bool block) {
@@ -307,4 +326,10 @@ void StructStoreShared::from_buffer(void* buffer, size_t bufsize) {
         throw std::runtime_error("target address mismatch; please reopen with correct target address");
     }
     std::memcpy(sh_data_ptr, buffer, ((SharedData*) buffer)->size);
+}
+
+bool StructStoreShared::operator==(const StructStoreShared& other) const {
+    assert_valid();
+    other.assert_valid();
+    return sh_data_ptr->data == other.sh_data_ptr->data;
 }

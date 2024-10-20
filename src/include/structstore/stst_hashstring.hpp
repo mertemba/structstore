@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
-#include <ostream>
-#include <unordered_set>
 
 namespace structstore {
 
@@ -14,6 +12,10 @@ constexpr uint64_t const_hash(const char* input) {
     return *input != 0 ? (const_hash(input + 1) ^ uint64_t((uint8_t) *input)) * 0x100000001b3ull
                        : 0xcbf29ce484222325ull;
 }
+
+#ifndef NDEBUG
+static_assert(structstore::const_hash("foobar") == 0x4bedc277acafaa72ull);
+#endif
 
 struct HashString {
     const char* str;

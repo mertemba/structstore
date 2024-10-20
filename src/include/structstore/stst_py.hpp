@@ -9,8 +9,6 @@
 #include "structstore/stst_utils.hpp"
 
 #include <functional>
-#include <iostream>
-#include <stdexcept>
 #include <unordered_map>
 
 #include <nanobind/make_iterator.h>
@@ -31,13 +29,28 @@ namespace structstore {
 
 namespace nb = nanobind;
 
-nb::object to_python(const StructStoreField& field, bool recursive);
-
-void from_python(FieldAccess access, const nb::handle& value, const std::string& field_name);
-
 class py {
+public:
+    enum class ToPythonMode {
+        NON_RECURSIVE,
+        RECURSIVE,
+    };
+
+    using FromPythonFn = std::function<bool(FieldAccess, const nb::handle&)>;
+    using ToPythonFn = std::function<nb::object(const StructStoreField&, ToPythonMode mode)>;
+    using ToPythonCastFn = std::function<nb::object(const StructStoreField&)>;
+
 private:
-    static nb::object __slots__(StructStore& store);
+    struct __attribute__((__visibility__("default"))) PyType {
+        const FromPythonFn from_python_fn;
+        const ToPythonFn to_python_fn;
+        const ToPythonCastFn to_python_cast_fn;
+    };
+
+    static std::unordered_map<uint64_t, const PyType>& get_py_types();
+
+    static const PyType& get_py_type(uint64_t type_hash);
+
 
     static nb::object get_field(StructStore& store, const std::string& name);
 
@@ -58,135 +71,145 @@ private:
     static void clear(StructStore& store);
 
 public:
-    static nb::object SimpleNamespace;
-
-    using FromPythonFn = std::function<bool(FieldAccess, const nb::handle&)>;
-    using ToPythonFn = std::function<nb::object(const StructStoreField&, bool recursive)>;
-
-    static std::unordered_map<uint64_t, FromPythonFn>& get_from_python_fns();
-
-    static std::unordered_map<uint64_t, ToPythonFn>& get_to_python_fns();
-
-    template<typename T>
-    static void register_from_python_fn(const FromPythonFn& from_python_fn) {
-        uint64_t type_hash = typing::get_type_hash<T>();
-        bool success = get_from_python_fns().insert({type_hash, from_python_fn}).second;
-        if (!success) {
-            throw typing::already_registered_type_error(type_hash);
-        }
-    }
-
-    template<typename T>
-    static void register_to_python_fn(const ToPythonFn& to_python_fn) {
-        uint64_t type_hash = typing::get_type_hash<T>();
-        bool success = get_to_python_fns().insert({type_hash, to_python_fn}).second;
-        if (!success) {
-            throw typing::already_registered_type_error(type_hash);
-        }
-    }
-
-    template<typename T_cpp>
-    static void register_basic_to_python() {
-        register_to_python_fn<T_cpp>([](const StructStoreField& field, bool recursive) -> nb::object {
-            return nb::cast(field.get<T_cpp>(), nb::rv_policy::reference);
-        });
-    }
-
-    template<typename T_cpp, typename T_py>
-    static void register_basic_py() {
-        static_assert(!std::is_pointer<T_cpp>::value);
-        register_to_python_fn<T_cpp>([](const StructStoreField& field, bool recursive) -> nb::object {
-            return T_py(field.get<T_cpp>());
-        });
-        register_from_python_fn<T_cpp>([](FieldAccess access, const nb::handle& value) {
-            if (nb::isinstance<T_py>(value)) {
-                access.get<T_cpp>() = nb::cast<T_cpp>(value);
-                return true;
-            }
-            return false;
-        });
-    }
-
-    template<typename T>
-    static void register_basic_py_funcs(nb::class_<T>& cls) {
-        static_assert(!std::is_pointer<T>::value);
-        cls.def("to_yaml", [=](T& t) {
-            return YAML::Dump(to_yaml(*FieldView{t}));
-        });
-        cls.def("__repr__", [=](T& t) {
-            return (std::ostringstream() << *FieldView{t}).str();
-        });
-        cls.def("copy", [=](T& t) {
-            return structstore::to_python(*FieldView{t}, false);
-        });
-        cls.def("deepcopy", [=](T& t) {
-            return structstore::to_python(*FieldView{t}, true);
-        });
-        cls.def("__copy__", [=](T& t) {
-            return structstore::to_python(*FieldView{t}, false);
-        });
-        cls.def("__deepcopy__", [=](T& t, nb::handle&) {
-            return structstore::to_python(*FieldView{t}, true);
-        });
-    }
-
-    template<typename T>
-    static void register_basic_py(nb::class_<T>& cls) {
-        static_assert(!std::is_pointer<T>::value);
-        register_to_python_fn<T>([](const StructStoreField& field, bool /*recursive*/) -> nb::object {
-            return nb::cast(field.get<T>(), nb::rv_policy::reference);
-        });
-        register_from_python_fn<T>([cls](FieldAccess access, const nb::handle& value) {
-            if (value.type().equal(cls)) {
-                access.get<T>() = nb::cast<T&>(value);
-                return true;
-            }
-            return false;
-        });
-        register_basic_py_funcs<T>(cls);
-    }
-
-    template<typename T_cpp>
-    static void register_ptr_py(const nb::handle& T_ptr_py, const nb::handle& T_py) {
-        static_assert(std::is_pointer<T_cpp>::value);
-        register_basic_to_python<T_cpp>();
-        register_from_python_fn<T_cpp>([T_ptr_py, T_py](FieldAccess access, const nb::handle& value) {
-            if (value.type().equal(T_ptr_py) || (!access.get_field().empty() && value.type().equal(T_py))) {
-                access.get<T_cpp>() = nb::cast<T_cpp>(value);
-                return true;
-            }
-            return false;
-        });
-    }
-
-    template<typename T_cpp>
-    static bool object_from_python(FieldAccess access, const nb::handle& value) {
-        try {
-            T_cpp& value_cpp = nb::cast<T_cpp&>(value, false);
-            T_cpp& field_cpp = access.get<T_cpp>();
-            if (&value_cpp == &field_cpp) {
-                return true;
-            }
-            field_cpp = value_cpp;
+    template<typename T, typename T_py>
+    static bool default_from_python_fn(FieldAccess access, const nb::handle& value) {
+        if (nb::isinstance<T_py>(value)) {
+            access.get<T>() = nb::cast<T>(value);
             return true;
-        } catch (const nb::cast_error&) {
         }
         return false;
+    };
+
+    template<typename T, typename T_py>
+    static nb::object default_to_python_fn(const StructStoreField& field, ToPythonMode) {
+        return T_py(field.get<T>());
+    };
+
+    template<typename T>
+    static nb::object default_to_python_cast_fn(const StructStoreField& field) {
+        return nb::cast(field.get<T>(), nb::rv_policy::reference);
+    };
+
+    template<typename T>
+    static void register_type(FromPythonFn from_python_fn, ToPythonFn to_python_fn,
+                              ToPythonCastFn to_python_cast_fn) {
+        PyType py_type{from_python_fn, to_python_fn, to_python_cast_fn};
+        const uint64_t type_hash = typing::get_type_hash<T>();
+        STST_LOG_DEBUG() << "registering Python type '" << typing::get_type_name<T>() << "' with hash '" << type_hash << "'";
+        auto ret = get_py_types().insert({type_hash, py_type});
+        if (!ret.second) {
+            throw typing::already_registered_type_error(type_hash);
+        }
     }
 
-    template<typename T_cpp>
-    static void register_object_from_python() {
-        register_from_python_fn<T_cpp>(object_from_python<T_cpp>);
+    static const FromPythonFn& get_from_python_fn(uint64_t type_hash) {
+        return get_py_type(type_hash).from_python_fn;
+    }
+
+    static const ToPythonFn& get_to_python_fn(uint64_t type_hash) {
+        return get_py_type(type_hash).to_python_fn;
+    }
+
+    static const ToPythonCastFn& get_to_python_cast_fn(uint64_t type_hash) {
+        return get_py_type(type_hash).to_python_cast_fn;
+    }
+
+    template<typename T, typename T_py>
+    static void register_basic_type() {
+        static_assert(!std::is_pointer_v<T>);
+        register_type<T>(default_from_python_fn<T, T_py>, default_to_python_fn<T, T_py>,
+                         default_to_python_cast_fn<T>);
     }
 
     template<typename T>
-    static void register_structstore_py(nb::class_<T>& cls) {
-        register_basic_py_funcs<T>(cls);
-
-        cls.def_prop_ro("__slots__", [](T& t) {
-            auto& store = t.get_store();
-            return __slots__(store);
+    static void register_complex_type_funcs(nb::class_<T>& cls) {
+        static_assert(!std::is_pointer_v<T>);
+        cls.def("to_yaml", [](T& t) {
+            return YAML::Dump(to_yaml(*FieldView{t}));
         });
+        cls.def("__repr__", [](T& t) {
+            return (std::ostringstream() << *FieldView{t}).str();
+        });
+        cls.def("copy", [](T& t) {
+            return to_python(*FieldView{t}, ToPythonMode::NON_RECURSIVE);
+        });
+        cls.def("deepcopy", [](T& t) {
+            return to_python(*FieldView{t}, ToPythonMode::RECURSIVE);
+        });
+        cls.def("__copy__", [](T& t) {
+            return to_python(*FieldView{t}, ToPythonMode::NON_RECURSIVE);
+        });
+        cls.def("__deepcopy__", [](T& t, nb::handle&) {
+            return to_python(*FieldView{t}, ToPythonMode::RECURSIVE);
+        });
+        cls.def("__eq__", [](T& t, nb::handle& other) {
+            if (const T* other_ = try_cast<T>(other)) {
+                return t == *other_;
+            }
+            return false;
+        });
+    }
+
+    template<typename T>
+    static void register_ptr_type(const nb::handle& T_ptr_py, const nb::handle& T_py) {
+        static_assert(std::is_pointer_v<T>);
+        auto from_python_fn = [T_ptr_py, T_py](FieldAccess access, const nb::handle& value) {
+            if (value.type().equal(T_ptr_py) ||
+                (!access.get_field().empty() && value.type().equal(T_py))) {
+                access.get<T>() = nb::cast<T>(value);
+                return true;
+            }
+            return false;
+        };
+        register_type<T>(
+                PyType{from_python_fn, default_to_python_cast_fn<T>, default_to_python_cast_fn<T>});
+    }
+
+    template<typename T>
+    static T* try_cast(const nb::handle& value) {
+        try {
+            return &nb::cast<T&>(value, false);
+        } catch (const nb::cast_error&) {
+            return nullptr;
+        }
+    }
+
+    template<typename T>
+    static bool copy_cast_from_python(FieldAccess access, const nb::handle& value) {
+        T* value_cpp = try_cast<T>(value);
+        if (value_cpp == nullptr) {
+            return false;
+        }
+        T& field_cpp = access.get<T>();
+        STST_LOG_DEBUG() << "at type " << typing::get_type_name<T>();
+        if (value_cpp == &field_cpp) {
+            STST_LOG_DEBUG() << "copying to itself";
+            return true;
+        }
+        STST_LOG_DEBUG() << "copying " << typing::get_type_name<T>() << " from " << value_cpp << " to " << &field_cpp;
+        field_cpp = *value_cpp;
+        return true;
+    }
+
+    template<typename T>
+    static void register_structstore_funcs(nb::class_<T>& cls) {
+        register_complex_type_funcs<T>(cls);
+
+        cls.def("__getstate__", [](StructStore& store) {
+            nb::object dict = _to_python(store, py::ToPythonMode::RECURSIVE);
+            return dict;
+        });
+
+        if constexpr (std::is_same_v<T, StructStore>) {
+            cls.def("__setstate__", [](StructStore& store, nb::handle value) {
+                new (&store) StructStore(static_alloc);
+                _from_python(store, store.mm_alloc, value, "<root>");
+            });
+        } else {
+            cls.def("__setstate__", [](T&, nb::handle) {
+                throw std::runtime_error("cannot unpickle type " + typing::get_type_name<T>());
+            });
+        }
 
         cls.def("__getattr__", [](T& t, const std::string& name) {
             auto& store = t.get_store();
@@ -214,31 +237,31 @@ public:
         });
 
         cls.def("check", [](T& t) {
-            std::cout << "checking from python ..." << std::endl;
+            STST_LOG_DEBUG() << "checking from python ...";
             auto& store = t.get_store();
             return store.check();
         });
     }
+
+    static nb::object to_python(const StructStoreField& field, ToPythonMode mode);
+
+    static nb::object to_python_cast(const StructStoreField& field);
+
+    static void from_python(FieldAccess access, const nb::handle& value, const std::string& field_name);
+
+protected:
+    template<typename T>
+    static void _from_python(T& t, MiniMalloc& mm_alloc,
+                             const nb::handle& value,
+                             const std::string& field_name) {
+        from_python(*AccessView{t, mm_alloc}, value, field_name);
+    }
+
+    template<typename T>
+    static nb::object _to_python(T& t, ToPythonMode mode) {
+        return to_python(*FieldView{t}, mode);
+    }
 };
-
-template<typename T>
-nb::class_<T> register_struct_type_and_py(nb::module_& m, const std::string& name) {
-    static_assert(std::is_base_of<Struct, T>::value,
-                  "template parameter is not derived from structstore::Struct");
-    typing::register_type<T>(name);
-    typing::register_mm_alloc_constructor<T>();
-    typing::register_default_destructor<T>();
-    typing::register_default_serializer_text<T>();
-    typing::register_check<T>([](MiniMalloc&, const T* t) {
-        get_store(*t).check();
-    });
-
-    auto nb_cls = nb::class_<T>(m, name.c_str());
-    nb_cls.def(nb::init());
-    py::register_basic_py<T>(nb_cls);
-    py::register_structstore_py(nb_cls);
-    return nb_cls;
-}
 
 } // namespace structstore
 

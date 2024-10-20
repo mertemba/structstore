@@ -1,6 +1,7 @@
 #ifndef STST_CONTAINERS_HPP
 #define STST_CONTAINERS_HPP
 
+#include "structstore/stst_alloc.hpp"
 #include "structstore/stst_structstore.hpp"
 #include "structstore/stst_field.hpp"
 #include "structstore/stst_typing.hpp"
@@ -18,6 +19,7 @@ class List {
 
 public:
     class Iterator {
+        // todo: store scoped lock
         const List& list;
         size_t index;
 
@@ -42,13 +44,16 @@ public:
         }
     };
 
-    List() : mm_alloc(*(MiniMalloc*) nullptr), data(StlAllocator<StructStoreField>(static_alloc)) {
+    List() : mm_alloc(static_alloc), data(StlAllocator<StructStoreField>(static_alloc)) {
         throw std::runtime_error("List should not be constructed without an allocator");
     }
 
-    explicit List(MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), data(StlAllocator<StructStoreField>(mm_alloc)) {}
+    explicit List(MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), data(StlAllocator<StructStoreField>(mm_alloc)) {
+        STST_LOG_DEBUG() << "constructing List at " << this;
+    }
 
     ~List() {
+        STST_LOG_DEBUG() << "destructing List at " << this;
         clear();
     }
 
@@ -69,6 +74,7 @@ public:
     List& operator=(List&&) = delete;
 
     FieldAccess push_back() {
+        STST_LOG_DEBUG() << "this: " << this << ", cur size: " << data.size();
         return {data.emplace_back(), mm_alloc};
     }
 
@@ -139,13 +145,16 @@ public:
 
     template<typename T>
     friend YAML::Node structstore::to_yaml(const T&);
+
+    template<typename T>
+    friend void structstore::check(MiniMalloc&, const T&);
+
+    bool operator==(const List& other) const;
+
+    inline bool operator!=(const List& other) const {
+        return !(*this == other);
+    }
 };
-
-template<>
-std::ostream& to_text(std::ostream&, const List&);
-
-template<>
-YAML::Node to_yaml(const List&);
 
 template<>
 void List::push_back<const char*>(const char* const& value);
@@ -247,6 +256,15 @@ public:
 
     template<typename T>
     friend YAML::Node structstore::to_yaml(const T&);
+
+    template<typename T>
+    friend void structstore::check(MiniMalloc&, const T&);
+
+    bool operator==(const Matrix& other) const;
+
+    inline bool operator!=(const Matrix& other) const {
+        return !(*this == other);
+    }
 };
 
 }

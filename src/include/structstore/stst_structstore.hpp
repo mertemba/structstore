@@ -8,7 +8,7 @@
 #include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
 
-#include <iostream>
+#include <type_traits>
 #include <unordered_map>
 
 #include <yaml-cpp/yaml.h>
@@ -43,6 +43,7 @@ public:
 
     template<typename T>
     T& get() {
+        static_assert(!std::is_same_v<typename std::remove_cv_t<T>, StructStoreField>);
         if (!field.empty()) {
             // field already exists, directly return
             return field.get<T>();
@@ -52,7 +53,9 @@ public:
         }
         StlAllocator<T> tmp_alloc{mm_alloc};
         void* ptr = tmp_alloc.allocate(1);
+        STST_LOG_DEBUG() << "allocating at " << ptr;
         uint64_t type_hash = typing::get_type_hash<T>();
+        STST_LOG_DEBUG() << "constructing field " << typing::get_type_name(type_hash) << " at " << ptr;
         const typing::ConstructorFn<>& constructor = typing::get_constructor(type_hash);
         constructor(mm_alloc, ptr);
         field.replace_data<T>(ptr, mm_alloc);
@@ -91,7 +94,9 @@ public:
     }
 
     void check() const {
-        try_with_info("at FieldAccess: ", field.check(mm_alloc););
+        if (managed) {
+            try_with_info("at FieldAccess: ", field.check(mm_alloc););
+        }
     }
 };
 
@@ -115,11 +120,23 @@ public:
     }
 };
 
+template<>
+inline FieldAccess::operator StructStoreField&() {
+    return get_field();
+}
+
+template<>
+inline FieldAccess::operator const StructStoreField&() {
+    return get_field();
+}
+
 class StructStoreShared;
 
 class List;
 
 class Struct;
+
+class py;
 
 class StructStore;
 
@@ -129,6 +146,9 @@ std::ostream& to_text(std::ostream&, const StructStore&);
 template<>
 YAML::Node to_yaml(const StructStore&);
 
+template<>
+void check(MiniMalloc&, const StructStore&);
+
 class StructStore {
     friend class structstore::StructStoreShared;
 
@@ -137,6 +157,8 @@ class StructStore {
     friend class structstore::List;
 
     friend class structstore::Struct;
+
+    friend class structstore::py;
 
     static void register_type();
 
@@ -160,7 +182,10 @@ private:
 
 public:
     explicit StructStore(MiniMalloc& mm_alloc)
-            : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {}
+        : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {
+        STST_LOG_DEBUG() << "constructing StructStore at " << this << " with alloc at " << &mm_alloc;
+        if (&mm_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is the static_alloc)";
+    }
 
     StructStore(const StructStore&) = delete;
 
@@ -177,10 +202,16 @@ public:
     StructStore& operator=(StructStore&&) = delete;
 
     ~StructStore() {
+        STST_LOG_DEBUG() << "deconstructing StructStore at " << this;
         clear();
     }
 
     void clear() {
+        STST_LOG_DEBUG() << "clearing StructStore at " << this << "with alloc at " << &mm_alloc;
+        if (&mm_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is using the static_alloc)";
+    #ifndef NDEBUG
+        check();
+    #endif
         for (auto& [key, value]: fields) {
             if (managed) {
                 value.clear(mm_alloc);
@@ -256,7 +287,7 @@ public:
         if (managed) {
             throw std::runtime_error("cannot register field with existing data in StructStore with only managed data");
         }
-        if constexpr (std::is_base_of<Struct, T>::value) {
+        if constexpr (std::is_base_of_v<Struct, T>) {
             if (&t.get_alloc() != &mm_alloc) {
                 std::ostringstream str;
                 str << "registering Struct field '" << name.str << "' with a different allocator "
@@ -264,12 +295,18 @@ public:
                 throw std::runtime_error(str.str());
             }
         }
+        STST_LOG_DEBUG() << "registering unmanaged data at " << &t << "in StructStore at " << this << " with alloc at " << &mm_alloc;
+        if (&mm_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is the static_alloc)";
         HashString name_int = internal_string(name);
         auto ret = fields.emplace(name_int, StructStoreField{&t});
         if (!ret.second) {
             throw std::runtime_error("field name already exists");
         }
         slots.emplace_back(name_int);
+        STST_LOG_DEBUG() << "field " << name.str << " at " << &t;
+#ifndef NDEBUG
+        check();
+#endif
     }
 
     template<typename T>
@@ -298,18 +335,23 @@ public:
     }
 
     void check() const {
-      for (const HashString &str : slots) {
-        try_with_info("in slot '" << str.str << "' name: ",
-                      mm_alloc.assert_owned(str.str););
-      }
-      for (const auto &[key, value] : fields) {
-        try_with_info("in field '" << key.str << "' name: ",
-                      mm_alloc.assert_owned(key.str););
-        if (managed) {
-            try_with_info("in field '" << key.str << "' value: ",
-                          value.check(mm_alloc););
+        for (const HashString& str: slots) {
+            try_with_info("in slot '" << str.str << "' name: ", mm_alloc.assert_owned(str.str););
         }
-      }
+        for (const auto& [key, value]: fields) {
+            try_with_info("in field '" << key.str << "' name: ", mm_alloc.assert_owned(key.str););
+            if (managed) {
+                try_with_info("in field '" << key.str << "' value: ", value.check(mm_alloc););
+            }
+        }
+    }
+
+    bool operator==(const StructStore& other) const {
+        return slots == other.slots && fields == other.fields;
+    }
+
+    bool operator!=(const StructStore& other) const {
+        return !(*this == other);
     }
 };
 
@@ -319,7 +361,8 @@ FieldAccess& FieldAccess::operator=<const char*>(const char* const& value);
 template<>
 FieldAccess& FieldAccess::operator=<std::string>(const std::string& value);
 
-class bindings;
+
+class py;
 
 class Struct;
 
@@ -328,7 +371,7 @@ static const StructStore& get_store(const Struct&);
 static StructStore& get_store(Struct&);
 
 class Struct {
-    friend class structstore::bindings;
+    friend class structstore::py;
 
     friend class structstore::StructStore;
 

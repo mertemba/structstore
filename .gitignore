@@ -1,2 +1,8 @@
 build
-build_pkg
+pacman
+.venv
+.cache
+.py-build-cmake_cache
+.vscode
+Testing
+dist
