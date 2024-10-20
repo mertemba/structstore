@@ -146,6 +146,9 @@ std::ostream& to_text(std::ostream&, const StructStore&);
 template<>
 YAML::Node to_yaml(const StructStore&);
 
+template<>
+void check(MiniMalloc&, const StructStore&);
+
 class StructStore {
     friend class structstore::StructStoreShared;
 
@@ -357,9 +360,6 @@ FieldAccess& FieldAccess::operator=<const char*>(const char* const& value);
 
 template<>
 FieldAccess& FieldAccess::operator=<std::string>(const std::string& value);
-
-template<>
-void check(MiniMalloc&, const StructStore&);
 
 
 class py;

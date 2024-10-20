@@ -20,4 +20,5 @@ class TestPickle0(unittest.TestCase):
         data = pickle.dumps(state)
         state2 = pickle.loads(data)
         print(state2)
+        assert state == state2
         assert state.deepcopy() == state2.deepcopy()

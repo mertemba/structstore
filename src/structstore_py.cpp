@@ -61,7 +61,7 @@ NB_MODULE(MODULE_NAME, m) {
             }
             return true;
         }
-        if (!access.get_field().empty() && nb::hasattr(value, "__slots__")) {
+        if (nb::hasattr(value, "__slots__")) {
             auto slots = nb::iterable(value.attr("__slots__"));
             StructStore& store = access.get<StructStore>();
             STST_LOG_DEBUG() << "copying __slots__ to " << &store;

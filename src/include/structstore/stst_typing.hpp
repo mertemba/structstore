@@ -26,9 +26,7 @@ YAML::Node to_yaml(const T& t) {
 }
 
 template<typename T>
-void check(MiniMalloc& mm_alloc, const T& t) {
-    try_with_info("in default check: ", mm_alloc.assert_owned(&t););
-}
+void check(MiniMalloc&, const T&) {}
 
 class Struct;
 
@@ -161,6 +159,7 @@ private:
     template<typename T>
     static void default_check_fn(MiniMalloc& mm_alloc, const T* t) {
         try_with_info("in default check: ", mm_alloc.assert_owned(t););
+        check(mm_alloc, *t);
     }
 
     template<typename T>
