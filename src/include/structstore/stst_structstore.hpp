@@ -43,7 +43,7 @@ public:
 
     template<typename T>
     T& get() {
-        static_assert(!std::is_same<typename std::remove_cv<T>::type, StructStoreField>::value);
+        static_assert(!std::is_same_v<typename std::remove_cv_t<T>, StructStoreField>);
         if (!field.empty()) {
             // field already exists, directly return
             return field.get<T>();
@@ -284,7 +284,7 @@ public:
         if (managed) {
             throw std::runtime_error("cannot register field with existing data in StructStore with only managed data");
         }
-        if constexpr (std::is_base_of<Struct, T>::value) {
+        if constexpr (std::is_base_of_v<Struct, T>) {
             if (&t.get_alloc() != &mm_alloc) {
                 std::ostringstream str;
                 str << "registering Struct field '" << name.str << "' with a different allocator "
@@ -332,18 +332,15 @@ public:
     }
 
     void check() const {
-      for (const HashString &str : slots) {
-        try_with_info("in slot '" << str.str << "' name: ",
-                      mm_alloc.assert_owned(str.str););
-      }
-      for (const auto &[key, value] : fields) {
-        try_with_info("in field '" << key.str << "' name: ",
-                      mm_alloc.assert_owned(key.str););
-        if (managed) {
-            try_with_info("in field '" << key.str << "' value: ",
-                          value.check(mm_alloc););
+        for (const HashString& str: slots) {
+            try_with_info("in slot '" << str.str << "' name: ", mm_alloc.assert_owned(str.str););
         }
-      }
+        for (const auto& [key, value]: fields) {
+            try_with_info("in field '" << key.str << "' name: ", mm_alloc.assert_owned(key.str););
+            if (managed) {
+                try_with_info("in field '" << key.str << "' value: ", value.check(mm_alloc););
+            }
+        }
     }
 
     bool operator==(const StructStore& other) const {
@@ -360,6 +357,10 @@ FieldAccess& FieldAccess::operator=<const char*>(const char* const& value);
 
 template<>
 FieldAccess& FieldAccess::operator=<std::string>(const std::string& value);
+
+template<>
+void check(MiniMalloc&, const StructStore&);
+
 
 class py;
 

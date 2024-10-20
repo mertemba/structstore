@@ -28,14 +28,8 @@ YAML::Node structstore::to_yaml(const StructStore& store) {
 }
 
 void StructStore::register_type() {
-    typing::register_type(typing::FieldType<StructStore>{
-            .name = "structstore::StructStore",
-            .constructor_fn = typing::mm_alloc_constructor_fn<StructStore>,
-            .check_fn = [](MiniMalloc& mm_alloc, const StructStore* store) {
-                try_with_info("StructStore: ", mm_alloc.assert_owned(store););
-                try_with_info("StructStore content: ", store->check(););
-            }});
-};
+    typing::register_type<StructStore>("structstore::StructStore");
+}
 
 template<>
 FieldAccess& FieldAccess::operator=<const char*>(const char* const& value) {
@@ -46,4 +40,9 @@ FieldAccess& FieldAccess::operator=<const char*>(const char* const& value) {
 template<>
 FieldAccess& FieldAccess::operator=<std::string>(const std::string& value) {
     return *this = value.c_str();
+}
+
+template<>
+void structstore::check(MiniMalloc&, const StructStore& store) {
+    store.check();
 }

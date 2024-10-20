@@ -92,10 +92,8 @@ NB_MODULE(MODULE_NAME, m) {
         }
         return false;
     };
-    py::register_type<StructStore>(py::PyType{
-            .from_python_fn = structstore_from_python_fn,
-            .to_python_fn = structstore_to_python_fn,
-            .to_python_cast_fn = py::default_to_python_cast_fn<StructStore>});
+    py::register_type<StructStore>(structstore_from_python_fn, structstore_to_python_fn,
+                                   py::default_to_python_cast_fn<StructStore>);
     py::register_structstore_funcs(cls);
 
     auto shcls = nb::class_<StructStoreShared>(m, "StructStoreShared");
@@ -152,19 +150,20 @@ NB_MODULE(MODULE_NAME, m) {
     py::register_basic_type<bool, nb::bool_>();
 
     // structstore::string
-    py::register_type<structstore::string>(py::PyType{
-            .from_python_fn = [](FieldAccess access, const nb::handle& value) {
+    py::register_type<structstore::string>(
+            [](FieldAccess access, const nb::handle& value) {
                 if (nb::isinstance<nb::str>(value)) {
                     access.get<structstore::string>() = nb::cast<std::string>(value);
                     return true;
                 }
-                return false; },
-            .to_python_fn = [](const StructStoreField& field, py::ToPythonMode) -> nb::object {
+                return false;
+            },
+            [](const StructStoreField& field, py::ToPythonMode) -> nb::object {
                 return nb::str(field.get<structstore::string>().c_str());
             },
-            .to_python_cast_fn = [](const StructStoreField& field) -> nb::object {
+            [](const StructStoreField& field) -> nb::object {
                 return nb::str(field.get<structstore::string>().c_str());
-            }});
+            });
 
     // structstore::List
     auto list_cls = nb::class_<List>(m, "StructStoreList");
@@ -196,11 +195,8 @@ NB_MODULE(MODULE_NAME, m) {
         }
         return false;
     };
-    py::register_type<List>(py::PyType{
-            .from_python_fn = list_from_python_fn,
-            .to_python_fn = list_to_python_fn,
-            .to_python_cast_fn = py::default_to_python_cast_fn<List>,
-    });
+    py::register_type<List>(list_from_python_fn, list_to_python_fn,
+                            py::default_to_python_cast_fn<List>);
     py::register_complex_type_funcs<List>(list_cls);
     list_cls.def("lock", [](List& list) {
         return ScopedLock(list.get_mutex());
@@ -293,11 +289,8 @@ NB_MODULE(MODULE_NAME, m) {
         }
         return false;
     };
-    py::register_type<Matrix>(py::PyType{
-            .from_python_fn = matrix_from_python_fn,
-            .to_python_fn = matrix_to_python_fn,
-            .to_python_cast_fn = py::default_to_python_cast_fn<Matrix>,
-    });
+    py::register_type<Matrix>(matrix_from_python_fn, matrix_to_python_fn,
+                              py::default_to_python_cast_fn<Matrix>);
     py::register_complex_type_funcs<Matrix>(matrix_cls);
 }
 

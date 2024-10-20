@@ -1,6 +1,7 @@
 #ifndef STST_CONTAINERS_HPP
 #define STST_CONTAINERS_HPP
 
+#include "structstore/stst_alloc.hpp"
 #include "structstore/stst_structstore.hpp"
 #include "structstore/stst_field.hpp"
 #include "structstore/stst_typing.hpp"
@@ -145,18 +146,15 @@ public:
     template<typename T>
     friend YAML::Node structstore::to_yaml(const T&);
 
+    template<typename T>
+    friend void structstore::check(MiniMalloc&, const T&);
+
     bool operator==(const List& other) const;
 
     inline bool operator!=(const List& other) const {
         return !(*this == other);
     }
 };
-
-template<>
-std::ostream& to_text(std::ostream&, const List&);
-
-template<>
-YAML::Node to_yaml(const List&);
 
 template<>
 void List::push_back<const char*>(const char* const& value);
@@ -258,6 +256,9 @@ public:
 
     template<typename T>
     friend YAML::Node structstore::to_yaml(const T&);
+
+    template<typename T>
+    friend void structstore::check(MiniMalloc&, const T&);
 
     bool operator==(const Matrix& other) const;
 

@@ -31,9 +31,22 @@ namespace nb = nanobind;
 
 class py {
 public:
-    struct PyType;
+    enum class ToPythonMode {
+        NON_RECURSIVE,
+        RECURSIVE,
+    };
+
+    using FromPythonFn = std::function<bool(FieldAccess, const nb::handle&)>;
+    using ToPythonFn = std::function<nb::object(const StructStoreField&, ToPythonMode mode)>;
+    using ToPythonCastFn = std::function<nb::object(const StructStoreField&)>;
 
 private:
+    struct PyType {
+        const FromPythonFn from_python_fn;
+        const ToPythonFn to_python_fn;
+        const ToPythonCastFn to_python_cast_fn;
+    };
+
     static std::unordered_map<uint64_t, const PyType>& get_py_types();
 
     static const PyType& get_py_type(uint64_t type_hash);
@@ -58,15 +71,6 @@ private:
     static void clear(StructStore& store);
 
 public:
-    enum class ToPythonMode {
-        NON_RECURSIVE,
-        RECURSIVE,
-    };
-
-    using FromPythonFn = std::function<bool(FieldAccess, const nb::handle&)>;
-    using ToPythonFn = std::function<nb::object(const StructStoreField&, ToPythonMode mode)>;
-    using ToPythonCastFn = std::function<nb::object(const StructStoreField&)>;
-
     template<typename T, typename T_py>
     static bool default_from_python_fn(FieldAccess access, const nb::handle& value) {
         if (nb::isinstance<T_py>(value)) {
@@ -86,14 +90,10 @@ public:
         return nb::cast(field.get<T>(), nb::rv_policy::reference);
     };
 
-    struct PyType {
-        const FromPythonFn from_python_fn;
-        const ToPythonFn to_python_fn;
-        const ToPythonCastFn to_python_cast_fn;
-    };
-
     template<typename T>
-    static void register_type(const PyType& py_type) {
+    static void register_type(FromPythonFn from_python_fn, ToPythonFn to_python_fn,
+                              ToPythonCastFn to_python_cast_fn) {
+        PyType py_type{from_python_fn, to_python_fn, to_python_cast_fn};
         const uint64_t type_hash = typing::get_type_hash<T>();
         STST_LOG_DEBUG() << "registering Python type '" << typing::get_type_name<T>() << "' with hash '" << type_hash << "'";
         auto ret = get_py_types().insert({type_hash, py_type});
@@ -116,16 +116,14 @@ public:
 
     template<typename T, typename T_py>
     static void register_basic_type() {
-        static_assert(!std::is_pointer<T>::value);
-        register_type<T>(PyType{
-                .from_python_fn = default_from_python_fn<T, T_py>,
-                .to_python_fn = default_to_python_fn<T, T_py>,
-                .to_python_cast_fn = default_to_python_cast_fn<T>});
+        static_assert(!std::is_pointer_v<T>);
+        register_type<T>(default_from_python_fn<T, T_py>, default_to_python_fn<T, T_py>,
+                         default_to_python_cast_fn<T>);
     }
 
     template<typename T>
     static void register_complex_type_funcs(nb::class_<T>& cls) {
-        static_assert(!std::is_pointer<T>::value);
+        static_assert(!std::is_pointer_v<T>);
         cls.def("to_yaml", [](T& t) {
             return YAML::Dump(to_yaml(*FieldView{t}));
         });
@@ -154,17 +152,17 @@ public:
 
     template<typename T>
     static void register_ptr_type(const nb::handle& T_ptr_py, const nb::handle& T_py) {
-        static_assert(std::is_pointer<T>::value);
-        register_type<T>(PyType{
-                .from_python_fn = [T_ptr_py, T_py](FieldAccess access, const nb::handle& value) {
-                    if (value.type().equal(T_ptr_py) || (!access.get_field().empty() && value.type().equal(T_py))) {
-                        access.get<T>() = nb::cast<T>(value);
-                        return true;
-                    }
-                    return false;
-                },
-                .to_python_fn = default_to_python_cast_fn<T>,
-                .to_python_cast_fn = default_to_python_cast_fn<T>});
+        static_assert(std::is_pointer_v<T>);
+        auto from_python_fn = [T_ptr_py, T_py](FieldAccess access, const nb::handle& value) {
+            if (value.type().equal(T_ptr_py) ||
+                (!access.get_field().empty() && value.type().equal(T_py))) {
+                access.get<T>() = nb::cast<T>(value);
+                return true;
+            }
+            return false;
+        };
+        register_type<T>(
+                PyType{from_python_fn, default_to_python_cast_fn<T>, default_to_python_cast_fn<T>});
     }
 
     template<typename T>
@@ -202,7 +200,7 @@ public:
             return dict;
         });
 
-        if constexpr (std::is_same<T, StructStore>::value) {
+        if constexpr (std::is_same_v<T, StructStore>) {
             cls.def("__setstate__", [](StructStore& store, nb::handle value) {
                 new (&store) StructStore(static_alloc);
                 _from_python(store, store.mm_alloc, value, "<root>");

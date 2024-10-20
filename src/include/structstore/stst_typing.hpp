@@ -25,20 +25,14 @@ YAML::Node to_yaml(const T& t) {
     return YAML::Node(t);
 }
 
-struct Struct;
+template<typename T>
+void check(MiniMalloc& mm_alloc, const T& t) {
+    try_with_info("in default check: ", mm_alloc.assert_owned(&t););
+}
+
+class Struct;
 
 class typing {
-public:
-    template<typename T>
-    struct FieldType;
-
-private:
-    static std::unordered_map<std::type_index, uint64_t>& get_type_hashes();
-
-    static std::unordered_map<uint64_t, const FieldType<void>>& get_field_types();
-
-    static const FieldType<void>& get_field_type(uint64_t type_hash);
-
 public:
     template<typename T=void>
     using ConstructorFn = std::function<void(MiniMalloc&, T*)>;
@@ -58,6 +52,77 @@ public:
     template<typename T = void>
     using CmpEqualFn = std::function<bool(const T*, const T*)>;
 
+private:
+    template<typename T = void>
+    struct FieldType {
+        const std::string name;
+        ConstructorFn<T> constructor_fn;
+        DestructorFn<T> destructor_fn;
+        SerializeTextFn<T> serialize_text_fn;
+        SerializeYamlFn<T> serialize_yaml_fn;
+        CheckFn<T> check_fn;
+        CmpEqualFn<T> cmp_equal_fn;
+
+        FieldType(const std::string name) : name{name} {
+            if constexpr (!std::is_void_v<T>) {
+                if constexpr (std::is_constructible_v<T, MiniMalloc&>) {
+                    constructor_fn = mm_alloc_constructor_fn<T>;
+                } else if constexpr (std::is_constructible_v<T, const StlAllocator<T>&>) {
+                    constructor_fn = stl_alloc_constructor_fn<T>;
+                } else {
+                    constructor_fn = default_constructor_fn<T>;
+                }
+                destructor_fn = default_destructor_fn<T>;
+                serialize_text_fn = default_serialize_text_fn<T>;
+                serialize_yaml_fn = default_serialize_yaml_fn<T>;
+                check_fn = default_check_fn<T>;
+                cmp_equal_fn = default_cmp_equal_fn<T>;
+            } else {
+                constructor_fn = [](MiniMalloc&, void*) {};
+                destructor_fn = [](MiniMalloc&, void*) {};
+                serialize_text_fn = [](std::ostream& os, const void*) -> std::ostream& {
+                    return os << "<empty>";
+                };
+                serialize_yaml_fn = [](const void*) { return YAML::Node(YAML::Null); };
+                check_fn = [](MiniMalloc&, const void*) {};
+                cmp_equal_fn = [](const void*, const void*) { return true; };
+            }
+        }
+
+        void assert_complete() {
+            if (!constructor_fn) {
+                throw std::runtime_error("FieldType has no constructor_fn");
+            }
+            if (!destructor_fn) {
+                throw std::runtime_error("FieldType has no destructor_fn");
+            }
+            if (!serialize_text_fn) {
+                throw std::runtime_error("FieldType has no serialize_text_fn");
+            }
+            if (!serialize_yaml_fn) {
+                throw std::runtime_error("FieldType has no serialize_yaml_fn");
+            }
+            if (!check_fn) {
+                throw std::runtime_error("FieldType has no check_fn");
+            }
+            if (!cmp_equal_fn) {
+                throw std::runtime_error("FieldType has no cmp_equal_fn");
+            }
+        }
+
+    protected:
+        friend class typing;
+        const FieldType<void>& cast() const {
+            return (FieldType<void>&) *this;
+        }
+    };
+
+    static std::unordered_map<std::type_index, uint64_t>& get_type_hashes();
+
+    static std::unordered_map<uint64_t, const FieldType<void>>& get_field_types();
+
+    static const FieldType<void>& get_field_type(uint64_t type_hash);
+
     template<typename T>
     static void default_constructor_fn(MiniMalloc&, T* t) {
         new (t) T();
@@ -70,8 +135,7 @@ public:
 
     template<typename T>
     static void stl_alloc_constructor_fn(MiniMalloc& mm_alloc, T* t) {
-        StlAllocator<T> tmp_alloc{mm_alloc};
-        new (t) T(tmp_alloc);
+        new (t) T(StlAllocator<T>{mm_alloc});
     }
 
     template<typename T>
@@ -104,23 +168,7 @@ public:
         return *t == *other;
     };
 
-    template<typename T = void>
-    struct FieldType {
-        const std::string name;
-        const ConstructorFn<T> constructor_fn = default_constructor_fn<T>;
-        const DestructorFn<T> destructor_fn = default_destructor_fn<T>;
-        const SerializeTextFn<T> serialize_text_fn = default_serialize_text_fn<T>;
-        const SerializeYamlFn<T> serialize_yaml_fn = default_serialize_yaml_fn<T>;
-        const CheckFn<T> check_fn = default_check_fn<T>;
-        const CmpEqualFn<T> cmp_equal_fn = default_cmp_equal_fn<T>;
-
-    protected:
-        friend class typing;
-        const FieldType<void>& cast() const {
-            return (FieldType<void>&) *this;
-        }
-    };
-
+public:
     static void register_common_types();
 
     static std::runtime_error already_registered_type_error(uint64_t type_hash) {
@@ -130,21 +178,25 @@ public:
     }
 
     template<typename T>
-    static void register_type(const FieldType<T>& field_type) {
-        uint64_t type_hash = const_hash(field_type.name.c_str());
-        if constexpr (std::is_void<T>::value) {
+    static void register_type(const std::string& name) {
+        uint64_t type_hash = const_hash(name.c_str());
+        if constexpr (std::is_void_v<T>) {
             type_hash = 0;
         } else {
             if (type_hash == 0) {
                 std::ostringstream str;
-                str << "hash collision between '" << field_type.name << "' and empty type";
+                str << "hash collision between '" << name << "' and empty type";
                 throw std::runtime_error(str.str());
             }
         }
-        STST_LOG_DEBUG() << "registering type '" << field_type.name << "' with hash '" << type_hash << "'";
+        STST_LOG_DEBUG() << "registering type '" << name << "' with hash '" << type_hash << "'";
         bool success = get_type_hashes().insert({typeid(T), type_hash}).second;
         if (!success) {
             throw already_registered_type_error(type_hash);
+        }
+        FieldType<T> field_type{name};
+        if constexpr (!std::is_void_v<T>) {
+            field_type.assert_complete();
         }
         auto ret = get_field_types().insert({type_hash, field_type.cast()});
         if (!ret.second) {
@@ -214,7 +266,7 @@ public:
 
     template<typename T>
     static void register_struct_type(const std::string& name) {
-        static_assert(std::is_base_of<structstore::Struct, T>::value,
+        static_assert(std::is_base_of_v<structstore::Struct, T>,
                       "template parameter is not derived from structstore::Struct");
         register_type(typing::FieldType<T>{
                 .name = name,
@@ -238,8 +290,20 @@ inline void StlAllocator<T>::construct(T* p) {
     }
 }
 
-} // namespace structstore
+using string = std::basic_string<char, std::char_traits<char>, StlAllocator<char>>;
 
-#include <structstore/stst_stl_types.hpp>
+template<class T>
+using vector = std::vector<T, StlAllocator<T>>;
+
+template<class K, class T>
+using unordered_map = std::unordered_map<K, T, std::hash<K>, std::equal_to<K>, StlAllocator<std::pair<const K, T>>>;
+
+template<>
+inline YAML::Node to_yaml(const string& str);
+
+template<>
+void check(MiniMalloc& mm_alloc, const structstore::string& str);
+
+} // namespace structstore
 
 #endif
