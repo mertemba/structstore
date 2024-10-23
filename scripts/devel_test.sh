@@ -15,6 +15,9 @@ export ASAN_OPTIONS=verify_asan_link_order=0
 cmake --build "$builddir"
 cmake --install "$builddir"
 
+# add test Python libs to search path
+export PYTHONPATH="$PYTHONPATH:$builddir"
+
 # test
 ctest --test-dir build --output-on-failure
 pytest -vv "$srcdir/tests"

@@ -50,6 +50,7 @@ if(${BUILD_WITH_PYTHON})
             OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_DIR)
     list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
     find_package(nanobind CONFIG REQUIRED)
+    include(cmake/NanobindStubgen.cmake)
 endif()
 
 # source files
@@ -107,27 +108,14 @@ if(${BUILD_WITH_PYTHON})
 
     # targets that will not be linked against: default python bindings
 
-    nanobind_add_module(structstore_py src/structstore_py.cpp NB_STATIC)
-    target_link_libraries(structstore_py PUBLIC structstore_py_lib)
-    set_target_properties(structstore_py PROPERTIES
-            LIBRARY_OUTPUT_NAME _structstore_py)
-    target_compile_definitions(structstore_py PRIVATE
-            MODULE_NAME=$<TARGET_FILE_BASE_NAME:structstore_py>
-            VERSION_INFO="${PY_FULL_VERSION}"
-    )
-    # hide all symbols by default(including external libraries on Linux)
-    set_target_properties(structstore_py PROPERTIES
-            CXX_VISIBILITY_PRESET "hidden"
-            VISIBILITY_INLINES_HIDDEN true)
-    if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-        target_link_options(structstore_py PRIVATE "LINKER:--exclude-libs,ALL")
-    endif()
+    include(cmake/StructStoreBindings.cmake)
+
+    add_structstore_binding(structstore_py src/structstore_py.cpp)
     list(APPEND STRUCTSTORE_NONDEP_TARGETS structstore_py)
 
     # mark nanobind headers as system includes to suppress warnings
     get_target_property(NB_INC_DIRS nanobind-static INTERFACE_INCLUDE_DIRECTORIES)
     target_include_directories(structstore_py_lib SYSTEM PRIVATE ${NB_INC_DIRS})
-    target_include_directories(structstore_py SYSTEM PRIVATE ${NB_INC_DIRS})
 endif()
 
 foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
@@ -206,9 +194,7 @@ if(${BUILD_WITH_PYTHON})
             COMPONENT install_modules
             DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR_PY})
 
-    include(cmake/NanobindStubgen.cmake)
     if(NOT ${BUILD_WITH_SANITIZER})
-        nanobind_stubgen(structstore_py)
         nanobind_stubgen_install(structstore_py ${STRUCTSTORE_INSTALL_LIBDIR_PY})
     endif()
 endif()

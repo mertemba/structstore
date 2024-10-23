@@ -22,5 +22,7 @@ cmake "$srcdir/tests" -GNinja -DCMAKE_BUILD_TYPE=Debug $cmake_options
 ninja
 ctest --output-on-failure
 if [ ! -z "$BUILD_WITH_PYTHON" ]; then
+    # add test Python libs to search path
+    export PYTHONPATH="$PYTHONPATH:$builddir"
     pytest "$srcdir/tests"
 fi
