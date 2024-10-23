@@ -17,6 +17,8 @@ std::ostream& to_text(std::ostream&, const StructStoreField&);
 template<>
 YAML::Node to_yaml(const StructStoreField&);
 
+class StructStore;
+
 class StructStoreField {
 private:
     void* data;
@@ -33,6 +35,12 @@ private:
             throw std::runtime_error("field is replaced/deleted while still initialized!");
         }
     }
+
+    friend class structstore::StructStore;
+
+    void copy_from(MiniMalloc& mm_alloc, const StructStoreField& other);
+
+    void move_from(StructStoreField& other);
 
 public:
     StructStoreField() : data(nullptr), type_hash(0) {}
@@ -52,7 +60,8 @@ public:
 
     ~StructStoreField() noexcept(false) {
         if (data) {
-            throw std::runtime_error("field was not cleaned up, type is " + typing::get_type_name(type_hash));
+            throw std::runtime_error("field was not cleaned up, type is " +
+                                     typing::get_type(type_hash).name);
         }
     }
 
@@ -62,9 +71,9 @@ public:
 
     void clear(MiniMalloc& mm_alloc) {
         if (data) {
-            const typing::DestructorFn<>& destructor = typing::get_destructor(type_hash);
-            STST_LOG_DEBUG() << "deconstructing field " << typing::get_type_name(type_hash) << " at " << data;
-            destructor(mm_alloc, data);
+            const auto& field_type = typing::get_type(type_hash);
+            STST_LOG_DEBUG() << "deconstructing field " << field_type.name << " at " << data;
+            field_type.destructor_fn(mm_alloc, data);
             STST_LOG_DEBUG() << "deallocating at " << data;
             mm_alloc.deallocate(data);
         }
@@ -83,7 +92,8 @@ public:
         clear(mm_alloc);
         data = new_data;
         type_hash = typing::get_type_hash<T>();
-        STST_LOG_DEBUG() << "replacing field data with " << new_data << ", type " << typing::get_type_name(type_hash);
+        STST_LOG_DEBUG() << "replacing field data with " << new_data << ", type "
+                         << typing::get_type(type_hash).name;
     }
 
     StructStoreField& operator=(StructStoreField&& other) noexcept {
@@ -131,7 +141,7 @@ public:
     void check(MiniMalloc& mm_alloc) const {
         if (data != nullptr) {
             try_with_info("in field data ptr: ", mm_alloc.assert_owned(data););
-            const typing::CheckFn<>& check = typing::get_check(type_hash);
+            const typing::CheckFn<>& check = typing::get_type(type_hash).check_fn;
             try_with_info("in field data content: ", check(mm_alloc, data););
         }
     }
@@ -143,8 +153,7 @@ public:
         if (type_hash != other.type_hash) {
             return false;
         }
-        auto cmp_equal_fn = typing::get_cmp_equal(type_hash);
-        return cmp_equal_fn(data, other.data);
+        return typing::get_type(type_hash).cmp_equal_fn(data, other.data);
     }
 
     bool operator!=(const StructStoreField& other) const {

@@ -54,10 +54,9 @@ public:
         StlAllocator<T> tmp_alloc{mm_alloc};
         void* ptr = tmp_alloc.allocate(1);
         STST_LOG_DEBUG() << "allocating at " << ptr;
-        uint64_t type_hash = typing::get_type_hash<T>();
-        STST_LOG_DEBUG() << "constructing field " << typing::get_type_name(type_hash) << " at " << ptr;
-        const typing::ConstructorFn<>& constructor = typing::get_constructor(type_hash);
-        constructor(mm_alloc, ptr);
+        const auto& field_type = typing::get_type<T>();
+        STST_LOG_DEBUG() << "constructing field " << field_type.name << " at " << ptr;
+        field_type.constructor_fn(mm_alloc, ptr);
         field.replace_data<T>(ptr, mm_alloc);
         return field.get<T>();
     }
@@ -187,19 +186,49 @@ public:
         if (&mm_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is the static_alloc)";
     }
 
-    StructStore(const StructStore&) = delete;
-
-    StructStore(StructStore&&) = delete;
-
-    StructStore& operator=(const StructStore& other) {
-        if (other.fields.empty()) {
-            clear();
-            return *this;
-        }
-        throw std::runtime_error("copy assignment of structstore::StructStore is not supported");
+    StructStore(const StructStore& other) : StructStore{static_alloc} {
+        *this = other;
     }
 
-    StructStore& operator=(StructStore&&) = delete;
+    StructStore(StructStore&& other) : StructStore{static_alloc} {
+        *this = std::move(other);
+    }
+
+    StructStore& operator=(const StructStore& other) {
+        if (!managed) {
+            throw std::runtime_error("copying into non-managed StructStore is not supported");
+        }
+        clear();
+        for (const HashString& str : other.slots) {
+            HashString name_int = internal_string(str);
+            slots.emplace_back(name_int);
+            StructStoreField& field = fields.emplace(name_int, StructStoreField{}).first->second;
+            field.copy_from(mm_alloc, other.fields.at(str));
+        }
+        return *this;
+    }
+
+    StructStore& operator=(StructStore&& other) {
+        if (!managed) {
+            throw std::runtime_error("moving into non-managed StructStore is not supported");
+        }
+        if (!other.managed) {
+            throw std::runtime_error("moving from non-managed StructStore is not supported");
+        }
+        if (&mm_alloc == &other.mm_alloc) {
+            clear();
+            for (const HashString& str : other.slots) {
+                slots.emplace_back(str);
+                StructStoreField& field = fields.emplace(str, StructStoreField{}).first->second;
+                field.move_from(other.fields.at(str));
+            }
+            other.slots.clear();
+            other.fields.clear();
+        } else {
+            *this = other;
+        }
+        return *this;
+    }
 
     ~StructStore() {
         STST_LOG_DEBUG() << "deconstructing StructStore at " << this;
@@ -335,6 +364,9 @@ public:
     }
 
     void check() const {
+        if (slots.size() != fields.size()) {
+            throw std::runtime_error("internal error: slots and fields with different size");
+        }
         for (const HashString& str: slots) {
             try_with_info("in slot '" << str.str << "' name: ", mm_alloc.assert_owned(str.str););
         }
@@ -400,6 +432,10 @@ protected:
         return store;
     }
 
+    const StructStore& get_store() const {
+        return store;
+    }
+
     MiniMalloc& get_alloc() {
         return mm_alloc;
     }
@@ -415,6 +451,8 @@ protected:
     friend YAML::Node structstore::to_yaml(const T&);
 
     friend std::ostream& operator<<(std::ostream&, const Struct&);
+
+    bool operator==(const Struct& other) const { return store == other.store; }
 };
 
 template<>

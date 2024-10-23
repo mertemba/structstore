@@ -92,14 +92,28 @@ public:
 
     template<typename T>
     static void register_type(FromPythonFn from_python_fn, ToPythonFn to_python_fn,
-                              ToPythonCastFn to_python_cast_fn) {
+                              ToPythonCastFn to_python_cast_fn = default_to_python_cast_fn<T>) {
+        static_assert(!std::is_pointer_v<T>);
         PyType py_type{from_python_fn, to_python_fn, to_python_cast_fn};
         const uint64_t type_hash = typing::get_type_hash<T>();
-        STST_LOG_DEBUG() << "registering Python type '" << typing::get_type_name<T>() << "' with hash '" << type_hash << "'";
+        STST_LOG_DEBUG() << "registering Python type '" << typing::get_type(type_hash).name << "' with hash '" << type_hash << "'";
         auto ret = get_py_types().insert({type_hash, py_type});
         if (!ret.second) {
             throw typing::already_registered_type_error(type_hash);
         }
+    }
+
+    static nb::object structstore_to_python(StructStore& store, py::ToPythonMode mode);
+
+    template<typename T>
+    static void register_struct_type(nb::class_<T>& cls) {
+        static_assert(std::is_base_of_v<Struct, T>);
+        py::ToPythonFn to_python_fn = [](const StructStoreField& field, py::ToPythonMode mode) {
+            auto& store = get_store(field.get<T>());
+            return structstore_to_python(store, mode);
+        };
+        register_type<T>(default_from_python_fn<T, nb::class_<T>>, to_python_fn);
+        register_structstore_funcs(cls);
     }
 
     static const FromPythonFn& get_from_python_fn(uint64_t type_hash) {
@@ -116,7 +130,6 @@ public:
 
     template<typename T, typename T_py>
     static void register_basic_type() {
-        static_assert(!std::is_pointer_v<T>);
         register_type<T>(default_from_python_fn<T, T_py>, default_to_python_fn<T, T_py>,
                          default_to_python_cast_fn<T>);
     }
@@ -181,12 +194,12 @@ public:
             return false;
         }
         T& field_cpp = access.get<T>();
-        STST_LOG_DEBUG() << "at type " << typing::get_type_name<T>();
+        STST_LOG_DEBUG() << "at type " << typing::get_type<T>().name;
         if (value_cpp == &field_cpp) {
             STST_LOG_DEBUG() << "copying to itself";
             return true;
         }
-        STST_LOG_DEBUG() << "copying " << typing::get_type_name<T>() << " from " << value_cpp << " to " << &field_cpp;
+        STST_LOG_DEBUG() << "copying " << typing::get_type<T>().name << " from " << value_cpp << " to " << &field_cpp;
         field_cpp = *value_cpp;
         return true;
     }
@@ -207,7 +220,7 @@ public:
             });
         } else {
             cls.def("__setstate__", [](T&, nb::handle) {
-                throw std::runtime_error("cannot unpickle type " + typing::get_type_name<T>());
+                throw std::runtime_error("cannot unpickle type " + typing::get_type<T>().name);
             });
         }
 

@@ -11,8 +11,6 @@ using namespace structstore;
 namespace nb = nanobind;
 
 NB_MODULE(MODULE_NAME, m) {
-    m.attr("__version__") = VERSION_INFO;
-
     // API types:
 
     nb::class_<ScopedLock>(m, "ScopedLock")
@@ -34,16 +32,7 @@ NB_MODULE(MODULE_NAME, m) {
     });
     py::ToPythonFn structstore_to_python_fn = [](const StructStoreField& field, py::ToPythonMode mode) -> nb::object {
         auto& store = field.get<StructStore>();
-        auto dict = nb::dict();
-        for (HashString str: store.get_slots()) {
-            auto key = nb::cast<std::string>(str.str);
-            if (mode == py::ToPythonMode::RECURSIVE) {
-                dict[key] = py::to_python(store.at(str), py::ToPythonMode::RECURSIVE);
-            } else { // non-recursive convert
-                dict[key] = py::to_python_cast(store.at(str));
-            }
-        }
-        return dict;
+        return py::structstore_to_python(store, mode);
     };
     py::FromPythonFn structstore_from_python_fn = [](FieldAccess access, const nanobind::handle& value) {
         if (py::copy_cast_from_python<StructStore>(access, value)) {
@@ -92,8 +81,7 @@ NB_MODULE(MODULE_NAME, m) {
         }
         return false;
     };
-    py::register_type<StructStore>(structstore_from_python_fn, structstore_to_python_fn,
-                                   py::default_to_python_cast_fn<StructStore>);
+    py::register_type<StructStore>(structstore_from_python_fn, structstore_to_python_fn);
     py::register_structstore_funcs(cls);
 
     auto shcls = nb::class_<StructStoreShared>(m, "StructStoreShared");
@@ -195,8 +183,7 @@ NB_MODULE(MODULE_NAME, m) {
         }
         return false;
     };
-    py::register_type<List>(list_from_python_fn, list_to_python_fn,
-                            py::default_to_python_cast_fn<List>);
+    py::register_type<List>(list_from_python_fn, list_to_python_fn);
     py::register_complex_type_funcs<List>(list_cls);
     list_cls.def("lock", [](List& list) {
         return ScopedLock(list.get_mutex());
@@ -247,7 +234,7 @@ NB_MODULE(MODULE_NAME, m) {
     }, nb::arg("index"), nb::arg("value").none());
     list_cls.def("__getitem__", [](List& list, size_t index) {
         auto lock = list.read_lock();
-        STST_LOG_DEBUG() << "getting list item of type " << typing::get_type_name(list[index].get_field().get_type_hash());
+        STST_LOG_DEBUG() << "getting list item of type " << typing::get_type(list[index].get_field().get_type_hash()).name;
         return py::to_python_cast(list[index].get_field());
     });
     list_cls.def("__delitem__", [](List& list, size_t index) {
@@ -289,8 +276,7 @@ NB_MODULE(MODULE_NAME, m) {
         }
         return false;
     };
-    py::register_type<Matrix>(matrix_from_python_fn, matrix_to_python_fn,
-                              py::default_to_python_cast_fn<Matrix>);
+    py::register_type<Matrix>(matrix_from_python_fn, matrix_to_python_fn);
     py::register_complex_type_funcs<Matrix>(matrix_cls);
 }
 

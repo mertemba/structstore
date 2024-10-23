@@ -20,9 +20,22 @@ const py::PyType& py::get_py_type(uint64_t type_hash) {
         return py::get_py_types().at(type_hash);
     } catch (const std::out_of_range&) {
         std::ostringstream str;
-        str << "could not find Python type information for type '" << typing::get_type_name(type_hash) << "'";
+        str << "could not find Python type information for type '" << typing::get_type(type_hash).name << "'";
         throw std::runtime_error(str.str());
     }
+}
+
+nb::object py::structstore_to_python(StructStore& store, py::ToPythonMode mode) {
+    auto dict = nb::dict();
+    for (HashString str: store.get_slots()) {
+        auto key = nb::cast<std::string>(str.str);
+        if (mode == py::ToPythonMode::RECURSIVE) {
+            dict[key] = py::to_python(store.at(str), py::ToPythonMode::RECURSIVE);
+        } else { // non-recursive convert
+            dict[key] = py::to_python_cast(store.at(str));
+        }
+    }
+    return dict;
 }
 
 nb::object py::to_python(const StructStoreField& field, ToPythonMode mode) {
@@ -48,7 +61,7 @@ void py::from_python(FieldAccess access, const nb::handle& value, const std::str
         return;
     }
     if (!access.get_field().empty()) {
-        STST_LOG_DEBUG() << "at field " << field_name << " of type " << typing::get_type_name(access.get_type_hash());
+        STST_LOG_DEBUG() << "at field " << field_name << " of type " << typing::get_type(access.get_type_hash()).name;
 #ifndef NDEBUG
         access.check();
 #endif
@@ -68,7 +81,7 @@ void py::from_python(FieldAccess access, const nb::handle& value, const std::str
     }
     std::ostringstream msg;
     msg << "cannot assign value of type '" << nb::cast<std::string>(nb::str(value.type()))
-        << "' to field '" << field_name << "' of type '" << typing::get_type_name(access.get_type_hash()) << "'";
+        << "' to field '" << field_name << "' of type '" << typing::get_type(access.get_type_hash()).name << "'";
     throw nb::type_error(msg.str().c_str());
 }
 

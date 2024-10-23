@@ -43,20 +43,16 @@ class NilLog {
 #define STST_LOG_DEBUG() NilLog()
 #define STST_LOG_INFO() NilLog()
 #else
-#define STST_LOG_DEBUG() \
-    if (Log::Level::DEBUG >= Log::level) Log("debug: ")
-#define STST_LOG_INFO() \
-    if (Log::Level::INFO >= Log::level) Log("info: ")
+#define STST_LOG_DEBUG()                                                                           \
+    if (structstore::Log::Level::DEBUG >= structstore::Log::level) structstore::Log("debug: ")
+#define STST_LOG_INFO()                                                                            \
+    if (structstore::Log::Level::INFO >= structstore::Log::level) structstore::Log("info: ")
 #endif
 
-#define STST_LOG_WARN()                       \
-    if (Log::Level::WARN >= Log::level) Log { \
-            "warning: "                       \
-        }
-#define STST_LOG_ERROR()                       \
-    if (Log::Level::ERROR >= Log::level) Log { \
-            "error: "                          \
-        }
+#define STST_LOG_WARN()                                                                            \
+    if (structstore::Log::Level::WARN >= structstore::Log::level) structstore::Log("warning: ")
+#define STST_LOG_ERROR()                                                                           \
+    if (structstore::Log::Level::ERROR >= structstore::Log::level) structstore::Log("error: ")
 
 #define try_with_info(info_stream, stmt)                               \
     do {                                                               \
