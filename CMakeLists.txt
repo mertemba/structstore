@@ -66,19 +66,16 @@ set(STRUCTSTORE_SRC_FILES
         ${PROJECT_SOURCE_DIR}/src/stst_typing.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_utils.cpp)
 
-# targets that will be linked against: library
+# library target
 
 add_library(structstore_lib SHARED
     ${STRUCTSTORE_INC_FILES}
     ${STRUCTSTORE_SRC_FILES})
 set_target_properties(structstore_lib PROPERTIES
     LIBRARY_OUTPUT_NAME structstore)
-set(STRUCTSTORE_DEP_TARGETS structstore_lib)
+set(STRUCTSTORE_LIB_TARGETS structstore_lib)
 
-# targets that will not be linked against: none
-
-set(STRUCTSTORE_NONDEP_TARGETS "")
-
+set(STRUCTSTORE_PY_TARGETS "")
 
 # python specifics
 
@@ -104,30 +101,28 @@ if(${BUILD_WITH_PYTHON})
     target_link_libraries(structstore_py_lib
             PUBLIC structstore_lib
             PRIVATE nanobind-static)
-    list(APPEND STRUCTSTORE_DEP_TARGETS structstore_py_lib)
+    list(APPEND STRUCTSTORE_PY_TARGETS structstore_py_lib)
 
     # targets that will not be linked against: default python bindings
 
     include(cmake/StructStoreBindings.cmake)
 
     add_structstore_binding(structstore_py src/structstore_py.cpp)
-    list(APPEND STRUCTSTORE_NONDEP_TARGETS structstore_py)
+    list(APPEND STRUCTSTORE_PY_TARGETS structstore_py)
 
     # mark nanobind headers as system includes to suppress warnings
     get_target_property(NB_INC_DIRS nanobind-static INTERFACE_INCLUDE_DIRECTORIES)
     target_include_directories(structstore_py_lib SYSTEM PRIVATE ${NB_INC_DIRS})
 endif()
 
-foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
+foreach(TARGET ${STRUCTSTORE_LIB_TARGETS} ${STRUCTSTORE_PY_TARGETS})
     target_compile_features(${TARGET} PUBLIC cxx_std_17)
     target_compile_options(${TARGET} PUBLIC -fPIC)
     target_compile_options(${TARGET} PUBLIC -Wall -Wextra -pedantic -Werror)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         target_compile_options(${TARGET} PUBLIC -Wno-class-memaccess)
     endif()
-    target_include_directories(${TARGET}
-            PUBLIC ${YAML_CPP_INCLUDE_DIRS}
-            PRIVATE ${PROJECT_SOURCE_DIR}/src/include)
+    # target_include_directories() is called later
     target_link_libraries(${TARGET} PUBLIC
             ${YAML_CPP_LIBRARIES}
             rt)
@@ -136,7 +131,7 @@ endforeach()
 # coverage
 
 if(${BUILD_WITH_COVERAGE})
-    foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
+    foreach(TARGET ${STRUCTSTORE_LIB_TARGETS} ${STRUCTSTORE_PY_TARGETS})
         target_compile_options(${TARGET} PRIVATE --coverage -fprofile-arcs -ftest-coverage -g -O0 -fno-lto)
         target_link_libraries(${TARGET} PRIVATE gcov -fprofile-arcs -ftest-coverage -fno-lto)
     endforeach()
@@ -145,7 +140,7 @@ endif()
 # sanitizer
 
 if(${BUILD_WITH_SANITIZER})
-    foreach(TARGET ${STRUCTSTORE_DEP_TARGETS} ${STRUCTSTORE_NONDEP_TARGETS})
+    foreach(TARGET ${STRUCTSTORE_LIB_TARGETS} ${STRUCTSTORE_PY_TARGETS})
         target_compile_options(${TARGET} PRIVATE -fsanitize=address)
         target_link_libraries(${TARGET} PRIVATE -fsanitize=address)
     endforeach()
@@ -176,22 +171,22 @@ endif()
 
 install(TARGETS structstore_lib
         EXPORT StructStoreTargets
-        COMPONENT install_modules
+        COMPONENT base
         DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR})
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/include/structstore
-        COMPONENT install_modules
+        COMPONENT base
         DESTINATION ${STRUCTSTORE_INSTALL_INCLUDEDIR})
 
 if(${BUILD_WITH_PYTHON})
     install(TARGETS structstore_py_lib
-            EXPORT StructStoreTargets
-            COMPONENT install_modules
+            EXPORT StructStorePyTargets
+            COMPONENT python
             DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR})
     install(TARGETS structstore_py
-            COMPONENT install_modules
+            COMPONENT python
             DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR_PY})
     install(FILES ${PROJECT_SOURCE_DIR}/src/structstore/__init__.py
-            COMPONENT install_modules
+            COMPONENT python
             DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR_PY})
 
     if(NOT ${BUILD_WITH_SANITIZER})
@@ -199,38 +194,52 @@ if(${BUILD_WITH_PYTHON})
     endif()
 endif()
 
+# add include directories after install directories are set
+
+foreach(TARGET ${STRUCTSTORE_LIB_TARGETS} ${STRUCTSTORE_PY_TARGETS})
+    target_include_directories(${TARGET}
+            PUBLIC
+            "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/include>"
+            "$<INSTALL_INTERFACE:${STRUCTSTORE_INSTALL_INCLUDEDIR}>")
+endforeach()
+
 # inspired by https://stackoverflow.com/a/49857699
-export(TARGETS ${STRUCTSTORE_DEP_TARGETS}
-        FILE "${PROJECT_BINARY_DIR}/StructStoreTargets.cmake")
 export(PACKAGE StructStore)
 configure_file(${PROJECT_SOURCE_DIR}/cmake/StructStoreConfig.cmake.in
         "${PROJECT_BINARY_DIR}/StructStoreConfig.cmake" @ONLY)
-configure_file(${PROJECT_SOURCE_DIR}/cmake/StructStoreConfigVersion.cmake.in
-        "${PROJECT_BINARY_DIR}/StructStoreConfigVersion.cmake" @ONLY)
 install(FILES
         "${PROJECT_BINARY_DIR}/StructStoreConfig.cmake"
-        "${PROJECT_BINARY_DIR}/StructStoreConfigVersion.cmake"
-        COMPONENT install_modules
+        COMPONENT base
         DESTINATION ${STRUCTSTORE_INSTALL_CMAKEDIR})
 install(EXPORT StructStoreTargets
-        COMPONENT install_modules
+        COMPONENT base
         DESTINATION ${STRUCTSTORE_INSTALL_CMAKEDIR})
 install(FILES
         "${PROJECT_SOURCE_DIR}/LICENSE"
-        COMPONENT install_modules
+        COMPONENT base
         DESTINATION ${STRUCTSTORE_INSTALL_LICENSEDIR})
 
 if(${BUILD_WITH_PYTHON})
+    export(PACKAGE StructStorePy)
+    configure_file(${PROJECT_SOURCE_DIR}/cmake/StructStorePyConfig.cmake.in
+            "${PROJECT_BINARY_DIR}/StructStorePyConfig.cmake" @ONLY)
+    install(FILES
+            "${PROJECT_BINARY_DIR}/StructStorePyConfig.cmake"
+            COMPONENT python
+            DESTINATION ${STRUCTSTORE_INSTALL_CMAKEDIR})
+    install(EXPORT StructStorePyTargets
+            COMPONENT python
+            DESTINATION ${STRUCTSTORE_INSTALL_CMAKEDIR})
     install(FILES
             "${PROJECT_SOURCE_DIR}/LICENSE"
-            COMPONENT install_modules
+            COMPONENT python
             DESTINATION ${STRUCTSTORE_INSTALL_LICENSEDIR_PY})
 endif()
 
 # tests
 
 if(${BUILD_WITH_TESTING})
-    set(STRUCTSTORE_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/src/include)
+    # set(STRUCTSTORE_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/src/include)
     set(STRUCTSTORE_TESTS_DIR ${PROJECT_SOURCE_DIR}/tests)
     include(${PROJECT_SOURCE_DIR}/tests/DefineTests.cmake)
 endif()

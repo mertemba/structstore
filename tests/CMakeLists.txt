@@ -28,6 +28,9 @@ if(${BUILD_WITH_PYTHON})
 endif()
 
 find_package(StructStore REQUIRED)
+if(${BUILD_WITH_PYTHON})
+    find_package(StructStorePy REQUIRED)
+endif()
 
 # define tests
 

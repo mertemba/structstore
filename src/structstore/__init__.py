@@ -6,4 +6,9 @@ from ._structstore_py import *
 
 
 def cmake_dir() -> str:
-    return str(pathlib.Path(__file__).parent.absolute() / 'cmake')
+    path = pathlib.Path(__file__).parent.absolute() / 'cmake'
+    if path.exists():
+        return str(path)
+    path = path.parent.parent.parent.parent / 'cmake' / 'structstore'
+    assert path.exists(), path
+    return str(path)
