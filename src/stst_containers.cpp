@@ -7,36 +7,33 @@ void List::register_type() {
     typing::register_type<List>("structstore::List");
 }
 
-template<>
-std::ostream& structstore::to_text(std::ostream& os, const List& list) {
-    STST_LOG_DEBUG() << "serializing list at " << &list;
+void List::to_text(std::ostream& os) const {
+    STST_LOG_DEBUG() << "serializing list at " << this;
     os << "[";
-    for (const StructStoreField& field: list.data) {
-        to_text(os, field) << ",";
+    for (const Field& field: data) {
+        os << field << ",";
     }
-    return os << "]";
+    os << "]";
 }
 
-template<>
-YAML::Node structstore::to_yaml(const List& list) {
+YAML::Node List::to_yaml() const {
     auto node = YAML::Node(YAML::NodeType::Sequence);
-    for (const StructStoreField& field: list) {
-        node.push_back(to_yaml(field));
+    for (const Field& field: data) {
+        node.push_back(field.to_yaml());
     }
     return node;
 }
 
-template<>
-void structstore::check(MiniMalloc& mm_alloc, const List& list) {
-    try_with_info("List*: ", mm_alloc.assert_owned(&list););
-    for (const StructStoreField& field: list.data) {
+void List::check(MiniMalloc& mm_alloc) const {
+    try_with_info("List*: ", mm_alloc.assert_owned(this););
+    for (const Field& field: data) {
         try_with_info("in List iter: ", field.check(mm_alloc););
     }
 }
 
 template<>
 void List::push_back<const char*>(const char* const& value) {
-    push_back().get<structstore::string>() = value;
+    push_back().get<structstore::String>() = value;
 }
 
 bool List::operator==(const List& other) const {
@@ -47,29 +44,26 @@ void Matrix::register_type() {
     typing::register_type<Matrix>("structstore::Matrix");
 }
 
-template<>
-std::ostream& structstore::to_text(std::ostream& os, const Matrix& matrix) {
+void Matrix::to_text(std::ostream& os) const {
     size_t size = 1;
-    for (size_t i = 0; i < matrix._ndim; ++i) {
-        size *= matrix._shape[i];
+    for (size_t i = 0; i < _ndim; ++i) {
+        size *= _shape[i];
     }
     os << "[";
     for (size_t i = 0; i < size; ++i) {
-        os << matrix._data[i] << ",";
+        os << _data[i] << ",";
     }
-    return os << "]";
+    os << "]";
 }
 
-template<>
-YAML::Node structstore::to_yaml(const Matrix&) {
+YAML::Node Matrix::to_yaml() const {
     throw std::runtime_error("serialize_yaml_fn not implemented for structstore::Matrix");
 }
 
-template<>
-void structstore::check(MiniMalloc& mm_alloc, const Matrix& matrix) {
-    try_with_info("Matrix*: ", mm_alloc.assert_owned(&matrix););
-    if (matrix._data) {
-        try_with_info("Matrix data: ", mm_alloc.assert_owned(matrix._data););
+void Matrix::check(MiniMalloc& mm_alloc) const {
+    try_with_info("Matrix*: ", mm_alloc.assert_owned(this););
+    if (_data) {
+        try_with_info("Matrix data: ", mm_alloc.assert_owned(_data););
     }
 }
 

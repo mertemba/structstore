@@ -9,17 +9,9 @@
 
 namespace structstore {
 
-class StructStoreField;
-
-template<>
-std::ostream& to_text(std::ostream&, const StructStoreField&);
-
-template<>
-YAML::Node to_yaml(const StructStoreField&);
-
 class StructStore;
 
-class StructStoreField {
+class Field {
 private:
     void* data;
     uint64_t type_hash;
@@ -38,27 +30,27 @@ private:
 
     friend class structstore::StructStore;
 
-    void copy_from(MiniMalloc& mm_alloc, const StructStoreField& other);
+    void copy_from(MiniMalloc& mm_alloc, const Field& other);
 
-    void move_from(StructStoreField& other);
+    void move_from(Field& other);
 
 public:
-    StructStoreField() : data(nullptr), type_hash(0) {}
+    Field() : data(nullptr), type_hash(0) {}
 
     template<typename T>
-    explicit StructStoreField(T* data)
+    explicit Field(T* data)
             : data(data), type_hash(typing::get_type_hash<T>()) {}
 
-    explicit StructStoreField(void* data, uint64_t type_hash)
+    explicit Field(void* data, uint64_t type_hash)
         : data(data), type_hash(type_hash) {}
 
-    StructStoreField(StructStoreField&& other) noexcept: StructStoreField() {
+    Field(Field&& other) noexcept: Field() {
         *this = std::move(other);
     }
 
-    StructStoreField(const StructStoreField&) = delete;
+    Field(const Field&) = delete;
 
-    ~StructStoreField() noexcept(false) {
+    ~Field() noexcept(false) {
         if (data) {
             throw std::runtime_error("field was not cleaned up, type is " +
                                      typing::get_type(type_hash).name);
@@ -96,27 +88,26 @@ public:
                          << typing::get_type(type_hash).name;
     }
 
-    StructStoreField& operator=(StructStoreField&& other) noexcept {
+    Field& operator=(Field&& other) noexcept {
         std::swap(data, other.data);
         std::swap(type_hash, other.type_hash);
         return *this;
     }
 
-    StructStoreField& operator=(const StructStoreField&) = delete;
+    Field& operator=(const Field&) = delete;
 
     [[nodiscard]] uint64_t get_type_hash() const {
         return type_hash;
     }
 
-    template<typename T>
-    friend std::ostream& structstore::to_text(std::ostream&, const T&);
+    void to_text(std::ostream& os) const;
 
-    template<typename T>
-    friend YAML::Node structstore::to_yaml(const T&);
-
-    friend std::ostream& operator<<(std::ostream& os, const StructStoreField& field) {
-        return to_text(os, field);
+    friend std::ostream& operator<<(std::ostream& os, const Field& field) {
+        field.to_text(os);
+        return os;
     }
+
+    YAML::Node to_yaml() const;
 
     template<typename T>
     T& get() const {
@@ -133,7 +124,7 @@ public:
     }
 
     template<typename T>
-    StructStoreField& operator=(const T& value) {
+    Field& operator=(const T& value) {
         get<T>() = value;
         return *this;
     }
@@ -146,7 +137,7 @@ public:
         }
     }
 
-    bool operator==(const StructStoreField& other) const {
+    bool operator==(const Field& other) const {
         if (data == nullptr) {
             return other.data == nullptr;
         }
@@ -156,7 +147,7 @@ public:
         return typing::get_type(type_hash).cmp_equal_fn(data, other.data);
     }
 
-    bool operator!=(const StructStoreField& other) const {
+    bool operator!=(const Field& other) const {
         return !(*this == other);
     }
 };
@@ -164,7 +155,7 @@ public:
 class StructStoreShared;
 
 class FieldView {
-    StructStoreField field;
+    Field field;
 
 public:
     template<typename T>
@@ -173,8 +164,12 @@ public:
     template<typename T>
     explicit FieldView(T& data, uint64_t type_hash) : field{&data, type_hash} {}
 
-    StructStoreField& operator*() {
+    Field& operator*() {
         return field;
+    }
+
+    Field* operator->() {
+        return &field;
     }
 
     ~FieldView() {

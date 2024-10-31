@@ -8,9 +8,30 @@
 
 namespace structstore {
 
-class List {
+using std_string = std::basic_string<char, std::char_traits<char>, StlAllocator<char>>;
+
+class String : public typing::FieldBase<String>, public std_string {
+public:
+    String(const StlAllocator<String>& alloc) : std_string(alloc) {}
+
+    void to_text(std::ostream& os) const { os << static_cast<const std_string&>(*this); }
+
+    YAML::Node to_yaml() const { return YAML::Node(c_str()); }
+
+    void check(MiniMalloc& mm_alloc) const {
+        try_with_info("string: ", mm_alloc.assert_owned(this););
+        if (!empty()) { try_with_info("string data: ", mm_alloc.assert_owned(data());); }
+    }
+
+    String& operator=(const char* const& value) {
+        static_cast<std_string&>(*this) = value;
+        return *this;
+    }
+};
+
+class List : public typing::FieldBase<List> {
     MiniMalloc& mm_alloc;
-    ::structstore::vector<StructStoreField> data;
+    ::structstore::vector<Field> data;
     mutable SpinMutex mutex;
 
     static void register_type();
@@ -39,16 +60,14 @@ public:
             return *this;
         }
 
-        StructStoreField& operator*() {
-            return ((List&) list).data.at(index);
-        }
+        Field& operator*() { return ((List&) list).data.at(index); }
     };
 
-    List() : mm_alloc(static_alloc), data(StlAllocator<StructStoreField>(static_alloc)) {
+    List() : mm_alloc(static_alloc), data(StlAllocator<Field>(static_alloc)) {
         throw std::runtime_error("List should not be constructed without an allocator");
     }
 
-    explicit List(MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), data(StlAllocator<StructStoreField>(mm_alloc)) {
+    explicit List(MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), data(StlAllocator<Field>(mm_alloc)) {
         STST_LOG_DEBUG() << "constructing List at " << this;
     }
 
@@ -126,9 +145,7 @@ public:
     }
 
     void clear() {
-        for (StructStoreField& field: data) {
-            field.clear(mm_alloc);
-        }
+        for (Field& field: data) { field.clear(mm_alloc); }
         data.clear();
     }
 
@@ -140,26 +157,19 @@ public:
         return ScopedLock(mutex);
     }
 
-    template<typename T>
-    friend std::ostream& structstore::to_text(std::ostream&, const T&);
+    void to_text(std::ostream&) const;
 
-    template<typename T>
-    friend YAML::Node structstore::to_yaml(const T&);
+    YAML::Node to_yaml() const;
 
-    template<typename T>
-    friend void structstore::check(MiniMalloc&, const T&);
+    void check(MiniMalloc&) const;
 
     bool operator==(const List& other) const;
-
-    inline bool operator!=(const List& other) const {
-        return !(*this == other);
-    }
 };
 
 template<>
 void List::push_back<const char*>(const char* const& value);
 
-class Matrix {
+class Matrix : public typing::FieldBase<Matrix> {
 public:
     static constexpr int MAX_DIMS = 8;
 
@@ -251,14 +261,11 @@ public:
         }
     }
 
-    template<typename T>
-    friend std::ostream& structstore::to_text(std::ostream&, const T&);
+    void to_text(std::ostream&) const;
 
-    template<typename T>
-    friend YAML::Node structstore::to_yaml(const T&);
+    YAML::Node to_yaml() const;
 
-    template<typename T>
-    friend void structstore::check(MiniMalloc&, const T&);
+    void check(MiniMalloc&) const;
 
     bool operator==(const Matrix& other) const;
 
@@ -266,7 +273,6 @@ public:
         return !(*this == other);
     }
 };
-
 }
 
 #endif

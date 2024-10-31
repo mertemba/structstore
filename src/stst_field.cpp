@@ -3,20 +3,17 @@
 
 using namespace structstore;
 
-template<>
-std::ostream& structstore::to_text(std::ostream& os, const StructStoreField& field) {
-    const auto& field_type = typing::get_type(field.get_type_hash());
-    field_type.serialize_text_fn(os, field.data);
-    return os;
+void Field::to_text(std::ostream& os) const {
+    const auto& field_type = typing::get_type(type_hash);
+    field_type.serialize_text_fn(os, data);
 }
 
-template<>
-YAML::Node structstore::to_yaml(const StructStoreField& field) {
-    const auto& field_type = typing::get_type(field.get_type_hash());
-    return field_type.serialize_yaml_fn(field.data);
+YAML::Node Field::to_yaml() const {
+    const auto& field_type = typing::get_type(type_hash);
+    return field_type.serialize_yaml_fn(data);
 }
 
-void StructStoreField::copy_from(MiniMalloc& mm_alloc, const StructStoreField& other) {
+void Field::copy_from(MiniMalloc& mm_alloc, const Field& other) {
     assert_empty();
     type_hash = other.type_hash;
     const auto& field_type = typing::get_type(type_hash);
@@ -25,11 +22,11 @@ void StructStoreField::copy_from(MiniMalloc& mm_alloc, const StructStoreField& o
     field_type.copy_fn(mm_alloc, data, other.data);
 }
 
-void StructStoreField::move_from(StructStoreField& other) {
+void Field::move_from(Field& other) {
     assert_empty();
     std::swap(type_hash, other.type_hash);
     std::swap(data, other.data);
 }
 
 template<>
-FieldView::FieldView(StructStoreShared& store) : field{&store->get_store()} {}
+FieldView::FieldView(StructStoreShared& store) : field{&*store} {}

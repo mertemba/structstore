@@ -33,7 +33,7 @@ static bool register_common_types_() {
     typing::register_type<int>("int");
     typing::register_type<double>("double");
     typing::register_type<bool>("bool");
-    typing::register_type<structstore::string>("structstore::string");
+    typing::register_type<structstore::String>("structstore::string");
     return true;
 }
 
@@ -51,16 +51,3 @@ static bool registered_common_types = []() {
     typing::register_common_types();
     return true;
 }();
-
-template<>
-inline YAML::Node structstore::to_yaml(const string& str) {
-    return YAML::Node(str.c_str());
-}
-
-template<>
-void structstore::check(MiniMalloc& mm_alloc, const structstore::string& str) {
-    try_with_info("string: ", mm_alloc.assert_owned(&str););
-    if (!str.empty()) {
-        try_with_info("string data: ", mm_alloc.assert_owned(str.data()););
-    }
-}

@@ -1,12 +1,13 @@
 #ifndef STST_TYPING_HPP
 #define STST_TYPING_HPP
 
-#include "structstore/stst_hashstring.hpp"
 #include "structstore/stst_alloc.hpp"
+#include "structstore/stst_hashstring.hpp"
 #include "structstore/stst_utils.hpp"
 
 #include <functional>
 #include <iostream>
+#include <stdexcept>
 #include <type_traits>
 #include <typeindex>
 #include <unordered_map>
@@ -15,23 +16,42 @@
 
 namespace structstore {
 
-template<typename T>
-std::ostream& to_text(std::ostream& os, const T& t) {
-    return os << t;
-}
+class StructStore;
 
 template<typename T>
-YAML::Node to_yaml(const T& t) {
-    return YAML::Node(t);
-}
-
-template<typename T>
-void check(MiniMalloc&, const T&) {}
-
 class Struct;
+
+extern MiniMalloc static_alloc;
 
 class typing {
 public:
+    template<typename T>
+    class FieldBase {
+    private:
+	friend class typing;
+
+        static void check_interface() {
+            static_assert(
+                    std::is_same_v<decltype(std::declval<const T>().to_text(std::cout)), void>);
+            static_assert(std::is_same_v<decltype(std::declval<const T>().to_yaml()), YAML::Node>);
+            static_assert(
+                    std::is_same_v<decltype(std::declval<const T>().check(static_alloc)), void>);
+            static_assert(
+                    std::is_same_v<decltype(std::declval<const T>() == std::declval<const T>()),
+                                   bool>);
+            static_assert(
+                    std::is_same_v<decltype(std::declval<T>() = std::declval<const T>()), T&>);
+        }
+    public:
+
+        friend std::ostream& operator<<(std::ostream& os, const T& t) {
+            t.to_text(os);
+            return os;
+        }
+
+        inline bool operator!=(const T& other) const { return !(*this == other); }
+    };
+
     template<typename T=void>
     using ConstructorFn = std::function<void(MiniMalloc&, T*)>;
 
@@ -55,6 +75,7 @@ public:
 
     template<typename T = void>
     struct FieldType_ {
+        static_assert(!std::is_class_v<T> || std::is_base_of_v<FieldBase<T>, T>);
         std::string name;
         size_t size;
         ConstructorFn<T> constructor_fn;
@@ -85,12 +106,14 @@ private:
             t.constructor_fn = [](MiniMalloc&, T* t) { new (t) T(); };
         }
         t.destructor_fn = [](MiniMalloc&, T* t) { t->~T(); };
-        t.serialize_text_fn = [](std::ostream& os, const T* t) { to_text(os, *t); };
-        t.serialize_yaml_fn = [](const T* t) -> YAML::Node { return to_yaml(*t); };
-        t.check_fn = [](MiniMalloc& mm_alloc, const T* t) {
-            try_with_info("in default check: ", mm_alloc.assert_owned(t););
-            check(mm_alloc, *t);
-        };
+        t.serialize_text_fn = [](std::ostream& os, const T* t) { os << *t; };
+        if constexpr (std::is_class_v<T>) {
+            t.serialize_yaml_fn = [](const T* t) -> YAML::Node { return t->to_yaml(); };
+            t.check_fn = [](MiniMalloc& mm_alloc, const T* t) { t->check(mm_alloc); };
+        } else {
+            t.serialize_yaml_fn = [](const T* t) -> YAML::Node { return YAML::Node(*t); };
+            t.check_fn = [](MiniMalloc& mm_alloc, const T* t) { mm_alloc.assert_owned(t); };
+        }
         t.cmp_equal_fn = [](const T* t, const T* other) { return *t == *other; };
         t.copy_fn = [](MiniMalloc&, T* t, const T* other) { *t = *other; };
         return (FieldType&) t;
@@ -138,6 +161,10 @@ public:
                 str << "hash collision between '" << name << "' and empty type";
                 throw std::runtime_error(str.str());
             }
+        }
+        if constexpr (std::is_class_v<T>) {
+            static_assert(std::is_base_of_v<FieldBase<T>, T>);
+            FieldBase<T>::check_interface();
         }
         STST_LOG_DEBUG() << "registering type '" << name << "' with hash '" << type_hash << "'";
         bool success = get_type_hashes().insert({typeid(T), type_hash}).second;
@@ -204,19 +231,11 @@ inline void StlAllocator<T>::construct(T* p) {
     }
 }
 
-using string = std::basic_string<char, std::char_traits<char>, StlAllocator<char>>;
-
 template<class T>
 using vector = std::vector<T, StlAllocator<T>>;
 
 template<class K, class T>
 using unordered_map = std::unordered_map<K, T, std::hash<K>, std::equal_to<K>, StlAllocator<std::pair<const K, T>>>;
-
-template<>
-inline YAML::Node to_yaml(const string& str);
-
-template<>
-void check(MiniMalloc& mm_alloc, const structstore::string& str);
 
 } // namespace structstore
 

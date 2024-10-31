@@ -38,7 +38,7 @@ nb::object py::structstore_to_python(StructStore& store, py::ToPythonMode mode) 
     return dict;
 }
 
-nb::object py::to_python(const StructStoreField& field, ToPythonMode mode) {
+nb::object py::to_python(const Field& field, ToPythonMode mode) {
     if (field.empty()) {
         return nb::none();
     }
@@ -46,7 +46,7 @@ nb::object py::to_python(const StructStoreField& field, ToPythonMode mode) {
     return to_python_fn(field, mode);
 }
 
-nb::object py::to_python_cast(const StructStoreField& field) {
+nb::object py::to_python_cast(const Field& field) {
     if (field.empty()) {
         return nb::none();
     }
@@ -87,7 +87,7 @@ void py::from_python(FieldAccess access, const nb::handle& value, const std::str
 
 nb::object py::get_field(StructStore& store, const std::string& name) {
     auto lock = store.read_lock();
-    StructStoreField* field = store.try_get_field(HashString{name.c_str()});
+    Field* field = store.try_get_field(HashString{name.c_str()});
     if (field == nullptr) {
         throw nb::attribute_error();
     }

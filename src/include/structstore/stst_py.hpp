@@ -2,8 +2,8 @@
 #define STST_PY_HPP
 
 #include "structstore/stst_alloc.hpp"
-#include "structstore/stst_containers.hpp"
 #include "structstore/stst_field.hpp"
+#include "structstore/stst_shared.hpp"
 #include "structstore/stst_structstore.hpp"
 #include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
@@ -37,8 +37,8 @@ public:
     };
 
     using FromPythonFn = std::function<bool(FieldAccess, const nb::handle&)>;
-    using ToPythonFn = std::function<nb::object(const StructStoreField&, ToPythonMode mode)>;
-    using ToPythonCastFn = std::function<nb::object(const StructStoreField&)>;
+    using ToPythonFn = std::function<nb::object(const Field&, ToPythonMode mode)>;
+    using ToPythonCastFn = std::function<nb::object(const Field&)>;
 
 private:
     struct __attribute__((__visibility__("default"))) PyType {
@@ -51,6 +51,12 @@ private:
 
     static const PyType& get_py_type(uint64_t type_hash);
 
+    static StructStore& get_store(StructStore& store) { return store; }
+    static StructStore& get_store(StructStoreShared& store) { return *store; }
+    template<typename T>
+    static StructStore& get_store(Struct<T>& s) {
+        return s.store;
+    }
 
     static nb::object get_field(StructStore& store, const std::string& name);
 
@@ -81,12 +87,12 @@ public:
     };
 
     template<typename T, typename T_py>
-    static nb::object default_to_python_fn(const StructStoreField& field, ToPythonMode) {
+    static nb::object default_to_python_fn(const Field& field, ToPythonMode) {
         return T_py(field.get<T>());
     };
 
     template<typename T>
-    static nb::object default_to_python_cast_fn(const StructStoreField& field) {
+    static nb::object default_to_python_cast_fn(const Field& field) {
         return nb::cast(field.get<T>(), nb::rv_policy::reference);
     };
 
@@ -107,8 +113,8 @@ public:
 
     template<typename T>
     static void register_struct_type(nb::class_<T>& cls) {
-        static_assert(std::is_base_of_v<Struct, T>);
-        py::ToPythonFn to_python_fn = [](const StructStoreField& field, py::ToPythonMode mode) {
+        static_assert(std::is_base_of_v<Struct<T>, T>);
+        py::ToPythonFn to_python_fn = [](const Field& field, py::ToPythonMode mode) {
             auto& store = get_store(field.get<T>());
             return structstore_to_python(store, mode);
         };
@@ -137,9 +143,7 @@ public:
     template<typename T>
     static void register_complex_type_funcs(nb::class_<T>& cls) {
         static_assert(!std::is_pointer_v<T>);
-        cls.def("to_yaml", [](T& t) {
-            return YAML::Dump(to_yaml(*FieldView{t}));
-        });
+        cls.def("to_yaml", [](T& t) { return YAML::Dump(FieldView { t } -> to_yaml()); });
         cls.def("__repr__", [](T& t) {
             return (std::ostringstream() << *FieldView{t}).str();
         });
@@ -224,41 +228,61 @@ public:
             });
         }
 
-        cls.def("__getattr__", [](T& t, const std::string& name) {
-            auto& store = t.get_store();
-            return get_field(store, name); }, nb::arg("name"), nb::rv_policy::reference_internal);
+        cls.def(
+                "__getattr__",
+                [](T& t, const std::string& name) {
+                    auto& store = get_store(t);
+                    return get_field(store, name);
+                },
+                nb::arg("name"), nb::rv_policy::reference_internal);
 
-        cls.def("__setattr__", [](T& t, const std::string& name, const nb::object& value) {
-            auto& store = t.get_store();
-            return set_field(store, name, value); }, nb::arg("name"), nb::arg("value").none());
+        cls.def(
+                "__setattr__",
+                [](T& t, const std::string& name, const nb::object& value) {
+                    auto& store = get_store(t);
+                    return set_field(store, name, value);
+                },
+                nb::arg("name"), nb::arg("value").none());
 
-        cls.def("__getitem__", [](T& t, const std::string& name) {
-            auto& store = t.get_store();
-            return get_field(store, name); }, nb::arg("name"), nb::rv_policy::reference_internal);
+        cls.def(
+                "__getitem__",
+                [](T& t, const std::string& name) {
+                    auto& store = get_store(t);
+                    return get_field(store, name);
+                },
+                nb::arg("name"), nb::rv_policy::reference_internal);
 
-        cls.def("__setitem__", [](T& t, const std::string& name, const nb::object& value) {
-            auto& store = t.get_store();
-            return set_field(store, name, value); }, nb::arg("name"), nb::arg("value").none());
+        cls.def(
+                "__setitem__",
+                [](T& t, const std::string& name, const nb::object& value) {
+                    auto& store = get_store(t);
+                    return set_field(store, name, value);
+                },
+                nb::arg("name"), nb::arg("value").none());
 
-        cls.def("lock", [](T& t) {
-            auto& store = t.get_store();
-            return lock(store); }, nb::rv_policy::move);
+        cls.def(
+                "lock",
+                [](T& t) {
+                    auto& store = get_store(t);
+                    return lock(store);
+                },
+                nb::rv_policy::move);
 
         cls.def("clear", [](T& t) {
-            auto& store = t.get_store();
+            auto& store = get_store(t);
             return clear(store);
         });
 
         cls.def("check", [](T& t) {
             STST_LOG_DEBUG() << "checking from python ...";
-            auto& store = t.get_store();
+            auto& store = get_store(t);
             return store.check();
         });
     }
 
-    static nb::object to_python(const StructStoreField& field, ToPythonMode mode);
+    static nb::object to_python(const Field& field, ToPythonMode mode);
 
-    static nb::object to_python_cast(const StructStoreField& field);
+    static nb::object to_python_cast(const Field& field);
 
     static void from_python(FieldAccess access, const nb::handle& value, const std::string& field_name);
 
