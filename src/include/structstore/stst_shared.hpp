@@ -169,7 +169,7 @@ public:
 
     FieldAccess operator[](const char* name) {
         assert_valid();
-        return sh_data_ptr->data.at(name);
+        return sh_data_ptr->data[name];
     }
 
     ~StructStoreShared() {

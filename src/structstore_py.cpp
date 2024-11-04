@@ -141,7 +141,6 @@ NB_MODULE(MODULE_NAME, m) {
     // built-in field types:
 
     // basic types
-    typing::register_common_types();
     py::register_basic_type<int, nb::int_>();
     py::register_basic_type<double, nb::float_>();
     py::register_basic_type<bool, nb::bool_>();

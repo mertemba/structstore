@@ -155,9 +155,8 @@ class StructStore : public typing::FieldBase<StructStore> {
 
     friend class structstore::py;
 
-    static void register_type();
-
-    friend void typing::register_common_types();
+public:
+    static const FieldType& type_info;
 
 private:
     MiniMalloc& mm_alloc;

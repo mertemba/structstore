@@ -12,6 +12,8 @@ using std_string = std::basic_string<char, std::char_traits<char>, StlAllocator<
 
 class String : public typing::FieldBase<String>, public std_string {
 public:
+    static const FieldType& type_info;
+
     String(const StlAllocator<String>& alloc) : std_string(alloc) {}
 
     void to_text(std::ostream& os) const { os << static_cast<const std_string&>(*this); }
@@ -34,11 +36,9 @@ class List : public typing::FieldBase<List> {
     ::structstore::vector<Field> data;
     mutable SpinMutex mutex;
 
-    static void register_type();
-
-    friend void typing::register_common_types();
-
 public:
+    static const FieldType& type_info;
+
     class Iterator {
         // todo: store scoped lock
         const List& list;
@@ -173,15 +173,13 @@ class Matrix : public typing::FieldBase<Matrix> {
 public:
     static constexpr int MAX_DIMS = 8;
 
+    static const FieldType& type_info;
+
 protected:
     MiniMalloc& mm_alloc;
     size_t _ndim;
     size_t _shape[MAX_DIMS] = {};
     double* _data;
-
-    static void register_type();
-
-    friend void typing::register_common_types();
 
 public:
     Matrix(MiniMalloc& mm_alloc) : Matrix(0, 0, mm_alloc) {}

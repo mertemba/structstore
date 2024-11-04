@@ -121,6 +121,7 @@ foreach(TARGET ${STRUCTSTORE_LIB_TARGETS} ${STRUCTSTORE_PY_TARGETS})
     target_compile_options(${TARGET} PUBLIC -Wall -Wextra -pedantic -Werror)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         target_compile_options(${TARGET} PUBLIC -Wno-class-memaccess)
+        target_compile_options(${TARGET} PUBLIC -Wno-dangling-reference)
     endif()
     # target_include_directories() is called later
     target_link_libraries(${TARGET} PUBLIC

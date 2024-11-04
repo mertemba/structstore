@@ -28,9 +28,10 @@ public:
     template<typename T>
     class FieldBase {
     private:
-	friend class typing;
+        friend class typing;
 
         static void check_interface() {
+            static_assert(std::is_same_v<decltype(T::type_info), const FieldType_<void>&>);
             static_assert(
                     std::is_same_v<decltype(std::declval<const T>().to_text(std::cout)), void>);
             static_assert(std::is_same_v<decltype(std::declval<const T>().to_yaml()), YAML::Node>);
@@ -87,11 +88,9 @@ public:
         CopyFn<T> copy_fn;
     };
 
-    using FieldType = FieldType_<>;
-
 private:
     template<typename T>
-    static FieldType create_field_type(const std::string name) {
+    static FieldType_<> create_field_type(const std::string name) {
         static_assert(!std::is_void_v<T>);
         FieldType_<T> t;
         t.name = name;
@@ -116,10 +115,10 @@ private:
         }
         t.cmp_equal_fn = [](const T* t, const T* other) { return *t == *other; };
         t.copy_fn = [](MiniMalloc&, T* t, const T* other) { *t = *other; };
-        return (FieldType&) t;
+        return (FieldType_<>&) t;
     }
 
-    static FieldType create_void_field_type(const std::string name) {
+    static FieldType_<> create_void_field_type(const std::string name) {
         FieldType_<> t;
         t.name = name;
         t.size = 0;
@@ -139,11 +138,9 @@ private:
 
     static std::unordered_map<std::type_index, uint64_t>& get_type_hashes();
 
-    static std::unordered_map<uint64_t, const FieldType>& get_field_types();
+    static std::unordered_map<uint64_t, const FieldType_<>>& get_field_types();
 
 public:
-    static void register_common_types();
-
     static std::runtime_error already_registered_type_error(uint64_t type_hash) {
         std::ostringstream str;
         str << "type already registered: " << get_type(type_hash).name;
@@ -151,7 +148,7 @@ public:
     }
 
     template<typename T>
-    static void register_type(const std::string& name) {
+    static const FieldType_<>& register_type(const std::string& name) {
         uint64_t type_hash = const_hash(name.c_str());
         if constexpr (std::is_void_v<T>) {
             type_hash = 0;
@@ -171,7 +168,7 @@ public:
         if (!success) {
             throw already_registered_type_error(type_hash);
         }
-        FieldType field_type;
+        FieldType_<> field_type;
         if constexpr (std::is_void_v<T>) {
             field_type = create_void_field_type("<empty>");
         } else {
@@ -187,6 +184,8 @@ public:
                 throw std::runtime_error(str.str());
             }
         }
+        // this triggers a `-Wdangling-reference` at the call site in GCC
+        return ret.first->second;
     }
 
     template<typename T>
@@ -210,13 +209,15 @@ public:
         return &it->second;
     }
 
-    static const FieldType& get_type(uint64_t type_hash);
+    static const FieldType_<>& get_type(uint64_t type_hash);
 
     template<typename T>
-    inline static const FieldType& get_type() {
+    inline static const FieldType_<>& get_type() {
         return get_type(get_type_hash<T>());
     }
 };
+
+using FieldType = typing::FieldType_<>;
 
 template<>
 uint64_t typing::get_type_hash<void>();

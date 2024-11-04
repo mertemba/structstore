@@ -3,6 +3,9 @@
 
 using namespace structstore;
 
+const FieldType& StructStore::type_info =
+        typing::register_type<StructStore>("structstore::StructStore");
+
 static constexpr size_t malloc_size = 1 << 20;
 MiniMalloc structstore::static_alloc(malloc_size, std::malloc(malloc_size));
 
@@ -41,10 +44,6 @@ void StructStore::check(MiniMalloc& mm_alloc) const {
             try_with_info("in field '" << key.str << "' value: ", value.check(mm_alloc););
         }
     }
-}
-
-void StructStore::register_type() {
-    typing::register_type<StructStore>("structstore::StructStore");
 }
 
 ::structstore::String& FieldAccess::get_str() { return get<::structstore::String>(); }

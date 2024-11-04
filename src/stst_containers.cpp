@@ -3,9 +3,9 @@
 
 using namespace structstore;
 
-void List::register_type() {
-    typing::register_type<List>("structstore::List");
-}
+const FieldType& String::type_info = typing::register_type<String>("structstore::String");
+
+const FieldType& List::type_info = typing::register_type<List>("structstore::List");
 
 void List::to_text(std::ostream& os) const {
     STST_LOG_DEBUG() << "serializing list at " << this;
@@ -40,9 +40,7 @@ bool List::operator==(const List& other) const {
     return data == other.data;
 }
 
-void Matrix::register_type() {
-    typing::register_type<Matrix>("structstore::Matrix");
-}
+const FieldType& Matrix::type_info = typing::register_type<Matrix>("structstore::Matrix");
 
 void Matrix::to_text(std::ostream& os) const {
     size_t size = 1;
