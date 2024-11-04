@@ -11,7 +11,12 @@ import structstore
 class TestMystruct0(unittest.TestCase):
     def test_mystruct_0(self):
         frame = Frame()
+        frame.t = 2.5
         self.assertEqual(frame, frame)
         self.assertEqual(type(frame.copy()), dict)
         state = structstore.StructStore()
-        state.frame = Frame()
+        state.frame = frame
+        self.assertEqual(state.frame.t, 2.5)
+        state.frame2 = state.frame
+        state.frame2.t = 3.0
+        self.assertEqual(state.frame.t, 2.5)

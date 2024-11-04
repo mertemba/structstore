@@ -9,10 +9,12 @@
 #include "structstore/stst_utils.hpp"
 
 #include <functional>
+#include <type_traits>
 #include <unordered_map>
 
 #include <nanobind/make_iterator.h>
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
 
 // make customized STL containers opaque to nanobind
 namespace nanobind::detail {
@@ -60,7 +62,7 @@ private:
 
     static nb::object get_field(StructStore& store, const std::string& name);
 
-    static void set_field(StructStore& store, const std::string& name, const nb::object& value);
+    static void set_field(StructStore& store, const std::string& name, const nb::handle& value);
 
     static ScopedLock lock(StructStore& store);
 
@@ -118,6 +120,7 @@ public:
     template<typename T>
     static void register_struct_type(nb::class_<T>& cls) {
         static_assert(std::is_base_of_v<Struct<T>, T>);
+        static_assert(std::is_same_v<T, std::remove_cv_t<T>>);
         py::ToPythonFn to_python_fn = [](const Field& field, py::ToPythonMode mode) {
             auto& store = get_store(field.get<T>());
             return structstore_to_python(store, mode);
@@ -242,7 +245,7 @@ public:
 
         cls.def(
                 "__setattr__",
-                [](T& t, const std::string& name, const nb::object& value) {
+                [](T& t, const std::string& name, const nb::handle& value) {
                     auto& store = get_store(t);
                     return set_field(store, name, value);
                 },
@@ -258,7 +261,7 @@ public:
 
         cls.def(
                 "__setitem__",
-                [](T& t, const std::string& name, const nb::object& value) {
+                [](T& t, const std::string& name, const nb::handle& value) {
                     auto& store = get_store(t);
                     return set_field(store, name, value);
                 },
