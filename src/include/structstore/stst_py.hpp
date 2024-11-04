@@ -79,10 +79,14 @@ private:
 public:
     template<typename T, typename T_py>
     static bool default_from_python_fn(FieldAccess access, const nb::handle& value) {
-        if (nb::isinstance<T_py>(value)) {
-            access.get<T>() = nb::cast<T>(value);
+        if (nb::isinstance<T>(value)) {
+            STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name
+                             << " succeeded";
+            const T& t = nb::cast<T>(value, false);
+            access.get<T>() = t;
             return true;
         }
+        STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name << " failed";
         return false;
     };
 

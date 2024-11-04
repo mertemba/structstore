@@ -10,7 +10,7 @@ void StructStore::to_text(std::ostream& os) const {
     STST_LOG_DEBUG() << "serializing StructStore at " << this;
     os << "{";
     for (const auto& name: slots) {
-        STST_LOG_DEBUG() << "field " << (void*) &name << " is at " << &fields.at(name);
+        STST_LOG_DEBUG() << "field " << &name << " is at " << &fields.at(name);
         os << '"' << name.str << "\":";
         os << fields.at(name) << ",";
     }

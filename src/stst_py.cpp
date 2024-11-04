@@ -96,6 +96,7 @@ nb::object py::get_field(StructStore& store, const std::string& name) {
 
 void py::set_field(StructStore& store, const std::string& name, const nb::object& value) {
     auto lock = store.write_lock();
+    STST_LOG_DEBUG() << "setting field to type " << nb::repr(value.type()).c_str();
     from_python(store[name.c_str()], value, name);
 }
 

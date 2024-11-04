@@ -14,4 +14,4 @@ class TestMystruct0(unittest.TestCase):
         self.assertEqual(frame, frame)
         self.assertEqual(type(frame.copy()), dict)
         state = structstore.StructStore()
-        # state.frame = Frame()
+        state.frame = Frame()

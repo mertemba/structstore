@@ -30,6 +30,8 @@ private:
 
     friend class structstore::StructStore;
 
+    void constr_copy_from(MiniMalloc& mm_alloc, const Field& other);
+
     void copy_from(MiniMalloc& mm_alloc, const Field& other);
 
     void move_from(Field& other);

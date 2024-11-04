@@ -1,5 +1,6 @@
 #include "structstore/structstore.hpp"
 #include "structstore/stst_py.hpp"
+#include "structstore/stst_utils.hpp"
 
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
@@ -24,6 +25,14 @@ NB_MODULE(MODULE_NAME, m) {
             .value("IF_LAST", IF_LAST)
             .value("ALWAYS", ALWAYS)
             .export_values();
+
+    nb::enum_<Log::Level>(m, "LogLevel")
+            .value("DEBUG", Log::Level::DEBUG)
+            .value("INFO", Log::Level::INFO)
+            .value("WARN", Log::Level::WARN)
+            .value("ERROR", Log::Level::ERROR)
+            .export_values();
+    m.def("set_log_level", [](Log::Level level) { Log::level = level; });
 
     // structstore::StructStore
     nb::class_<StructStore> cls = nb::class_<StructStore>{m, "StructStore"};

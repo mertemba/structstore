@@ -42,10 +42,10 @@ public:
             static_assert(
                     std::is_same_v<decltype(std::declval<T>() = std::declval<const T>()), T&>);
         }
-    public:
 
-        friend std::ostream& operator<<(std::ostream& os, const T& t) {
-            t.to_text(os);
+    public:
+        friend std::ostream& operator<<(std::ostream& os, const FieldBase<T>& t) {
+            ((const T&) t).to_text(os);
             return os;
         }
 

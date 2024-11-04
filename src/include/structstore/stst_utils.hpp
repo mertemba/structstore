@@ -31,6 +31,9 @@ public:
     ~Log() {
         str << '\n';
         std::cout << str.str();
+#ifndef NDEBUG
+        std::cout << std::flush;
+#endif
     }
 };
 

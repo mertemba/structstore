@@ -178,33 +178,45 @@ private:
 public:
     explicit StructStore(MiniMalloc& mm_alloc)
         : mm_alloc(mm_alloc), alloc(mm_alloc), fields(alloc), slots(alloc) {
-        STST_LOG_DEBUG() << "constructing StructStore at " << this << " with alloc at " << &mm_alloc;
-        if (&mm_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is the static_alloc)";
+        STST_LOG_DEBUG() << "constructing StructStore at " << this << " with alloc at " << &mm_alloc
+                        << " (static alloc: " << (&mm_alloc == &static_alloc) << ")";
     }
 
     StructStore(const StructStore& other) : StructStore{static_alloc} {
+        STST_LOG_DEBUG() << "copy-constructing StructStore";
         *this = other;
     }
 
     StructStore(StructStore&& other) : StructStore{static_alloc} {
+        STST_LOG_DEBUG() << "move-constructing StructStore";
         *this = std::move(other);
     }
 
     StructStore& operator=(const StructStore& other) {
+        STST_LOG_DEBUG() << "copying StructStore from " << &other << " into " << this;
         if (!managed) {
-            throw std::runtime_error("copying into non-managed StructStore is not supported");
+            if (slots != other.slots) {
+                throw std::runtime_error(
+                        "copying into non-managed StructStore with different fields");
+            }
+            for (const HashString& str: slots) {
+                fields.at(str).copy_from(mm_alloc, other.fields.at(str));
+            }
+            return *this;
         }
+        // if managed:
         clear();
         for (const HashString& str : other.slots) {
             HashString name_int = internal_string(str);
             slots.emplace_back(name_int);
             Field& field = fields.emplace(name_int, Field{}).first->second;
-            field.copy_from(mm_alloc, other.fields.at(str));
+            field.constr_copy_from(mm_alloc, other.fields.at(str));
         }
         return *this;
     }
 
     StructStore& operator=(StructStore&& other) {
+        STST_LOG_DEBUG() << "moving StructStore from " << &other << " into " << this;
         if (!managed) {
             throw std::runtime_error("moving into non-managed StructStore is not supported");
         }
@@ -234,9 +246,9 @@ public:
     void clear() {
         STST_LOG_DEBUG() << "clearing StructStore at " << this << "with alloc at " << &mm_alloc;
         if (&mm_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is using the static_alloc)";
-    #ifndef NDEBUG
+#ifndef NDEBUG
         check(mm_alloc);
-    #endif
+#endif
         for (auto& [key, value]: fields) {
             if (managed) {
                 value.clear(mm_alloc);
@@ -318,8 +330,9 @@ public:
                 throw std::runtime_error(str.str());
             }
         }
-        STST_LOG_DEBUG() << "registering unmanaged data at " << &t << "in StructStore at " << this << " with alloc at " << &mm_alloc;
-        if (&mm_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is the static_alloc)";
+        STST_LOG_DEBUG() << "registering unmanaged data at " << &t << "in StructStore at " << this
+                         << " with alloc at " << &mm_alloc
+                         << " (static alloc: " << (&mm_alloc == &static_alloc) << ")";
         HashString name_int = internal_string(name);
         auto ret = fields.emplace(name_int, Field{&t});
         if (!ret.second) {

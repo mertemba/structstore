@@ -1,5 +1,6 @@
 #include "structstore/stst_field.hpp"
 #include "structstore/stst_shared.hpp"
+#include <stdexcept>
 
 using namespace structstore;
 
@@ -13,12 +14,21 @@ YAML::Node Field::to_yaml() const {
     return field_type.serialize_yaml_fn(data);
 }
 
-void Field::copy_from(MiniMalloc& mm_alloc, const Field& other) {
+void Field::constr_copy_from(MiniMalloc& mm_alloc, const Field& other) {
     assert_empty();
     type_hash = other.type_hash;
     const auto& field_type = typing::get_type(type_hash);
     data = mm_alloc.allocate(field_type.size);
     field_type.constructor_fn(mm_alloc, data);
+    field_type.copy_fn(mm_alloc, data, other.data);
+}
+
+void Field::copy_from(MiniMalloc& mm_alloc, const Field& other) {
+    assert_nonempty();
+    if (type_hash != other.type_hash) {
+        throw std::runtime_error("copying field with different type");
+    }
+    const auto& field_type = typing::get_type(type_hash);
     field_type.copy_fn(mm_alloc, data, other.data);
 }
 
