@@ -4,7 +4,7 @@ variables:
   pacman_deps_makepkg: rsync fakeroot git namcap
   pacman_deps_py: python python-pip
   pacman_deps_test: gtest gcovr
-  pacman_deps_pytest: python-pytest python-numpy
+  pacman_deps_pytest: python-pytest python-numpy nanobind
   pacman_deps_clang: clang
 
 stages:

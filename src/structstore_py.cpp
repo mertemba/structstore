@@ -1,5 +1,6 @@
 #include "structstore/structstore.hpp"
 #include "structstore/stst_py.hpp"
+#include "structstore/stst_utils.hpp"
 
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
@@ -11,8 +12,6 @@ using namespace structstore;
 namespace nb = nanobind;
 
 NB_MODULE(MODULE_NAME, m) {
-    m.attr("__version__") = VERSION_INFO;
-
     // API types:
 
     nb::class_<ScopedLock>(m, "ScopedLock")
@@ -27,23 +26,22 @@ NB_MODULE(MODULE_NAME, m) {
             .value("ALWAYS", ALWAYS)
             .export_values();
 
+    nb::enum_<Log::Level>(m, "LogLevel")
+            .value("DEBUG", Log::Level::DEBUG)
+            .value("INFO", Log::Level::INFO)
+            .value("WARN", Log::Level::WARN)
+            .value("ERROR", Log::Level::ERROR)
+            .export_values();
+    m.def("set_log_level", [](Log::Level level) { Log::level = level; });
+
     // structstore::StructStore
     nb::class_<StructStore> cls = nb::class_<StructStore>{m, "StructStore"};
     cls.def("__init__", [](StructStore* store) {
         new (store) StructStore(static_alloc);
     });
-    py::ToPythonFn structstore_to_python_fn = [](const StructStoreField& field, py::ToPythonMode mode) -> nb::object {
+    py::ToPythonFn structstore_to_python_fn = [](const Field& field, py::ToPythonMode mode) -> nb::object {
         auto& store = field.get<StructStore>();
-        auto dict = nb::dict();
-        for (HashString str: store.get_slots()) {
-            auto key = nb::cast<std::string>(str.str);
-            if (mode == py::ToPythonMode::RECURSIVE) {
-                dict[key] = py::to_python(store.at(str), py::ToPythonMode::RECURSIVE);
-            } else { // non-recursive convert
-                dict[key] = py::to_python_cast(store.at(str));
-            }
-        }
-        return dict;
+        return py::structstore_to_python(store, mode);
     };
     py::FromPythonFn structstore_from_python_fn = [](FieldAccess access, const nanobind::handle& value) {
         if (py::copy_cast_from_python<StructStore>(access, value)) {
@@ -92,8 +90,7 @@ NB_MODULE(MODULE_NAME, m) {
         }
         return false;
     };
-    py::register_type<StructStore>(structstore_from_python_fn, structstore_to_python_fn,
-                                   py::default_to_python_cast_fn<StructStore>);
+    py::register_type<StructStore>(structstore_from_python_fn, structstore_to_python_fn);
     py::register_structstore_funcs(cls);
 
     auto shcls = nb::class_<StructStoreShared>(m, "StructStoreShared");
@@ -144,33 +141,32 @@ NB_MODULE(MODULE_NAME, m) {
     // built-in field types:
 
     // basic types
-    typing::register_common_types();
     py::register_basic_type<int, nb::int_>();
     py::register_basic_type<double, nb::float_>();
     py::register_basic_type<bool, nb::bool_>();
 
     // structstore::string
-    py::register_type<structstore::string>(
+    py::register_type<structstore::String>(
             [](FieldAccess access, const nb::handle& value) {
                 if (nb::isinstance<nb::str>(value)) {
-                    access.get<structstore::string>() = nb::cast<std::string>(value);
+                    access.get<structstore::String>() = nb::cast<std::string>(value).c_str();
                     return true;
                 }
                 return false;
             },
-            [](const StructStoreField& field, py::ToPythonMode) -> nb::object {
-                return nb::str(field.get<structstore::string>().c_str());
+            [](const Field& field, py::ToPythonMode) -> nb::object {
+                return nb::str(field.get<structstore::String>().c_str());
             },
-            [](const StructStoreField& field) -> nb::object {
-                return nb::str(field.get<structstore::string>().c_str());
+            [](const Field& field) -> nb::object {
+                return nb::str(field.get<structstore::String>().c_str());
             });
 
     // structstore::List
     auto list_cls = nb::class_<List>(m, "StructStoreList");
-    py::ToPythonFn list_to_python_fn = [](const StructStoreField& field, py::ToPythonMode mode) -> nb::object {
+    py::ToPythonFn list_to_python_fn = [](const Field& field, py::ToPythonMode mode) -> nb::object {
         auto& list = field.get<List>();
         auto ret = nb::list();
-        for (StructStoreField& field_: list) {
+        for (Field& field_: list) {
             if (mode == py::ToPythonMode::RECURSIVE) {
                 ret.append(py::to_python(field_, py::ToPythonMode::RECURSIVE));
             } else { // non-recursive convert
@@ -195,8 +191,7 @@ NB_MODULE(MODULE_NAME, m) {
         }
         return false;
     };
-    py::register_type<List>(list_from_python_fn, list_to_python_fn,
-                            py::default_to_python_cast_fn<List>);
+    py::register_type<List>(list_from_python_fn, list_to_python_fn);
     py::register_complex_type_funcs<List>(list_cls);
     list_cls.def("lock", [](List& list) {
         return ScopedLock(list.get_mutex());
@@ -247,7 +242,7 @@ NB_MODULE(MODULE_NAME, m) {
     }, nb::arg("index"), nb::arg("value").none());
     list_cls.def("__getitem__", [](List& list, size_t index) {
         auto lock = list.read_lock();
-        STST_LOG_DEBUG() << "getting list item of type " << typing::get_type_name(list[index].get_field().get_type_hash());
+        STST_LOG_DEBUG() << "getting list item of type " << typing::get_type(list[index].get_field().get_type_hash()).name;
         return py::to_python_cast(list[index].get_field());
     });
     list_cls.def("__delitem__", [](List& list, size_t index) {
@@ -266,7 +261,7 @@ NB_MODULE(MODULE_NAME, m) {
 
     // structstore::Matrix
     auto matrix_cls = nb::class_<Matrix>(m, "StructStoreMatrix");
-    py::ToPythonFn matrix_to_python_fn = [](const StructStoreField& field, py::ToPythonMode mode) -> nb::object {
+    py::ToPythonFn matrix_to_python_fn = [](const Field& field, py::ToPythonMode mode) -> nb::object {
         Matrix& m = field.get<Matrix>();
         if (mode == py::ToPythonMode::RECURSIVE) {
             return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()),
@@ -289,19 +284,18 @@ NB_MODULE(MODULE_NAME, m) {
         }
         return false;
     };
-    py::register_type<Matrix>(matrix_from_python_fn, matrix_to_python_fn,
-                              py::default_to_python_cast_fn<Matrix>);
+    py::register_type<Matrix>(matrix_from_python_fn, matrix_to_python_fn);
     py::register_complex_type_funcs<Matrix>(matrix_cls);
 }
 
 // required to make __iter__ method work
 namespace nanobind::detail {
 template<>
-struct type_caster<structstore::StructStoreField> {
+struct type_caster<structstore::Field> {
 public:
-    NB_TYPE_CASTER(structstore::StructStoreField, const_name("StructStoreField"))
+    NB_TYPE_CASTER(structstore::Field, const_name("Field"))
 
-    static handle from_cpp(structstore::StructStoreField& src, rv_policy, cleanup_list*) {
+    static handle from_cpp(structstore::Field& src, rv_policy, cleanup_list*) {
         return py::to_python_cast(src).release();
     }
 };

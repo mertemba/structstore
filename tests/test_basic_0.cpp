@@ -8,7 +8,7 @@ struct Subsettings {
     stst::StructStore& store;
 
     int& subnum = store["subnum"] = 42;
-    stst::string& substr = store["substr"] = (const char*) "bar";
+    stst::String& substr = store["substr"] = (const char*) "bar";
 
     explicit Subsettings(stst::StructStore& store) : store(store) {}
 };
@@ -19,7 +19,7 @@ struct Settings {
     int& num = store["num"] = 5;
     double& value = store["value"] = 3.14;
     bool& flag = store["flag"] = true;
-    stst::string& str = store["str"] = (const char*) "foo";
+    stst::String& str = store["str"] = (const char*) "foo";
     Subsettings subsettings{store.substore("subsettings")};
 
     explicit Settings(stst::StructStore& store) : store(store) {}
@@ -27,11 +27,12 @@ struct Settings {
 
 TEST(StructStoreTestBasic, refStructInLocalStore) {
     stst::StructStore store(stst::static_alloc);
-    int& num = store["num"];
-    num = 5;
-    std::stringstream str;
+    store["num"] = 5;
+    std::ostringstream str;
     str << store;
     EXPECT_EQ(str.str(), "{\"num\":5,}");
+    store.remove("num");
+    EXPECT_TRUE(store.empty());
 
     Settings settings{store};
     settings.num = 42;
@@ -47,19 +48,19 @@ TEST(StructStoreTestBasic, refStructInLocalStore) {
 
     stst::List& strlist = store["strlist"];
     strlist.push_back((const char*) "foo");
-    for (stst::string& str: strlist) {
+    for (stst::String& str: strlist) {
         str += "bar";
     }
     EXPECT_EQ(strlist.size(), 1);
-    EXPECT_EQ(strlist[0].get<stst::string>().size(), 6);
+    EXPECT_EQ(strlist[0].get<stst::String>().size(), 6);
 
-    std::string yaml_str = (std::stringstream() << to_yaml(store)).str();
+    std::string yaml_str = (std::ostringstream() << store.to_yaml()).str();
     EXPECT_EQ(yaml_str, "num: 42\nvalue: 3.1400000000000001\nflag: true\nstr: foo\nsubsettings:\n  subnum: 43\n  substr: bar\nlist:\n  - 6\n  - 43\nstrlist:\n  - foobar");
 }
 
 TEST(StructStoreTestBasic, refStructInSharedStore) {
     stst::StructStoreShared shdata_store("/shdata_store");
-    std::stringstream str;
+    std::ostringstream str;
     str << *shdata_store;
     EXPECT_EQ(str.str(), "{}");
 
@@ -70,7 +71,7 @@ TEST(StructStoreTestBasic, refStructInSharedStore) {
 TEST(StructStoreTestBasic, sharedStore) {
     stst::StructStoreShared shsettings_store("/shsettings_store");
     Settings shsettings{*shsettings_store};
-    std::stringstream str;
+    std::ostringstream str;
     str << *shsettings_store;
     EXPECT_EQ(str.str(), "{\"num\":5,\"value\":3.14,\"flag\":1,\"str\":foo,\"subsettings\":{\"subnum\":42,\"substr\":bar,},}");
 }
@@ -95,6 +96,15 @@ TEST(StructStoreTestBasic, cmpEqualShared) {
     settings2.subsettings.substr += '.';
     EXPECT_NE(*store1, *store2);
     EXPECT_NE(store1, store2);
+}
+
+TEST(StructStoreTestBasic, moveStore) {
+    stst::StructStore store(stst::static_alloc);
+    int& num = store["num"];
+    num = 5;
+    stst::StructStore store2 = std::move(store);
+    EXPECT_TRUE(store.empty());
+    EXPECT_EQ(store2["num"].get<int>(), 5);
 }
 
 int main(int argc, char** argv) {

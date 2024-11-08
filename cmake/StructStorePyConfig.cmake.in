@@ -1,6 +1,6 @@
 include(CMakeFindDependencyMacro)
-find_dependency(yaml-cpp REQUIRED)
+find_dependency(StructStore REQUIRED)
 
 get_filename_component(STRUCTSTORE_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 
-include("${STRUCTSTORE_CMAKE_DIR}/StructStoreTargets.cmake")
+include("${STRUCTSTORE_CMAKE_DIR}/StructStorePyTargets.cmake")

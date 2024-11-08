@@ -48,7 +48,7 @@ TEST(StructStoreTestBasic, structInStaticStore) {
 
     stst::StructStore store(stst::static_alloc);
     to_store(store, settings);
-    std::stringstream str;
+    std::ostringstream str;
     str << store;
     EXPECT_EQ(str.str(), "{\"num\":5,\"value\":3.14,\"flag\":1,\"str\":foo,\"subsettings\":{\"subnum\":42,\"substr\":bar,},}");
 }

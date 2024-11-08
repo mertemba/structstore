@@ -338,6 +338,19 @@ public:
         init_mini_malloc();
     }
 
+    ~MiniMalloc() noexcept(false) {
+        memnode* node = (memnode*) buffer;
+        bool found_allocated = false;
+        while (node != nullptr) {
+            if (!is_allocated(node) && node->size != 0) {
+                found_allocated = true;
+                STST_LOG_ERROR() << "found leaked memory block: " << node;
+            }
+            node = get_next_node(node);
+        }
+        if (found_allocated) { throw std::runtime_error("found leaked memory blocks"); }
+    }
+
     MiniMalloc() = delete;
 
     MiniMalloc(MiniMalloc&&) = delete;

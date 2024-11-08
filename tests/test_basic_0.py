@@ -38,6 +38,10 @@ class TestBasic0(unittest.TestCase):
         state.check()
         self.assertNotEqual(state.vec, state.mat)
         self.assertNotEqual(state.vec, state)
+        del state['none']
+        self.assertFalse(hasattr(state, 'none'))
+        del state.flag
+        self.assertFalse(hasattr(state, 'flag'))
 
         # check dict types
         self.assertEqual(type(state.sub), structstore.StructStore)
@@ -65,8 +69,6 @@ class TestBasic0(unittest.TestCase):
             "num": 5,
             "value": 3.14,
             "mystr": "foo",
-            "flag": True,
-            "none": None,
             "lst": [1, 2, 3, 5, 8],
             "tuple": [0, 0],
         })
@@ -93,4 +95,5 @@ class TestBasic0(unittest.TestCase):
         state.sub.vec.copy()[0] += 1.0
         self.assertNotEqual(state2.state, state)
         state2.clear()
+        self.assertTrue(state2.empty())
         self.assertEqual(str(state2), "{}")

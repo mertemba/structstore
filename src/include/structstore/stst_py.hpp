@@ -2,17 +2,19 @@
 #define STST_PY_HPP
 
 #include "structstore/stst_alloc.hpp"
-#include "structstore/stst_containers.hpp"
 #include "structstore/stst_field.hpp"
+#include "structstore/stst_shared.hpp"
 #include "structstore/stst_structstore.hpp"
 #include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
 
 #include <functional>
+#include <type_traits>
 #include <unordered_map>
 
 #include <nanobind/make_iterator.h>
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
 
 // make customized STL containers opaque to nanobind
 namespace nanobind::detail {
@@ -37,8 +39,8 @@ public:
     };
 
     using FromPythonFn = std::function<bool(FieldAccess, const nb::handle&)>;
-    using ToPythonFn = std::function<nb::object(const StructStoreField&, ToPythonMode mode)>;
-    using ToPythonCastFn = std::function<nb::object(const StructStoreField&)>;
+    using ToPythonFn = std::function<nb::object(const Field&, ToPythonMode mode)>;
+    using ToPythonCastFn = std::function<nb::object(const Field&)>;
 
 private:
     struct __attribute__((__visibility__("default"))) PyType {
@@ -51,10 +53,16 @@ private:
 
     static const PyType& get_py_type(uint64_t type_hash);
 
+    static StructStore& get_store(StructStore& store) { return store; }
+    static StructStore& get_store(StructStoreShared& store) { return *store; }
+    template<typename T>
+    static StructStore& get_store(Struct<T>& s) {
+        return s.store;
+    }
 
     static nb::object get_field(StructStore& store, const std::string& name);
 
-    static void set_field(StructStore& store, const std::string& name, const nb::object& value);
+    static void set_field(StructStore& store, const std::string& name, const nb::handle& value);
 
     static ScopedLock lock(StructStore& store);
 
@@ -73,33 +81,53 @@ private:
 public:
     template<typename T, typename T_py>
     static bool default_from_python_fn(FieldAccess access, const nb::handle& value) {
-        if (nb::isinstance<T_py>(value)) {
-            access.get<T>() = nb::cast<T>(value);
+        if (nb::isinstance<T>(value)) {
+            STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name
+                             << " succeeded";
+            const T& t = nb::cast<T>(value, false);
+            access.get<T>() = t;
             return true;
         }
+        STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name << " failed";
         return false;
     };
 
     template<typename T, typename T_py>
-    static nb::object default_to_python_fn(const StructStoreField& field, ToPythonMode) {
+    static nb::object default_to_python_fn(const Field& field, ToPythonMode) {
         return T_py(field.get<T>());
     };
 
     template<typename T>
-    static nb::object default_to_python_cast_fn(const StructStoreField& field) {
+    static nb::object default_to_python_cast_fn(const Field& field) {
         return nb::cast(field.get<T>(), nb::rv_policy::reference);
     };
 
     template<typename T>
     static void register_type(FromPythonFn from_python_fn, ToPythonFn to_python_fn,
-                              ToPythonCastFn to_python_cast_fn) {
+                              ToPythonCastFn to_python_cast_fn = default_to_python_cast_fn<T>) {
+        static_assert(!std::is_pointer_v<T>);
         PyType py_type{from_python_fn, to_python_fn, to_python_cast_fn};
         const uint64_t type_hash = typing::get_type_hash<T>();
-        STST_LOG_DEBUG() << "registering Python type '" << typing::get_type_name<T>() << "' with hash '" << type_hash << "'";
+        STST_LOG_DEBUG() << "registering Python type '" << typing::get_type<T>().name
+                         << "' with hash '" << type_hash << "'";
         auto ret = get_py_types().insert({type_hash, py_type});
         if (!ret.second) {
             throw typing::already_registered_type_error(type_hash);
         }
+    }
+
+    static nb::object structstore_to_python(StructStore& store, py::ToPythonMode mode);
+
+    template<typename T>
+    static void register_struct_type(nb::class_<T>& cls) {
+        static_assert(std::is_base_of_v<Struct<T>, T>);
+        static_assert(std::is_same_v<T, std::remove_cv_t<T>>);
+        py::ToPythonFn to_python_fn = [](const Field& field, py::ToPythonMode mode) {
+            auto& store = get_store(field.get<T>());
+            return structstore_to_python(store, mode);
+        };
+        register_type<T>(default_from_python_fn<T, nb::class_<T>>, to_python_fn);
+        register_structstore_funcs(cls);
     }
 
     static const FromPythonFn& get_from_python_fn(uint64_t type_hash) {
@@ -116,7 +144,6 @@ public:
 
     template<typename T, typename T_py>
     static void register_basic_type() {
-        static_assert(!std::is_pointer_v<T>);
         register_type<T>(default_from_python_fn<T, T_py>, default_to_python_fn<T, T_py>,
                          default_to_python_cast_fn<T>);
     }
@@ -124,9 +151,7 @@ public:
     template<typename T>
     static void register_complex_type_funcs(nb::class_<T>& cls) {
         static_assert(!std::is_pointer_v<T>);
-        cls.def("to_yaml", [](T& t) {
-            return YAML::Dump(to_yaml(*FieldView{t}));
-        });
+        cls.def("to_yaml", [](T& t) { return YAML::Dump(FieldView { t } -> to_yaml()); });
         cls.def("__repr__", [](T& t) {
             return (std::ostringstream() << *FieldView{t}).str();
         });
@@ -181,12 +206,12 @@ public:
             return false;
         }
         T& field_cpp = access.get<T>();
-        STST_LOG_DEBUG() << "at type " << typing::get_type_name<T>();
+        STST_LOG_DEBUG() << "at type " << typing::get_type<T>().name;
         if (value_cpp == &field_cpp) {
             STST_LOG_DEBUG() << "copying to itself";
             return true;
         }
-        STST_LOG_DEBUG() << "copying " << typing::get_type_name<T>() << " from " << value_cpp << " to " << &field_cpp;
+        STST_LOG_DEBUG() << "copying " << typing::get_type<T>().name << " from " << value_cpp << " to " << &field_cpp;
         field_cpp = *value_cpp;
         return true;
     }
@@ -207,45 +232,86 @@ public:
             });
         } else {
             cls.def("__setstate__", [](T&, nb::handle) {
-                throw std::runtime_error("cannot unpickle type " + typing::get_type_name<T>());
+                throw std::runtime_error("cannot unpickle type " + std::string(typeid(T).name()));
             });
         }
 
-        cls.def("__getattr__", [](T& t, const std::string& name) {
-            auto& store = t.get_store();
-            return get_field(store, name); }, nb::arg("name"), nb::rv_policy::reference_internal);
+        cls.def(
+                "__getattr__",
+                [](T& t, const std::string& name) {
+                    auto& store = get_store(t);
+                    return get_field(store, name);
+                },
+                nb::arg("name"), nb::rv_policy::reference_internal);
 
-        cls.def("__setattr__", [](T& t, const std::string& name, const nb::object& value) {
-            auto& store = t.get_store();
-            return set_field(store, name, value); }, nb::arg("name"), nb::arg("value").none());
+        cls.def(
+                "__setattr__",
+                [](T& t, const std::string& name, const nb::handle& value) {
+                    auto& store = get_store(t);
+                    return set_field(store, name, value);
+                },
+                nb::arg("name"), nb::arg("value").none());
 
-        cls.def("__getitem__", [](T& t, const std::string& name) {
-            auto& store = t.get_store();
-            return get_field(store, name); }, nb::arg("name"), nb::rv_policy::reference_internal);
+        cls.def(
+                "__delattr__",
+                [](T& t, const std::string& name) {
+                    auto& store = get_store(t);
+                    return store.remove(name.c_str());
+                },
+                nb::arg("name"));
 
-        cls.def("__setitem__", [](T& t, const std::string& name, const nb::object& value) {
-            auto& store = t.get_store();
-            return set_field(store, name, value); }, nb::arg("name"), nb::arg("value").none());
+        cls.def(
+                "__getitem__",
+                [](T& t, const std::string& name) {
+                    auto& store = get_store(t);
+                    return get_field(store, name);
+                },
+                nb::arg("name"), nb::rv_policy::reference_internal);
 
-        cls.def("lock", [](T& t) {
-            auto& store = t.get_store();
-            return lock(store); }, nb::rv_policy::move);
+        cls.def(
+                "__setitem__",
+                [](T& t, const std::string& name, const nb::handle& value) {
+                    auto& store = get_store(t);
+                    return set_field(store, name, value);
+                },
+                nb::arg("name"), nb::arg("value").none());
+
+        cls.def(
+                "__delitem__",
+                [](T& t, const std::string& name) {
+                    auto& store = get_store(t);
+                    return store.remove(name.c_str());
+                },
+                nb::arg("name"));
+
+        cls.def("empty", [](T& t) {
+            auto& store = get_store(t);
+            return store.empty();
+        });
+
+        cls.def(
+                "lock",
+                [](T& t) {
+                    auto& store = get_store(t);
+                    return lock(store);
+                },
+                nb::rv_policy::move);
 
         cls.def("clear", [](T& t) {
-            auto& store = t.get_store();
+            auto& store = get_store(t);
             return clear(store);
         });
 
         cls.def("check", [](T& t) {
             STST_LOG_DEBUG() << "checking from python ...";
-            auto& store = t.get_store();
+            auto& store = get_store(t);
             return store.check();
         });
     }
 
-    static nb::object to_python(const StructStoreField& field, ToPythonMode mode);
+    static nb::object to_python(const Field& field, ToPythonMode mode);
 
-    static nb::object to_python_cast(const StructStoreField& field);
+    static nb::object to_python_cast(const Field& field);
 
     static void from_python(FieldAccess access, const nb::handle& value, const std::string& field_name);
 
