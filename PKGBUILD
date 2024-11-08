@@ -2,7 +2,7 @@
 
 pkgbase=structstore
 pkgname=(structstore structstore_py)
-pkgver=0.2.1
+pkgver=0.2.2
 pkgrel=1
 pkgdesc='Structured object storage, dynamically typed, to be shared between processes'
 arch=('x86_64')
