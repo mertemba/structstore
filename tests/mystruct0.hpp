@@ -3,7 +3,7 @@
 namespace stst = structstore;
 
 struct Frame : public stst::Struct<Frame> {
-    static const stst::FieldType& type_info;
+    static const stst::TypeInfo& type_info;
 
     double t = 0.0;
     bool flag = false;

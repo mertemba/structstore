@@ -11,7 +11,7 @@ TEST(StructStoreTestStruct, structCreation) {
     Frame f;
     store["frame"] = f;
 
-    std::string yaml_str = (std::stringstream() << store.to_yaml()).str();
+    std::string yaml_str = (std::ostringstream() << store.to_yaml()).str();
     EXPECT_EQ(yaml_str, "frame:\n  t: 0\n  flag: false");
 
     stst::StructStore store2 = store;
@@ -20,12 +20,23 @@ TEST(StructStoreTestStruct, structCreation) {
     EXPECT_NE(store, store2);
 }
 
+TEST(StructStoreTestStruct, structBasicFuncs) {
+    Frame f;
+    f.flag = true;
+    f.t = 2.5;
+    Frame f2 = f;
+    EXPECT_EQ(f, f2);
+
+    std::string str = (std::ostringstream() << f).str();
+    EXPECT_EQ(str, "{\"t\":2.5,\"flag\":1,}");
+}
+
 TEST(StructStoreTestStruct, sharedStruct) {
     stst::StructStoreShared shdata_store("/shdata_store");
     Frame f;
     shdata_store["frame"] = f;
 
-    std::string yaml_str = (std::stringstream() << shdata_store->to_yaml()).str();
+    std::string yaml_str = (std::ostringstream() << shdata_store->to_yaml()).str();
     EXPECT_EQ(yaml_str, "frame:\n  t: 0\n  flag: false");
 
     stst::StructStore store2 = *shdata_store;

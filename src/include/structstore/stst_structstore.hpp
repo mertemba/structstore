@@ -56,9 +56,9 @@ public:
         StlAllocator<T> tmp_alloc{mm_alloc};
         void* ptr = tmp_alloc.allocate(1);
         STST_LOG_DEBUG() << "allocating at " << ptr;
-        const auto& field_type = typing::get_type<T>();
-        STST_LOG_DEBUG() << "constructing field " << field_type.name << " at " << ptr;
-        field_type.constructor_fn(mm_alloc, ptr);
+        const auto& type_info = typing::get_type<T>();
+        STST_LOG_DEBUG() << "constructing field " << type_info.name << " at " << ptr;
+        type_info.constructor_fn(mm_alloc, ptr);
         field.replace_data<T>(ptr, mm_alloc);
         return field.get<T>();
     }
@@ -156,7 +156,7 @@ class StructStore : public typing::FieldBase<StructStore> {
     friend class structstore::py;
 
 public:
-    static const FieldType& type_info;
+    static const TypeInfo& type_info;
 
 private:
     MiniMalloc& mm_alloc;

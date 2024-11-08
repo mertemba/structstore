@@ -29,7 +29,7 @@ TEST(StructStoreTestBasic, refStructInLocalStore) {
     stst::StructStore store(stst::static_alloc);
     int& num = store["num"];
     num = 5;
-    std::stringstream str;
+    std::ostringstream str;
     str << store;
     EXPECT_EQ(str.str(), "{\"num\":5,}");
 
@@ -53,13 +53,13 @@ TEST(StructStoreTestBasic, refStructInLocalStore) {
     EXPECT_EQ(strlist.size(), 1);
     EXPECT_EQ(strlist[0].get<stst::String>().size(), 6);
 
-    std::string yaml_str = (std::stringstream() << store.to_yaml()).str();
+    std::string yaml_str = (std::ostringstream() << store.to_yaml()).str();
     EXPECT_EQ(yaml_str, "num: 42\nvalue: 3.1400000000000001\nflag: true\nstr: foo\nsubsettings:\n  subnum: 43\n  substr: bar\nlist:\n  - 6\n  - 43\nstrlist:\n  - foobar");
 }
 
 TEST(StructStoreTestBasic, refStructInSharedStore) {
     stst::StructStoreShared shdata_store("/shdata_store");
-    std::stringstream str;
+    std::ostringstream str;
     str << *shdata_store;
     EXPECT_EQ(str.str(), "{}");
 
@@ -70,7 +70,7 @@ TEST(StructStoreTestBasic, refStructInSharedStore) {
 TEST(StructStoreTestBasic, sharedStore) {
     stst::StructStoreShared shsettings_store("/shsettings_store");
     Settings shsettings{*shsettings_store};
-    std::stringstream str;
+    std::ostringstream str;
     str << *shsettings_store;
     EXPECT_EQ(str.str(), "{\"num\":5,\"value\":3.14,\"flag\":1,\"str\":foo,\"subsettings\":{\"subnum\":42,\"substr\":bar,},}");
 }

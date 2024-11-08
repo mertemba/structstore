@@ -12,7 +12,7 @@ using std_string = std::basic_string<char, std::char_traits<char>, StlAllocator<
 
 class String : public typing::FieldBase<String>, public std_string {
 public:
-    static const FieldType& type_info;
+    static const TypeInfo& type_info;
 
     String(const StlAllocator<String>& alloc) : std_string(alloc) {}
 
@@ -37,7 +37,7 @@ class List : public typing::FieldBase<List> {
     mutable SpinMutex mutex;
 
 public:
-    static const FieldType& type_info;
+    static const TypeInfo& type_info;
 
     class Iterator {
         // todo: store scoped lock
@@ -173,7 +173,7 @@ class Matrix : public typing::FieldBase<Matrix> {
 public:
     static constexpr int MAX_DIMS = 8;
 
-    static const FieldType& type_info;
+    static const TypeInfo& type_info;
 
 protected:
     MiniMalloc& mm_alloc;

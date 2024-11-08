@@ -3,7 +3,7 @@
 
 using namespace structstore;
 
-const FieldType& StructStore::type_info =
+const TypeInfo& StructStore::type_info =
         typing::register_type<StructStore>("structstore::StructStore");
 
 static constexpr size_t malloc_size = 1 << 20;

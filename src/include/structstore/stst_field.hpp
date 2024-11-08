@@ -65,9 +65,9 @@ public:
 
     void clear(MiniMalloc& mm_alloc) {
         if (data) {
-            const auto& field_type = typing::get_type(type_hash);
-            STST_LOG_DEBUG() << "deconstructing field " << field_type.name << " at " << data;
-            field_type.destructor_fn(mm_alloc, data);
+            const auto& type_info = typing::get_type(type_hash);
+            STST_LOG_DEBUG() << "deconstructing field " << type_info.name << " at " << data;
+            type_info.destructor_fn(mm_alloc, data);
             STST_LOG_DEBUG() << "deallocating at " << data;
             mm_alloc.deallocate(data);
         }
@@ -134,8 +134,8 @@ public:
     void check(MiniMalloc& mm_alloc) const {
         if (data != nullptr) {
             try_with_info("in field data ptr: ", mm_alloc.assert_owned(data););
-            const typing::CheckFn<>& check = typing::get_type(type_hash).check_fn;
-            try_with_info("in field data content: ", check(mm_alloc, data););
+            const TypeInfo& type_info = typing::get_type(type_hash);
+            try_with_info("in field data content: ", type_info.check_fn(mm_alloc, data););
         }
     }
 
