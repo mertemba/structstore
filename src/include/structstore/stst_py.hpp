@@ -253,6 +253,14 @@ public:
                 nb::arg("name"), nb::arg("value").none());
 
         cls.def(
+                "__delattr__",
+                [](T& t, const std::string& name) {
+                    auto& store = get_store(t);
+                    return store.remove(name.c_str());
+                },
+                nb::arg("name"));
+
+        cls.def(
                 "__getitem__",
                 [](T& t, const std::string& name) {
                     auto& store = get_store(t);
@@ -267,6 +275,19 @@ public:
                     return set_field(store, name, value);
                 },
                 nb::arg("name"), nb::arg("value").none());
+
+        cls.def(
+                "__delitem__",
+                [](T& t, const std::string& name) {
+                    auto& store = get_store(t);
+                    return store.remove(name.c_str());
+                },
+                nb::arg("name"));
+
+        cls.def("empty", [](T& t) {
+            auto& store = get_store(t);
+            return store.empty();
+        });
 
         cls.def(
                 "lock",

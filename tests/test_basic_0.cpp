@@ -27,11 +27,12 @@ struct Settings {
 
 TEST(StructStoreTestBasic, refStructInLocalStore) {
     stst::StructStore store(stst::static_alloc);
-    int& num = store["num"];
-    num = 5;
+    store["num"] = 5;
     std::ostringstream str;
     str << store;
     EXPECT_EQ(str.str(), "{\"num\":5,}");
+    store.remove("num");
+    EXPECT_TRUE(store.empty());
 
     Settings settings{store};
     settings.num = 42;
@@ -95,6 +96,15 @@ TEST(StructStoreTestBasic, cmpEqualShared) {
     settings2.subsettings.substr += '.';
     EXPECT_NE(*store1, *store2);
     EXPECT_NE(store1, store2);
+}
+
+TEST(StructStoreTestBasic, moveStore) {
+    stst::StructStore store(stst::static_alloc);
+    int& num = store["num"];
+    num = 5;
+    stst::StructStore store2 = std::move(store);
+    EXPECT_TRUE(store.empty());
+    EXPECT_EQ(store2["num"].get<int>(), 5);
 }
 
 int main(int argc, char** argv) {

@@ -349,6 +349,27 @@ public:
         (*this)(HashString{name}, t);
     }
 
+    bool empty() const {
+        return slots.empty();
+    }
+
+    void remove(HashString name) {
+        Field& field = fields.at(name);
+        if (managed) {
+            field.clear(mm_alloc);
+        } else {
+            field.clear_unmanaged();
+        }
+        fields.erase(name);
+        auto slot_it = std::find(slots.begin(), slots.end(), name);
+        mm_alloc.deallocate((void*) slot_it->str);
+        slots.erase(slot_it);
+    }
+
+    void remove(const char* name) {
+        remove(HashString{name});
+    }
+
     SpinMutex& get_mutex() {
         return mutex;
     }
