@@ -108,7 +108,8 @@ public:
         static_assert(!std::is_pointer_v<T>);
         PyType py_type{from_python_fn, to_python_fn, to_python_cast_fn};
         const uint64_t type_hash = typing::get_type_hash<T>();
-        STST_LOG_DEBUG() << "registering Python type '" << typing::get_type(type_hash).name << "' with hash '" << type_hash << "'";
+        STST_LOG_DEBUG() << "registering Python type '" << typing::get_type<T>().name
+                         << "' with hash '" << type_hash << "'";
         auto ret = get_py_types().insert({type_hash, py_type});
         if (!ret.second) {
             throw typing::already_registered_type_error(type_hash);
@@ -231,7 +232,7 @@ public:
             });
         } else {
             cls.def("__setstate__", [](T&, nb::handle) {
-                throw std::runtime_error("cannot unpickle type " + typing::get_type<T>().name);
+                throw std::runtime_error("cannot unpickle type " + std::string(typeid(T).name()));
             });
         }
 

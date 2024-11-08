@@ -22,11 +22,6 @@ const TypeInfo& typing::get_type(uint64_t type_hash) {
     }
 }
 
-template<>
-uint64_t typing::get_type_hash<void>() {
-    return 0;
-}
-
 static bool registered_common_types = []() {
     typing::register_type<void>("<empty>");
     typing::register_type<int>("int");

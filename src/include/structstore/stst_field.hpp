@@ -40,8 +40,7 @@ public:
     Field() : data(nullptr), type_hash(0) {}
 
     template<typename T>
-    explicit Field(T* data)
-            : data(data), type_hash(typing::get_type_hash<T>()) {}
+    explicit Field(T* data) : data(data), type_hash(typing::get_type_hash<T>()) {}
 
     explicit Field(void* data, uint64_t type_hash)
         : data(data), type_hash(type_hash) {}
@@ -87,7 +86,7 @@ public:
         data = new_data;
         type_hash = typing::get_type_hash<T>();
         STST_LOG_DEBUG() << "replacing field data with " << new_data << ", type "
-                         << typing::get_type(type_hash).name;
+                         << typing::get_type<T>().name;
     }
 
     Field& operator=(Field&& other) noexcept {

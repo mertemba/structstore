@@ -68,6 +68,7 @@ public:
     using CopyFn = std::function<void(MiniMalloc&, void*, const void*)>;
 
     struct TypeInfo {
+        uint64_t type_hash;
         std::string name;
         size_t size;
         ConstructorFn constructor_fn;
@@ -84,6 +85,7 @@ private:
     static TypeInfo create_type_info(const std::string name) {
         static_assert(!std::is_void_v<T>);
         TypeInfo t;
+        t.type_hash = -1;
         t.name = name;
         t.size = sizeof(T);
         if constexpr (std::is_constructible_v<T, MiniMalloc&>) {
@@ -175,6 +177,7 @@ public:
         } else {
             type_info = create_type_info<T>(name);
         }
+        type_info.type_hash = type_hash;
         auto ret = get_type_infos().insert({type_hash, type_info});
         if (!ret.second) {
             if (ret.first->second.name == type_info.name) {
@@ -191,6 +194,12 @@ public:
 
     template<typename T>
     static uint64_t get_type_hash() {
+        if constexpr (std::is_class_v<T>) {
+            static_assert(std::is_base_of_v<FieldBase<T>, T>);
+            return T::type_info.type_hash;
+        } else if constexpr (std::is_void_v<T>) {
+            return 0;
+        }
         try {
             return get_type_hashes().at(typeid(T));
         } catch (const std::out_of_range&) {
@@ -200,34 +209,21 @@ public:
         }
     }
 
-    template<typename T>
-    static const uint64_t* find_type_hash() {
-        auto& type_hashes = get_type_hashes();
-        auto it = type_hashes.find(typeid(T));
-        if (it == type_hashes.end()) {
-            return nullptr;
-        }
-        return &it->second;
-    }
-
     static const TypeInfo& get_type(uint64_t type_hash);
 
     template<typename T>
     inline static const TypeInfo& get_type() {
+        if constexpr (std::is_class_v<T>) { return T::type_info; }
         return get_type(get_type_hash<T>());
     }
 };
 
 using TypeInfo = typing::TypeInfo;
 
-template<>
-uint64_t typing::get_type_hash<void>();
-
 template<typename T>
 inline void StlAllocator<T>::construct(T* p) {
-    const uint64_t* type_hash = typing::find_type_hash<T>();
-    if (type_hash) {
-        typing::get_type(*type_hash).constructor_fn(mm_alloc, p);
+    if constexpr (std::is_base_of_v<typing::FieldBase<T>, T>) {
+        T::type_info.constructor_fn(mm_alloc, p);
     } else {
         new (p) T;
     }
