@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Dict, List
 
 import numpy as np
-from _mystruct0_py import Frame
+from _mystruct0_py import Frame, Track
 
 import structstore
 
@@ -20,3 +20,9 @@ class TestMystruct0(unittest.TestCase):
         state.frame2 = state.frame
         state.frame2.t = 3.0
         self.assertEqual(state.frame.t, 2.5)
+
+        track = Track()
+        self.assertEqual(track.frame1, track.frame2)
+        state.track = track
+        state.track.frame2 = state.frame
+        self.assertNotEqual(state.track.frame1, state.track.frame2)

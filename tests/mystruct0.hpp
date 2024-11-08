@@ -1,3 +1,6 @@
+#ifndef STST_MYSTRUCT0_HPP
+#define STST_MYSTRUCT0_HPP
+
 #include <structstore/structstore.hpp>
 
 namespace stst = structstore;
@@ -29,3 +32,5 @@ struct Frame : public stst::Struct<Frame> {
         return *this;
     }
 };
+
+#endif

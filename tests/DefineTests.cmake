@@ -3,6 +3,7 @@ find_package(GTest REQUIRED)
 
 set(TEST_LIB_TARGETS "")
 list(APPEND TEST_LIB_TARGETS mystruct0)
+list(APPEND TEST_LIB_TARGETS mystruct1)
 
 foreach(TEST_LIB_TARGET ${TEST_LIB_TARGETS})
     add_library(${TEST_LIB_TARGET} SHARED ${STRUCTSTORE_TESTS_DIR}/${TEST_LIB_TARGET}.cpp)
@@ -13,6 +14,7 @@ set(TEST_TARGETS "")
 list(APPEND TEST_TARGETS test_basic_0)
 list(APPEND TEST_TARGETS test_basic_1)
 list(APPEND TEST_TARGETS test_mystruct0)
+list(APPEND TEST_TARGETS test_mystruct1)
 
 foreach(TEST_TARGET ${TEST_TARGETS})
     add_executable(${TEST_TARGET} ${STRUCTSTORE_TESTS_DIR}/${TEST_TARGET}.cpp)
