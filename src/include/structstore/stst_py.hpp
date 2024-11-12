@@ -105,7 +105,6 @@ public:
     template<typename T>
     static void register_type(FromPythonFn from_python_fn, ToPythonFn to_python_fn,
                               ToPythonCastFn to_python_cast_fn = default_to_python_cast_fn<T>) {
-        static_assert(!std::is_pointer_v<T>);
         PyType py_type{from_python_fn, to_python_fn, to_python_cast_fn};
         const uint64_t type_hash = typing::get_type_hash<T>();
         STST_LOG_DEBUG() << "registering Python type '" << typing::get_type<T>().name
@@ -119,6 +118,38 @@ public:
     static nb::object structstore_to_python(StructStore& store, py::ToPythonMode mode);
 
     template<typename T>
+    static void register_struct_ptr_type() {
+        static_assert(!std::is_pointer_v<T>);
+        static_assert(std::is_class_v<T>);
+        auto from_python_fn = [](FieldAccess access, const nb::handle& value) {
+            if (access.get_type_hash() == typing::get_type_hash<T*>() && nb::isinstance<T>(value)) {
+                STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name
+                                 << " succeeded";
+                T& t = nb::cast<T&>(value, false);
+                access.get<T*>() = &t;
+                return true;
+            }
+            STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name << " failed";
+            return false;
+        };
+        py::ToPythonFn to_python_fn = [](const Field& field, py::ToPythonMode) {
+            T* t_ptr = field.get<T*>();
+            if (t_ptr == nullptr) {
+                return nb::none();
+            }
+            return nb::cast(*t_ptr, nb::rv_policy::reference);
+        };
+        py::ToPythonCastFn to_python_cast_fn = [](const Field& field) {
+            T* t_ptr = field.get<T*>();
+            if (t_ptr == nullptr) {
+                return nb::none();
+            }
+            return nb::cast(*t_ptr, nb::rv_policy::reference);
+        };
+        register_type<T*>(from_python_fn, to_python_fn, to_python_cast_fn);
+    }
+
+    template<typename T>
     static void register_struct_type(nb::class_<T>& cls) {
         static_assert(std::is_base_of_v<Struct<T>, T>);
         static_assert(std::is_same_v<T, std::remove_cv_t<T>>);
@@ -127,6 +158,7 @@ public:
             return structstore_to_python(store, mode);
         };
         register_type<T>(default_from_python_fn<T, nb::class_<T>>, to_python_fn);
+        register_struct_ptr_type<T>();
         register_structstore_funcs(cls);
     }
 
@@ -142,10 +174,43 @@ public:
         return get_py_type(type_hash).to_python_cast_fn;
     }
 
+    template<typename T>
+    static void register_basic_ptr_type() {
+        static_assert(!std::is_pointer_v<T>);
+        static_assert(!std::is_class_v<T>);
+        auto from_python_fn = [](FieldAccess access, const nb::handle& value) {
+            if (access.get_type_hash() == typing::get_type_hash<T*>() && nb::isinstance<T>(value)) {
+                STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name
+                                 << " succeeded";
+                T t = nb::cast<T>(value, false);
+                *access.get<T*>() = t;
+                return true;
+            }
+            STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name << " failed";
+            return false;
+        };
+        py::ToPythonFn to_python_fn = [](const Field& field, py::ToPythonMode) {
+            T* t_ptr = field.get<T*>();
+            if (t_ptr == nullptr) {
+                return nb::none();
+            }
+            return nb::cast(*t_ptr);
+        };
+        py::ToPythonCastFn to_python_cast_fn = [](const Field& field) {
+            T* t_ptr = field.get<T*>();
+            if (t_ptr == nullptr) {
+                return nb::none();
+            }
+            return nb::cast(*t_ptr);
+        };
+        register_type<T*>(from_python_fn, to_python_fn, to_python_cast_fn);
+    }
+
     template<typename T, typename T_py>
     static void register_basic_type() {
         register_type<T>(default_from_python_fn<T, T_py>, default_to_python_fn<T, T_py>,
                          default_to_python_cast_fn<T>);
+        register_basic_ptr_type<T>();
     }
 
     template<typename T>
@@ -173,21 +238,6 @@ public:
             }
             return false;
         });
-    }
-
-    template<typename T>
-    static void register_ptr_type(const nb::handle& T_ptr_py, const nb::handle& T_py) {
-        static_assert(std::is_pointer_v<T>);
-        auto from_python_fn = [T_ptr_py, T_py](FieldAccess access, const nb::handle& value) {
-            if (value.type().equal(T_ptr_py) ||
-                (!access.get_field().empty() && value.type().equal(T_py))) {
-                access.get<T>() = nb::cast<T>(value);
-                return true;
-            }
-            return false;
-        };
-        register_type<T>(
-                PyType{from_python_fn, default_to_python_cast_fn<T>, default_to_python_cast_fn<T>});
     }
 
     template<typename T>

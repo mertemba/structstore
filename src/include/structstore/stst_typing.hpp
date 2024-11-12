@@ -104,6 +104,7 @@ private:
                 return ((const T*) t)->to_yaml();
             };
             t.check_fn = [](MiniMalloc& mm_alloc, const void* t) {
+                mm_alloc.assert_owned((const T*) t);
                 ((const T*) t)->check(mm_alloc);
             };
         } else {
@@ -119,6 +120,32 @@ private:
         };
         t.copy_fn = [](MiniMalloc&, void* t, const void* other) { *(T*) t = *(const T*) other; };
         return t;
+    }
+
+    template<typename T>
+    static TypeInfo create_ptr_type_info(const std::string name) {
+        static_assert(std::is_pointer_v<T>);
+        TypeInfo ti;
+        ti.type_hash = -1;
+        ti.name = name;
+        ti.size = sizeof(T);
+        ti.constructor_fn = [](MiniMalloc&, void* t) { *(T**) t = nullptr; };
+        ti.destructor_fn = [](MiniMalloc&, void* t) { *(T**) t = nullptr; };
+        ti.serialize_text_fn = [name](std::ostream& os, const void*) { os << "<" << name << ">"; };
+        ti.serialize_yaml_fn = [=](const void*) -> YAML::Node {
+            return YAML::Node{"<" + name + ">"};
+        };
+        ti.check_fn = [=](MiniMalloc& mm_alloc, const void* t) {
+            mm_alloc.assert_owned(t);
+            if (*(T**) t != nullptr) { mm_alloc.assert_owned(*(T* const*) t); }
+        };
+        ti.cmp_equal_fn = [=](const void* t, const void* other) {
+            return *(T* const*) t == *(T* const*) other || **(T* const*) t == **(T* const*) other;
+        };
+        ti.copy_fn = [=](MiniMalloc&, void* t, const void* other) {
+            *(T**) t = *(T* const*) other;
+        };
+        return ti;
     }
 
     static TypeInfo create_void_type_info(const std::string name) {
@@ -143,15 +170,8 @@ private:
 
     static std::unordered_map<uint64_t, const TypeInfo>& get_type_infos();
 
-public:
-    static std::runtime_error already_registered_type_error(uint64_t type_hash) {
-        std::ostringstream str;
-        str << "type already registered: " << get_type(type_hash).name;
-        return std::runtime_error(str.str());
-    }
-
     template<typename T>
-    static const TypeInfo& register_type(const std::string& name) {
+    static const TypeInfo& register_type_internal(const std::string& name) {
         uint64_t type_hash = const_hash(name.c_str());
         if constexpr (std::is_void_v<T>) {
             type_hash = 0;
@@ -174,6 +194,8 @@ public:
         TypeInfo type_info;
         if constexpr (std::is_void_v<T>) {
             type_info = create_void_type_info("<empty>");
+        } else if constexpr (std::is_pointer_v<T>) {
+            type_info = create_ptr_type_info<T>(name);
         } else {
             type_info = create_type_info<T>(name);
         }
@@ -188,8 +210,25 @@ public:
                 throw std::runtime_error(str.str());
             }
         }
+        if constexpr (!std::is_pointer_v<T>) {
+            // register corresponding pointer type
+            register_type_internal<T*>(name + '*');
+        }
         // this triggers a `-Wdangling-reference` at the call site in GCC
-        return ret.first->second;
+        const TypeInfo& inserted_type_info = ret.first->second;
+        return inserted_type_info;
+    }
+
+public:
+    static std::runtime_error already_registered_type_error(uint64_t type_hash) {
+        std::ostringstream str;
+        str << "type already registered: " << get_type(type_hash).name;
+        return std::runtime_error(str.str());
+    }
+
+    template<typename T>
+    static const TypeInfo& register_type(const std::string& name) {
+        return register_type_internal<T>(name);
     }
 
     template<typename T>

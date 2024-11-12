@@ -14,7 +14,8 @@ TEST(StructStoreTestStruct, nestedStruct) {
 
     std::string yaml_str = (std::ostringstream() << store.to_yaml()).str();
     EXPECT_EQ(yaml_str,
-              "track:\n  frame1:\n    t: 0\n    flag: false\n  frame2:\n    t: 0\n    flag: false");
+              "track:\n  frame1:\n    t: 0\n    flag: false\n    t_ptr: <double*>\n  frame2:\n    "
+              "t: 0\n    flag: false\n    t_ptr: <double*>\n  frame_ptr: <Frame*>");
 
     stst::StructStore store2 = store;
     EXPECT_EQ(store, store2);
