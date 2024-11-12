@@ -40,6 +40,7 @@ class MiniMalloc {
     size_type sizes[SIZES_COUNT];
     const size_t blocksize;
     size_t allocated;
+    memnode* block_node;
 
     // member methods
     static inline bool is_allocated(memnode* node) {
@@ -211,7 +212,7 @@ class MiniMalloc {
         }
         assert(ptr >= (byte*) &(*free_nodes)[SIZES_COUNT]);
         // allocate first block
-        auto* block_node = (memnode*) ptr;
+        block_node = (memnode*) ptr;
         assert(block_node != nullptr);
         block_node->d_next_free_node = 0;
         block_node->prev_node_size = 0; // also sets to unallocated
@@ -330,7 +331,8 @@ class MiniMalloc {
     }
 
 public:
-    MiniMalloc(size_t size, void* buffer) : buffer{(byte*) buffer}, blocksize{size}, allocated{0} {
+    MiniMalloc(size_t size, void* buffer)
+        : buffer{(byte*) buffer}, blocksize{size}, allocated{0}, block_node{nullptr} {
         ScopedLock lock{mutex};
         if (buffer == nullptr) {
             return;
@@ -339,12 +341,13 @@ public:
     }
 
     ~MiniMalloc() noexcept(false) {
-        memnode* node = (memnode*) buffer;
+        memnode* node = block_node;
         bool found_allocated = false;
         while (node != nullptr) {
-            if (!is_allocated(node) && node->size != 0) {
+            if (is_allocated(node)) {
                 found_allocated = true;
-                STST_LOG_ERROR() << "found leaked memory block: " << node;
+                STST_LOG_ERROR() << "found leaked memory block " << node << " of size "
+                                 << node->size;
             }
             node = get_next_node(node);
         }
