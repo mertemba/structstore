@@ -232,7 +232,7 @@ void StructStoreShared::mmap_existing_fd() {
     ++sh_data_ptr->usage_count;
 
 #ifndef NDEBUG
-    sh_data_ptr->data.check(sh_data_ptr->mm_alloc);
+    sh_data_ptr->data.check(sh_data_ptr->mm_alloc, nullptr);
 #endif
 }
 

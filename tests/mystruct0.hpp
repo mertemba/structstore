@@ -15,9 +15,9 @@ struct Frame : public stst::Struct<Frame> {
     Frame() : Frame(stst::static_alloc) {}
 
     explicit Frame(stst::MiniMalloc& mm_alloc) : Struct(mm_alloc) {
-        store("t", t);
-        store("flag", flag);
-        store("t_ptr", t_ptr);
+        field_map.store_ref("t", t);
+        field_map.store_ref("flag", flag);
+        field_map.store_ref("t_ptr", t_ptr);
     }
 
     Frame(const Frame& other) : Frame() { *this = other; }
@@ -25,13 +25,7 @@ struct Frame : public stst::Struct<Frame> {
     Frame(Frame&& other) : Frame() { *this = std::move(other); }
 
     Frame& operator=(const Frame& other) {
-        store = other.store;
-        t_ptr = &t;
-        return *this;
-    }
-
-    Frame& operator=(Frame&& other) {
-        store = std::move(other.store);
+        field_map = other.field_map;
         t_ptr = &t;
         return *this;
     }

@@ -1,6 +1,6 @@
 #include "structstore/stst_field.hpp"
+#include "structstore/stst_containers.hpp"
 #include "structstore/stst_shared.hpp"
-#include <stdexcept>
 
 using namespace structstore;
 
@@ -14,7 +14,7 @@ YAML::Node Field::to_yaml() const {
     return type_info.serialize_yaml_fn(data);
 }
 
-void Field::constr_copy_from(MiniMalloc& mm_alloc, const Field& other) {
+void Field::construct_copy_from(MiniMalloc& mm_alloc, const Field& other) {
     assert_empty();
     type_hash = other.type_hash;
     const auto& type_info = typing::get_type(type_hash);
@@ -40,3 +40,16 @@ void Field::move_from(Field& other) {
 
 template<>
 FieldView::FieldView(StructStoreShared& store) : field{&*store} {}
+
+::structstore::String& FieldAccess::get_str() { return get<::structstore::String>(); }
+
+template<>
+FieldAccess& FieldAccess::operator= <const char*>(const char* const& value) {
+    get<structstore::String>() = value;
+    return *this;
+}
+
+template<>
+FieldAccess& FieldAccess::operator= <std::string>(const std::string& value) {
+    return *this = value.c_str();
+}

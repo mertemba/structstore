@@ -17,9 +17,9 @@ struct Track : public stst::Struct<Track> {
 
     explicit Track(stst::MiniMalloc& mm_alloc)
         : Struct(mm_alloc), frame1{mm_alloc}, frame2{mm_alloc} {
-        store("frame1", frame1);
-        store("frame2", frame2);
-        store("frame_ptr", frame_ptr);
+        field_map.store_ref("frame1", frame1);
+        field_map.store_ref("frame2", frame2);
+        field_map.store_ref("frame_ptr", frame_ptr);
     }
 
     Track(const Track& other) : Track() { *this = other; }
@@ -27,12 +27,7 @@ struct Track : public stst::Struct<Track> {
     Track(Track&& other) : Track() { *this = std::move(other); }
 
     Track& operator=(const Track& other) {
-        store = other.store;
-        return *this;
-    }
-
-    Track& operator=(Track&& other) {
-        store = std::move(other.store);
+        field_map = other.field_map;
         return *this;
     }
 };

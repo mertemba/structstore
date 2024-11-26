@@ -413,7 +413,9 @@ public:
     }
 };
 
-template<typename T>
+extern MiniMalloc static_alloc;
+
+template<typename T = char>
 class StlAllocator {
     template<typename U>
     friend class StlAllocator;

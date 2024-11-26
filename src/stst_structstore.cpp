@@ -1,60 +1,32 @@
 #include "structstore/stst_structstore.hpp"
-#include "structstore/stst_containers.hpp"
 
 using namespace structstore;
 
 const TypeInfo& StructStore::type_info =
         typing::register_type<StructStore>("structstore::StructStore");
 
-static constexpr size_t malloc_size = 1 << 20;
-MiniMalloc structstore::static_alloc(malloc_size, std::malloc(malloc_size));
-
-void StructStore::to_text(std::ostream& os) const {
-    STST_LOG_DEBUG() << "serializing StructStore at " << this;
-    os << "{";
-    for (const auto& name: slots) {
-        STST_LOG_DEBUG() << "field " << &name << " is at " << &fields.at(name);
-        os << '"' << name.str << "\":";
-        os << fields.at(name) << ",";
+void StructStore::check() const {
+    field_map.check();
+    for (const auto& [key, value]: field_map.get_fields()) {
+        try_with_info("in field '" << key.str << "' value: ",
+                      value.check(field_map.get_alloc(), *this););
     }
-    os << "}";
 }
 
-YAML::Node StructStore::to_yaml() const {
-    YAML::Node root(YAML::NodeType::Map);
-    for (const auto& name: slots) {
-        root[name.str] = fields.at(name).to_yaml();
-    }
-    return root;
-}
-
-void StructStore::check(MiniMalloc& mm_alloc) const {
-    if (&mm_alloc != &this->mm_alloc) {
+void StructStore::check(const MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) const {
+    if (&mm_alloc != &field_map.get_alloc()) {
         throw std::runtime_error("internal error: allocators are not the same");
     }
-    if (slots.size() != fields.size()) {
-        throw std::runtime_error("internal error: slots and fields with different size");
+    if (this->parent_field != parent_field) {
+        STST_LOG_WARN() << "invalid parent_field pointer in field of type " << type_info.name;
     }
-    for (const HashString& str: slots) {
-        try_with_info("in slot '" << str.str << "' name: ", mm_alloc.assert_owned(str.str););
-    }
-    for (const auto& [key, value]: fields) {
-        try_with_info("in field '" << key.str << "' name: ", mm_alloc.assert_owned(key.str););
-        if (managed) {
-            try_with_info("in field '" << key.str << "' value: ", value.check(mm_alloc););
-        }
-    }
+    check();
 }
 
-::structstore::String& FieldAccess::get_str() { return get<::structstore::String>(); }
-
-template<>
-FieldAccess& FieldAccess::operator=<const char*>(const char* const& value) {
-    get<structstore::String>() = value;
-    return *this;
+FieldAccess StructStore::at(HashString name) {
+    return FieldAccess{field_map.at(name), field_map.get_alloc()};
 }
 
-template<>
-FieldAccess& FieldAccess::operator=<std::string>(const std::string& value) {
-    return *this = value.c_str();
+FieldAccess StructStore::operator[](HashString name) {
+    return FieldAccess{field_map[name], field_map.get_alloc()};
 }

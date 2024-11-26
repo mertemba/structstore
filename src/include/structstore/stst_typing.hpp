@@ -21,12 +21,27 @@ class StructStore;
 template<typename T>
 class Struct;
 
-extern MiniMalloc static_alloc;
-
 class typing {
 public:
+    class FieldTypeBase {
+    protected:
+        FieldTypeBase* parent_field = nullptr;
+        mutable SpinMutex mutex = {};
+
+        FieldTypeBase() {}
+        FieldTypeBase(const FieldTypeBase&) {}
+        FieldTypeBase(FieldTypeBase&&) {}
+        FieldTypeBase& operator=(const FieldTypeBase&) { return *this; }
+        FieldTypeBase& operator=(FieldTypeBase&&) { return *this; }
+
+    public:
+        [[nodiscard]] ScopedLock write_lock() { return ScopedLock(mutex); }
+
+        [[nodiscard]] ScopedLock read_lock() const { return ScopedLock(mutex); }
+    };
+
     template<typename T>
-    class FieldBase {
+    class FieldType : public FieldTypeBase {
     private:
         friend class typing;
 
@@ -36,7 +51,9 @@ public:
                     std::is_same_v<decltype(std::declval<const T>().to_text(std::cout)), void>);
             static_assert(std::is_same_v<decltype(std::declval<const T>().to_yaml()), YAML::Node>);
             static_assert(
-                    std::is_same_v<decltype(std::declval<const T>().check(static_alloc)), void>);
+                    std::is_same_v<decltype(std::declval<const T>().check(
+                                           static_alloc, std::declval<const FieldTypeBase*>())),
+                                   void>);
             static_assert(
                     std::is_same_v<decltype(std::declval<const T>() == std::declval<const T>()),
                                    bool>);
@@ -45,13 +62,16 @@ public:
         }
 
     public:
-        friend std::ostream& operator<<(std::ostream& os, const FieldBase<T>& t) {
+        friend std::ostream& operator<<(std::ostream& os, const FieldType<T>& t) {
             ((const T&) t).to_text(os);
             return os;
         }
 
-        inline bool operator!=(const T& other) const { return !(*this == other); }
+        inline bool operator!=(const T& other) const { return !((const T&) *this == other); }
     };
+
+    template<typename T>
+    constexpr static bool is_field_type = std::is_base_of_v<FieldType<T>, T> || !std::is_class_v<T>;
 
     using ConstructorFn = std::function<void(MiniMalloc&, void*)>;
 
@@ -61,7 +81,7 @@ public:
 
     using SerializeYamlFn = std::function<YAML::Node(const void*)>;
 
-    using CheckFn = std::function<void(MiniMalloc&, const void*)>;
+    using CheckFn = std::function<void(const MiniMalloc&, const void*, const FieldTypeBase*)>;
 
     using CmpEqualFn = std::function<bool(const void*, const void*)>;
 
@@ -103,15 +123,20 @@ private:
             t.serialize_yaml_fn = [](const void* t) -> YAML::Node {
                 return ((const T*) t)->to_yaml();
             };
-            t.check_fn = [](MiniMalloc& mm_alloc, const void* t) {
+            t.check_fn = [](const MiniMalloc& mm_alloc, const void* t,
+                            const FieldTypeBase* parent_field) {
+                if (((const T*) t)->parent_field != parent_field) {
+                    STST_LOG_WARN() << "invalid parent_field pointer in field of type "
+                                    << T::type_info.name;
+                }
                 mm_alloc.assert_owned((const T*) t);
-                ((const T*) t)->check(mm_alloc);
+                ((const T*) t)->check(mm_alloc, parent_field);
             };
         } else {
             t.serialize_yaml_fn = [](const void* t) -> YAML::Node {
                 return YAML::Node(*(const T*) t);
             };
-            t.check_fn = [](MiniMalloc& mm_alloc, const void* t) {
+            t.check_fn = [](const MiniMalloc& mm_alloc, const void* t, const FieldTypeBase*) {
                 mm_alloc.assert_owned((const T*) t);
             };
         }
@@ -135,7 +160,7 @@ private:
         ti.serialize_yaml_fn = [=](const void*) -> YAML::Node {
             return YAML::Node{"<" + name + ">"};
         };
-        ti.check_fn = [=](MiniMalloc& mm_alloc, const void* t) {
+        ti.check_fn = [=](const MiniMalloc& mm_alloc, const void* t, const FieldTypeBase*) {
             mm_alloc.assert_owned(t);
             if (*(T**) t != nullptr) { mm_alloc.assert_owned(*(T* const*) t); }
         };
@@ -156,7 +181,7 @@ private:
         t.destructor_fn = [](MiniMalloc&, void*) {};
         t.serialize_text_fn = [](std::ostream& os, const void*) { os << "<empty>"; };
         t.serialize_yaml_fn = [](const void*) { return YAML::Node(YAML::Null); };
-        t.check_fn = [](MiniMalloc&, const void* t) {
+        t.check_fn = [](const MiniMalloc&, const void* t, const FieldTypeBase*) {
             if (t != nullptr) {
                 throw std::runtime_error("internal error: empty data ptr is not nullptr");
             }
@@ -183,8 +208,8 @@ private:
             }
         }
         if constexpr (std::is_class_v<T>) {
-            static_assert(std::is_base_of_v<FieldBase<T>, T>);
-            FieldBase<T>::check_interface();
+            static_assert(std::is_base_of_v<FieldType<T>, T>);
+            FieldType<T>::check_interface();
         }
         STST_LOG_DEBUG() << "registering type '" << name << "' with hash '" << type_hash << "'";
         bool success = get_type_hashes().insert({typeid(T), type_hash}).second;
@@ -234,7 +259,7 @@ public:
     template<typename T>
     static uint64_t get_type_hash() {
         if constexpr (std::is_class_v<T>) {
-            static_assert(std::is_base_of_v<FieldBase<T>, T>);
+            static_assert(std::is_base_of_v<FieldType<T>, T>);
             return T::type_info.type_hash;
         } else if constexpr (std::is_void_v<T>) {
             return 0;
@@ -252,16 +277,20 @@ public:
 
     template<typename T>
     inline static const TypeInfo& get_type() {
+        static_assert(is_field_type<T>);
         if constexpr (std::is_class_v<T>) { return T::type_info; }
         return get_type(get_type_hash<T>());
     }
 };
 
 using TypeInfo = typing::TypeInfo;
+using FieldTypeBase = typing::FieldTypeBase;
+template<typename T>
+using FieldType = typing::FieldType<T>;
 
 template<typename T>
 inline void StlAllocator<T>::construct(T* p) {
-    if constexpr (std::is_base_of_v<typing::FieldBase<T>, T>) {
+    if constexpr (std::is_base_of_v<FieldType<T>, T>) {
         T::type_info.constructor_fn(mm_alloc, p);
     } else {
         new (p) T;

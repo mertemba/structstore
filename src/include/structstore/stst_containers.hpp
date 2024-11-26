@@ -2,7 +2,6 @@
 #define STST_CONTAINERS_HPP
 
 #include "structstore/stst_alloc.hpp"
-#include "structstore/stst_structstore.hpp"
 #include "structstore/stst_field.hpp"
 #include "structstore/stst_typing.hpp"
 
@@ -10,7 +9,7 @@ namespace structstore {
 
 using std_string = std::basic_string<char, std::char_traits<char>, StlAllocator<char>>;
 
-class String : public typing::FieldBase<String>, public std_string {
+class String : public FieldType<String>, public std_string {
 public:
     static const TypeInfo& type_info;
 
@@ -20,21 +19,14 @@ public:
 
     YAML::Node to_yaml() const { return YAML::Node(c_str()); }
 
-    void check(MiniMalloc& mm_alloc) const {
-        try_with_info("string: ", mm_alloc.assert_owned(this););
-        if (!empty()) { try_with_info("string data: ", mm_alloc.assert_owned(data());); }
-    }
+    void check(const MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) const;
 
-    String& operator=(const char* const& value) {
-        static_cast<std_string&>(*this) = value;
-        return *this;
-    }
+    String& operator=(const char* const& value);
 };
 
-class List : public typing::FieldBase<List> {
+class List : public FieldType<List> {
     MiniMalloc& mm_alloc;
     ::structstore::vector<Field> data;
-    mutable SpinMutex mutex;
 
 public:
     static const TypeInfo& type_info;
@@ -94,7 +86,7 @@ public:
 
     FieldAccess push_back() {
         STST_LOG_DEBUG() << "this: " << this << ", cur size: " << data.size();
-        return {data.emplace_back(), mm_alloc};
+        return FieldAccess{data.emplace_back(), mm_alloc};
     }
 
     template<typename T>
@@ -106,19 +98,17 @@ public:
         if (index > data.size()) {
             throw std::out_of_range("index out of bounds: " + std::to_string(index));
         }
-        return {*data.emplace(data.begin() + index), mm_alloc};
+        return FieldAccess{*data.emplace(data.begin() + index), mm_alloc};
     }
 
     FieldAccess operator[](size_t index) {
         if (index >= data.size()) {
             throw std::out_of_range("index out of bounds: " + std::to_string(index));
         }
-        return {data.at(index), mm_alloc};
+        return FieldAccess{data.at(index), mm_alloc};
     }
 
-    FieldAccess at(size_t index) {
-        return {data.at(index), mm_alloc};
-    }
+    FieldAccess at(size_t index) { return FieldAccess{data.at(index), mm_alloc}; }
 
     Iterator begin() const {
         return {*this, 0};
@@ -126,10 +116,6 @@ public:
 
     Iterator end() const {
         return {*this, data.size()};
-    }
-
-    SpinMutex& get_mutex() {
-        return mutex;
     }
 
     size_t size() {
@@ -140,28 +126,20 @@ public:
         if (index >= data.size()) {
             throw std::out_of_range("index out of bounds: " + std::to_string(index));
         }
-        data.at(index).clear(mm_alloc);
+        at(index).clear();
         data.erase(data.begin() + index);
     }
 
     void clear() {
-        for (Field& field: data) { field.clear(mm_alloc); }
+        for (Field& field: data) { FieldAccess{field, mm_alloc}.clear(); }
         data.clear();
-    }
-
-    [[nodiscard]] auto write_lock() {
-        return ScopedLock(mutex);
-    }
-
-    [[nodiscard]] auto read_lock() const {
-        return ScopedLock(mutex);
     }
 
     void to_text(std::ostream&) const;
 
     YAML::Node to_yaml() const;
 
-    void check(MiniMalloc&) const;
+    void check(const MiniMalloc&, const FieldTypeBase*) const;
 
     bool operator==(const List& other) const;
 };
@@ -169,7 +147,7 @@ public:
 template<>
 void List::push_back<const char*>(const char* const& value);
 
-class Matrix : public typing::FieldBase<Matrix> {
+class Matrix : public FieldType<Matrix> {
 public:
     static constexpr int MAX_DIMS = 8;
 
@@ -263,7 +241,7 @@ public:
 
     YAML::Node to_yaml() const;
 
-    void check(MiniMalloc&) const;
+    void check(const MiniMalloc&, const FieldTypeBase*) const;
 
     bool operator==(const Matrix& other) const;
 

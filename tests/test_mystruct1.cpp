@@ -1,8 +1,6 @@
-#include "structstore/stst_structstore.hpp"
-#include <gtest/gtest.h>
-
-#include "mystruct0.hpp"
 #include "mystruct1.hpp"
+
+#include <gtest/gtest.h>
 #include <structstore/structstore.hpp>
 
 namespace stst = structstore;
