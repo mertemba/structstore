@@ -31,12 +31,12 @@ public:
     StructStore(StructStore&& other) : StructStore{static_alloc} { *this = std::move(other); }
 
     StructStore& operator=(const StructStore& other) {
-        field_map = other.field_map;
+        field_map.copy_from(other.field_map, this);
         return *this;
     }
 
     StructStore& operator=(StructStore&& other) {
-        field_map = std::move(other.field_map);
+        field_map.move_from(std::move(other.field_map), this);
         return *this;
     }
 
@@ -63,15 +63,15 @@ public:
 
     inline MiniMalloc& get_alloc() { return field_map.get_alloc(); }
 
-    FieldAccess at(HashString name);
+    FieldAccess<true> at(HashString name);
 
-    inline FieldAccess at(const char* name) { return at(HashString{name}); }
+    inline FieldAccess<true> at(const char* name) { return at(HashString{name}); }
 
     // insert operations
 
-    FieldAccess operator[](HashString name);
+    FieldAccess<true> operator[](HashString name);
 
-    inline FieldAccess operator[](const char* name) { return operator[](HashString{name}); }
+    inline FieldAccess<true> operator[](const char* name) { return operator[](HashString{name}); }
 
     template<typename T>
     T& get(const char* name) {

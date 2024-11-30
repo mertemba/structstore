@@ -69,6 +69,15 @@ public:
 // unmanaged means only pointers are stored.
 template<bool managed>
 class FieldMap : public FieldMapBase {
+protected:
+    void copy_from_unmanaged(const FieldMap& other);
+
+    void copy_from_managed(const FieldMap& other, const FieldTypeBase* parent_field);
+
+    void move_from_managed(FieldMap&& other, const FieldTypeBase* parent_field);
+
+    Field& get_or_insert(HashString name);
+
 public:
     // constructor, assignment, destructor
 
@@ -78,11 +87,25 @@ public:
 
     FieldMap(FieldMap&& other) : FieldMap{static_alloc} { *this = std::move(other); }
 
-    FieldMap& operator=(const FieldMap& other);
+    inline FieldMap& operator=(const FieldMap& other) {
+        static_assert(!managed, "cannot copy from managed FieldMap; use copy_from() instead");
+        copy_from_unmanaged(other);
+        return *this;
+    }
 
-    FieldMap<true>& operator=(FieldMap<true>&& other);
+    FieldMap& operator=(FieldMap&& other) = delete;
 
-    FieldMap<false>& operator=(FieldMap<false>&& other) = delete;
+
+    inline void copy_from(const FieldMap& other, const FieldTypeBase* parent_field) {
+        static_assert(managed,
+                      "cannot copy from unmanaged FieldMap; use assignment operator instead");
+        copy_from_managed(other, parent_field);
+    }
+
+    inline void move_from(FieldMap&& other, const FieldTypeBase* parent_field) {
+        static_assert(managed, "cannot move from unmanaged FieldMap");
+        move_from_managed(std::move(other), parent_field);
+    }
 
     ~FieldMap() noexcept(false) {
         STST_LOG_DEBUG() << "deconstructing FieldMap at " << this;
@@ -93,10 +116,6 @@ public:
 
     // insert operations
 
-private:
-    Field& get_or_insert(HashString name);
-
-public:
     inline Field& operator[](HashString name) {
         static_assert(managed, "potentially creating fields in unmanaged FieldMap is not supported "
                                "(use .at() instead)");

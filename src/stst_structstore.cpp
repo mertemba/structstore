@@ -18,15 +18,15 @@ void StructStore::check(const MiniMalloc& mm_alloc, const FieldTypeBase* parent_
         throw std::runtime_error("internal error: allocators are not the same");
     }
     if (this->parent_field != parent_field) {
-        STST_LOG_WARN() << "invalid parent_field pointer in field of type " << type_info.name;
+        throw std::runtime_error("invalid parent_field pointer in field of type " + type_info.name);
     }
     check();
 }
 
-FieldAccess StructStore::at(HashString name) {
-    return FieldAccess{field_map.at(name), field_map.get_alloc()};
+FieldAccess<true> StructStore::at(HashString name) {
+    return FieldAccess<true>{field_map.at(name), field_map.get_alloc(), this};
 }
 
-FieldAccess StructStore::operator[](HashString name) {
-    return FieldAccess{field_map[name], field_map.get_alloc()};
+FieldAccess<true> StructStore::operator[](HashString name) {
+    return FieldAccess<true>{field_map[name], field_map.get_alloc(), this};
 }

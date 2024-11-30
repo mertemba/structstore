@@ -1,4 +1,5 @@
 #include "structstore/stst_containers.hpp"
+#include "structstore/stst_field.hpp"
 #include "structstore/stst_py.hpp"
 #include "structstore/stst_utils.hpp"
 
@@ -43,13 +44,13 @@ NB_MODULE(MODULE_NAME, m) {
         auto& store = field.get<StructStore>();
         return py::structstore_to_python(store, mode);
     };
-    py::FromPythonFn structstore_from_python_fn = [](Field& field, MiniMalloc& mm_alloc,
+    py::FromPythonFn structstore_from_python_fn = [](FieldAccess<true> access,
                                                      const nanobind::handle& value) {
-        if (py::copy_cast_from_python<StructStore>(field, mm_alloc, value)) { return true; }
+        if (py::copy_cast_from_python<StructStore>(access, value)) { return true; }
         // todo: strict check if this is one of dict, SimpleNamespace, StructStore
         if (nb::hasattr(value, "__dict__")) {
             auto dict = nb::dict(value.attr("__dict__"));
-            StructStore& store = field.get_or_construct<StructStore>(mm_alloc);
+            StructStore& store = access.get<StructStore>();
             STST_LOG_DEBUG() << "copying __dict__ to " << &store;
             store.clear();
             for (const auto& [key, val]: dict) {
@@ -60,7 +61,7 @@ NB_MODULE(MODULE_NAME, m) {
         }
         if (nb::hasattr(value, "__slots__")) {
             auto slots = nb::iterable(value.attr("__slots__"));
-            StructStore& store = field.get_or_construct<StructStore>(mm_alloc);
+            StructStore& store = access.get<StructStore>();
             STST_LOG_DEBUG() << "copying __slots__ to " << &store;
             store.clear();
             for (const auto& key: slots) {
@@ -71,7 +72,7 @@ NB_MODULE(MODULE_NAME, m) {
         }
         if (nb::isinstance<nb::dict>(value)) {
             nb::dict dict = nb::cast<nb::dict>(value);
-            StructStore& store = field.get_or_construct<StructStore>(mm_alloc);
+            StructStore& store = access.get<StructStore>();
             STST_LOG_DEBUG() << "copying nb::dict to " << &store;
             store.clear();
             for (const auto& [key, val]: dict) {
@@ -146,10 +147,9 @@ NB_MODULE(MODULE_NAME, m) {
 
     // structstore::string
     py::register_type<structstore::String>(
-            [](Field& field, MiniMalloc& mm_alloc, const nb::handle& value) {
+            [](FieldAccess<true> access, const nb::handle& value) {
                 if (nb::isinstance<nb::str>(value)) {
-                    field.get_or_construct<structstore::String>(mm_alloc) =
-                            nb::cast<std::string>(value).c_str();
+                    access.get<structstore::String>() = nb::cast<std::string>(value).c_str();
                     return true;
                 }
                 return false;
@@ -175,11 +175,11 @@ NB_MODULE(MODULE_NAME, m) {
         }
         return ret;
     };
-    py::FromPythonFn list_from_python_fn = [](Field& field, MiniMalloc& mm_alloc,
+    py::FromPythonFn list_from_python_fn = [](FieldAccess<true> access,
                                               const nanobind::handle& value) {
-        if (py::copy_cast_from_python<List>(field, mm_alloc, value)) { return true; }
+        if (py::copy_cast_from_python<List>(access, value)) { return true; }
         if (nb::isinstance<nb::list>(value) || nb::isinstance<nb::tuple>(value)) {
-            List& list = field.get_or_construct<List>(mm_alloc);
+            List& list = access.get<List>();
             list.clear();
             int i = 0;
             for (const auto& val: nb::cast<nb::iterable>(value)) {
@@ -267,16 +267,16 @@ NB_MODULE(MODULE_NAME, m) {
             return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()));
         }
     };
-    py::FromPythonFn matrix_from_python_fn = [](Field& field, MiniMalloc& mm_alloc,
+    py::FromPythonFn matrix_from_python_fn = [](FieldAccess<true> access,
                                                 const nanobind::handle& value) {
-        if (py::copy_cast_from_python<Matrix>(field, mm_alloc, value)) { return true; }
+        if (py::copy_cast_from_python<Matrix>(access, value)) { return true; }
         if (nb::ndarray_check(value)) {
             auto array = nb::cast<nb::ndarray<const double, nb::c_contig>>(value);
             if (array.ndim() > Matrix::MAX_DIMS) {
                 throw std::runtime_error("Incompatible buffer dimension!");
             }
-            field.get_or_construct<Matrix>(mm_alloc).from(
-                    array.ndim(), (const size_t*) array.shape_ptr(), array.data());
+            access.get<Matrix>().from(array.ndim(), (const size_t*) array.shape_ptr(),
+                                      array.data());
             return true;
         }
         return false;

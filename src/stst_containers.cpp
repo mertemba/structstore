@@ -8,7 +8,7 @@ const TypeInfo& String::type_info = typing::register_type<String>("structstore::
 
 void String::check(const MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) const {
     if (this->parent_field != parent_field) {
-        STST_LOG_WARN() << "invalid parent_field pointer in field of type " << type_info.name;
+        throw std::runtime_error("invalid parent_field pointer in field of type " + type_info.name);
     }
     try_with_info("string: ", mm_alloc.assert_owned(this););
     if (!empty()) { try_with_info("string data: ", mm_alloc.assert_owned(data());); }
@@ -41,7 +41,7 @@ YAML::Node List::to_yaml() const {
 
 void List::check(const MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) const {
     if (this->parent_field != parent_field) {
-        STST_LOG_WARN() << "invalid parent_field pointer in field of type " << type_info.name;
+        throw std::runtime_error("invalid parent_field pointer in field of type " + type_info.name);
     }
     try_with_info("List*: ", mm_alloc.assert_owned(this););
     for (const Field& field: data) {
@@ -78,7 +78,7 @@ YAML::Node Matrix::to_yaml() const {
 
 void Matrix::check(const MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) const {
     if (this->parent_field != parent_field) {
-        STST_LOG_WARN() << "invalid parent_field pointer in field of type " << type_info.name;
+        throw std::runtime_error("invalid parent_field pointer in field of type " + type_info.name);
     }
     try_with_info("Matrix*: ", mm_alloc.assert_owned(this););
     if (_data) {

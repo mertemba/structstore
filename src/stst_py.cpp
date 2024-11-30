@@ -1,4 +1,6 @@
 #include "structstore/stst_py.hpp"
+#include "structstore/stst_field.hpp"
+#include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
 
 #include <nanobind/nanobind.h>
@@ -56,26 +58,27 @@ __attribute__((__visibility__("default"))) nb::object py::to_python_cast(const F
     return to_python_cast_fn(field);
 }
 
-__attribute__((__visibility__("default"))) void py::from_python(Field& field, MiniMalloc& mm_alloc,
-                                                                const nb::handle& value,
-                                                                const std::string& field_name) {
+__attribute__((__visibility__("default"))) void
+py::from_python(FieldAccess<false> access, const nb::handle& value, const std::string& field_name) {
     if (value.is_none()) { throw nb::value_error("cannot assign None to unmanaged field"); }
-    if (field.empty()) { throw nb::value_error("internal error: unmanaged field is empty"); }
+    if (access.get_field().empty()) {
+        throw nb::value_error("internal error: unmanaged field is empty");
+    }
     STST_LOG_DEBUG() << "at field " << field_name << " of type "
-                     << typing::get_type(field.get_type_hash()).name;
-    auto from_python_fn = py::get_from_python_fn(field.get_type_hash());
-    bool success = from_python_fn(field, mm_alloc, value);
+                     << typing::get_type(access.get_type_hash()).name;
+    auto from_python_fn = py::get_from_python_fn(access.get_type_hash());
+    bool success = from_python_fn(access.to_managed_access(), value);
     if (!success) {
         std::ostringstream msg;
         msg << "cannot assign value of type '" << nb::cast<std::string>(nb::str(value.type()))
             << "' to field '" << field_name << "' of type '"
-            << typing::get_type(field.get_type_hash()).name << "'";
+            << typing::get_type(access.get_type_hash()).name << "'";
         throw nb::type_error(msg.str().c_str());
     }
 }
 
-__attribute__((__visibility__("default")))
-void py::from_python(FieldAccess access, const nb::handle& value, const std::string& field_name) {
+__attribute__((__visibility__("default"))) void
+py::from_python(FieldAccess<true> access, const nb::handle& value, const std::string& field_name) {
     if (value.is_none()) {
         access.clear();
         return;
@@ -86,14 +89,14 @@ void py::from_python(FieldAccess access, const nb::handle& value, const std::str
         // access.check();
 #endif
         auto from_python_fn = py::get_from_python_fn(access.get_type_hash());
-        bool success = from_python_fn(access.get_field(), access.get_alloc(), value);
+        bool success = from_python_fn(access, value);
         if (success) {
             return;
         }
     } else {
-        STST_LOG_WARN() << "at empty field " << field_name;
+        STST_LOG_DEBUG() << "at empty field " << field_name;
         for (const auto& [type_hash, py_type]: py::get_py_types()) {
-            bool success = py_type.from_python_fn(access.get_field(), access.get_alloc(), value);
+            bool success = py_type.from_python_fn(access, value);
             if (success) {
                 return;
             }
@@ -114,17 +117,23 @@ __attribute__((__visibility__("default"))) nb::object py::get_field(const FieldM
     return to_python_cast(*field);
 }
 
-__attribute__((__visibility__("default"))) void
-py::set_field(FieldMap<false>& field_map, const std::string& name, const nb::handle& value) {
+__attribute__((__visibility__("default"))) void py::set_field(FieldMap<false>& field_map,
+                                                              const std::string& name,
+                                                              const nb::handle& value,
+                                                              const FieldTypeBase& parent_field) {
     STST_LOG_DEBUG() << "setting field to type " << nb::repr(value.type()).c_str();
     Field* field = field_map.try_get_field(HashString{name.c_str()});
     if (field == nullptr) { throw nb::attribute_error(); }
-    from_python(*field, field_map.get_alloc(), value, name);
+    auto access = FieldAccess<false>{*field, field_map.get_alloc(), &parent_field};
+    from_python(access, value, name);
 }
 
-__attribute__((__visibility__("default"))) void
-py::set_field(FieldMap<true>& field_map, const std::string& name, const nb::handle& value) {
+__attribute__((__visibility__("default"))) void py::set_field(FieldMap<true>& field_map,
+                                                              const std::string& name,
+                                                              const nb::handle& value,
+                                                              const FieldTypeBase& parent_field) {
     STST_LOG_DEBUG() << "setting field to type " << nb::repr(value.type()).c_str();
-    from_python(FieldAccess{field_map[HashString{name.c_str()}], field_map.get_alloc()}, value,
-                name);
+    auto access = FieldAccess<true>{field_map[HashString{name.c_str()}], field_map.get_alloc(),
+                                    &parent_field};
+    from_python(access, value, name);
 }

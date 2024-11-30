@@ -56,7 +56,7 @@ void FieldMapBase::check() const {
 }
 
 template<>
-FieldMap<false>& FieldMap<false>::operator=(const FieldMap<false>& other) {
+void FieldMap<false>::copy_from_unmanaged(const FieldMap<false>& other) {
     // unmanaged copy: slots have to be the same
     STST_LOG_DEBUG() << "copying FieldMap from " << &other << " into " << this;
     if (slots != other.get_slots()) {
@@ -65,11 +65,11 @@ FieldMap<false>& FieldMap<false>::operator=(const FieldMap<false>& other) {
     for (const HashString& str: slots) {
         fields.at(str).copy_from(mm_alloc, other.get_fields().at(str));
     }
-    return *this;
 }
 
 template<>
-FieldMap<true>& FieldMap<true>::operator=(const FieldMap<true>& other) {
+void FieldMap<true>::copy_from_managed(const FieldMap<true>& other,
+                                       const FieldTypeBase* parent_field) {
     // managed copy: clear and insert the other contents
     STST_LOG_DEBUG() << "copying FieldMap from " << &other << " into " << this;
     clear();
@@ -77,13 +77,12 @@ FieldMap<true>& FieldMap<true>::operator=(const FieldMap<true>& other) {
         HashString name_int = internalize_string(str);
         slots.emplace_back(name_int);
         Field& field = fields.emplace(name_int, Field{}).first->second;
-        field.construct_copy_from(mm_alloc, other.get_fields().at(str));
+        field.construct_copy_from(mm_alloc, other.get_fields().at(str), parent_field);
     }
-    return *this;
 }
 
 template<>
-FieldMap<true>& FieldMap<true>::operator=(FieldMap<true>&& other) {
+void FieldMap<true>::move_from_managed(FieldMap<true>&& other, const FieldTypeBase* parent_field) {
     // managed move: clear and move or copy fields
     STST_LOG_DEBUG() << "moving FieldMap from " << &other << " into " << this;
     if (&mm_alloc == &other.mm_alloc) {
@@ -96,9 +95,8 @@ FieldMap<true>& FieldMap<true>::operator=(FieldMap<true>&& other) {
         other.slots.clear();
         other.fields.clear();
     } else {
-        *this = other;
+        copy_from(other, parent_field);
     }
-    return *this;
 }
 
 template<>

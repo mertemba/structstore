@@ -84,9 +84,9 @@ public:
 
     List& operator=(List&&) = delete;
 
-    FieldAccess push_back() {
+    FieldAccess<true> push_back() {
         STST_LOG_DEBUG() << "this: " << this << ", cur size: " << data.size();
-        return FieldAccess{data.emplace_back(), mm_alloc};
+        return FieldAccess<true>{data.emplace_back(), mm_alloc, this};
     }
 
     template<typename T>
@@ -94,21 +94,21 @@ public:
         data.emplace_back(StlAllocator<T>(mm_alloc).allocate(1)) = value;
     }
 
-    FieldAccess insert(size_t index) {
+    FieldAccess<true> insert(size_t index) {
         if (index > data.size()) {
             throw std::out_of_range("index out of bounds: " + std::to_string(index));
         }
-        return FieldAccess{*data.emplace(data.begin() + index), mm_alloc};
+        return FieldAccess<true>{*data.emplace(data.begin() + index), mm_alloc, this};
     }
 
-    FieldAccess operator[](size_t index) {
+    FieldAccess<true> operator[](size_t index) {
         if (index >= data.size()) {
             throw std::out_of_range("index out of bounds: " + std::to_string(index));
         }
-        return FieldAccess{data.at(index), mm_alloc};
+        return FieldAccess<true>{data.at(index), mm_alloc, this};
     }
 
-    FieldAccess at(size_t index) { return FieldAccess{data.at(index), mm_alloc}; }
+    FieldAccess<true> at(size_t index) { return FieldAccess<true>{data.at(index), mm_alloc, this}; }
 
     Iterator begin() const {
         return {*this, 0};
@@ -131,7 +131,7 @@ public:
     }
 
     void clear() {
-        for (Field& field: data) { FieldAccess{field, mm_alloc}.clear(); }
+        for (Field& field: data) { FieldAccess<true>{field, mm_alloc, this}.clear(); }
         data.clear();
     }
 

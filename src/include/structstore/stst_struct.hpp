@@ -42,8 +42,8 @@ public:
             throw std::runtime_error("internal error: allocators are not the same");
         }
         if (this->parent_field != parent_field) {
-            STST_LOG_WARN() << "invalid parent_field pointer in field of type "
-                            << T::type_info.name;
+            throw std::runtime_error("invalid parent_field pointer in field of type " +
+                                     T::type_info.name);
         }
         field_map.check();
         for (const auto& [key, value]: field_map.get_fields()) {

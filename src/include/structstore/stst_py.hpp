@@ -38,7 +38,7 @@ public:
         RECURSIVE,
     };
 
-    using FromPythonFn = std::function<bool(Field&, MiniMalloc&, const nb::handle&)>;
+    using FromPythonFn = std::function<bool(FieldAccess<true>, const nb::handle&)>;
     using ToPythonFn = std::function<nb::object(const Field&, ToPythonMode mode)>;
     using ToPythonCastFn = std::function<nb::object(const Field&)>;
 
@@ -66,9 +66,9 @@ private:
     static nb::object get_field(const FieldMapBase& field_map, const std::string& name);
 
     static void set_field(FieldMap<false>& field_map, const std::string& name,
-                          const nb::handle& value);
+                          const nb::handle& value, const FieldTypeBase& parent_field);
     static void set_field(FieldMap<true>& field_map, const std::string& name,
-                          const nb::handle& value);
+                          const nb::handle& value, const FieldTypeBase& parent_field);
 
     static ScopedLock lock(StructStore& store);
 
@@ -84,13 +84,12 @@ private:
 
 public:
     template<typename T, typename T_py>
-    static bool default_from_python_fn(Field& field, MiniMalloc& mm_alloc,
-                                       const nb::handle& value) {
+    static bool default_from_python_fn(FieldAccess<true> access, const nb::handle& value) {
         if (nb::isinstance<T>(value)) {
             STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name
                              << " succeeded";
             const T& t = nb::cast<T>(value, false);
-            field.get_or_construct<T>(mm_alloc) = t;
+            access.get<T>() = t;
             return true;
         }
         STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name << " failed";
@@ -131,12 +130,12 @@ public:
     static void register_struct_ptr_type() {
         static_assert(!std::is_pointer_v<T>);
         static_assert(std::is_class_v<T>);
-        auto from_python_fn = [](Field& field, MiniMalloc& mm_alloc, const nb::handle& value) {
-            if (field.get_type_hash() == typing::get_type_hash<T*>() && nb::isinstance<T>(value)) {
+        auto from_python_fn = [](FieldAccess<true> access, const nb::handle& value) {
+            if (access.get_type_hash() == typing::get_type_hash<T*>() && nb::isinstance<T>(value)) {
                 STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name
                                  << " succeeded";
                 T& t = nb::cast<T&>(value, false);
-                field.get_or_construct<T*>(mm_alloc) = &t;
+                access.get<T*>() = &t;
                 return true;
             }
             STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name << " failed";
@@ -188,12 +187,12 @@ public:
     static void register_basic_ptr_type() {
         static_assert(!std::is_pointer_v<T>);
         static_assert(!std::is_class_v<T>);
-        auto from_python_fn = [](Field& field, MiniMalloc& mm_alloc, const nb::handle& value) {
-            if (field.get_type_hash() == typing::get_type_hash<T*>() && nb::isinstance<T>(value)) {
+        auto from_python_fn = [](FieldAccess<true> access, const nb::handle& value) {
+            if (access.get_type_hash() == typing::get_type_hash<T*>() && nb::isinstance<T>(value)) {
                 STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name
                                  << " succeeded";
                 T t = nb::cast<T>(value, false);
-                *field.get_or_construct<T*>(mm_alloc) = t;
+                *access.get<T*>() = t;
                 return true;
             }
             STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name << " failed";
@@ -262,12 +261,12 @@ public:
     }
 
     template<typename T>
-    static bool copy_cast_from_python(Field& field, MiniMalloc& mm_alloc, const nb::handle& value) {
+    static bool copy_cast_from_python(FieldAccess<true> access, const nb::handle& value) {
         T* value_cpp = try_cast<T>(value);
         if (value_cpp == nullptr) {
             return false;
         }
-        T& field_cpp = field.get_or_construct<T>(mm_alloc);
+        T& field_cpp = access.get<T>();
         STST_LOG_DEBUG() << "at type " << typing::get_type<T>().name;
         if (value_cpp == &field_cpp) {
             STST_LOG_DEBUG() << "copying to itself";
@@ -289,8 +288,9 @@ public:
 
         if constexpr (typing::is_field_type<T>) {
             cls.def("__setstate__", [](T& t, nb::handle value) {
-                typing::get_type<T>().constructor_fn(static_alloc, &t);
-                from_python(*FieldView{t}, static_alloc, value, "<root>");
+                typing::get_type<T>().constructor_fn(static_alloc, &t, nullptr);
+                from_python(FieldAccess<true>{*FieldView{t}, static_alloc, nullptr}, value,
+                            "<root>");
             });
         } else {
             cls.def("__setstate__", [](T&, nb::handle) {
@@ -306,7 +306,11 @@ public:
         cls.def(
                 "__setattr__",
                 [](T& t, const std::string& name, const nb::handle& value) {
-                    return set_field(get_field_map(t), name, value);
+                    if constexpr (std::is_same_v<T, StructStoreShared>) {
+                        return set_field(get_field_map(t), name, value, *t);
+                    } else {
+                        return set_field(get_field_map(t), name, value, t);
+                    }
                 },
                 nb::arg("name"), nb::arg("value").none());
 
@@ -322,7 +326,11 @@ public:
         cls.def(
                 "__setitem__",
                 [](T& t, const std::string& name, const nb::handle& value) {
-                    return set_field(get_field_map(t), name, value);
+                    if constexpr (std::is_same_v<T, StructStoreShared>) {
+                        return set_field(get_field_map(t), name, value, *t);
+                    } else {
+                        return set_field(get_field_map(t), name, value, t);
+                    }
                 },
                 nb::arg("name"), nb::arg("value").none());
 
@@ -378,11 +386,11 @@ public:
     static nb::object to_python_cast(const Field& field);
 
     // for unmanaged fields
-    static void from_python(Field& field, MiniMalloc& mm_alloc, const nb::handle& value,
+    static void from_python(FieldAccess<false> access, const nb::handle& value,
                             const std::string& field_name);
 
     // for managed fields
-    static void from_python(FieldAccess access, const nb::handle& value,
+    static void from_python(FieldAccess<true> access, const nb::handle& value,
                             const std::string& field_name);
 };
 

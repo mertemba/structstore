@@ -25,7 +25,7 @@ class typing {
 public:
     class FieldTypeBase {
     protected:
-        FieldTypeBase* parent_field = nullptr;
+        const FieldTypeBase* parent_field = nullptr;
         mutable SpinMutex mutex = {};
 
         FieldTypeBase() {}
@@ -73,7 +73,7 @@ public:
     template<typename T>
     constexpr static bool is_field_type = std::is_base_of_v<FieldType<T>, T> || !std::is_class_v<T>;
 
-    using ConstructorFn = std::function<void(MiniMalloc&, void*)>;
+    using ConstructorFn = std::function<void(MiniMalloc&, void*, const FieldTypeBase*)>;
 
     using DestructorFn = std::function<void(MiniMalloc&, void*)>;
 
@@ -109,13 +109,22 @@ private:
         t.name = name;
         t.size = sizeof(T);
         if constexpr (std::is_constructible_v<T, MiniMalloc&>) {
-            t.constructor_fn = [](MiniMalloc& mm_alloc, void* t) { new (t) T(mm_alloc); };
+            t.constructor_fn = [](MiniMalloc& mm_alloc, void* t,
+                                  const FieldTypeBase* parent_field) {
+                new (t) T(mm_alloc);
+                if constexpr (std::is_class_v<T>) { ((T*) t)->parent_field = parent_field; }
+            };
         } else if constexpr (std::is_constructible_v<T, const StlAllocator<T>&>) {
-            t.constructor_fn = [](MiniMalloc& mm_alloc, void* t) {
+            t.constructor_fn = [](MiniMalloc& mm_alloc, void* t,
+                                  const FieldTypeBase* parent_field) {
                 new (t) T(StlAllocator<T>{mm_alloc});
+                if constexpr (std::is_class_v<T>) { ((T*) t)->parent_field = parent_field; }
             };
         } else {
-            t.constructor_fn = [](MiniMalloc&, void* t) { new (t) T(); };
+            t.constructor_fn = [](MiniMalloc&, void* t, const FieldTypeBase* parent_field) {
+                new (t) T();
+                if constexpr (std::is_class_v<T>) { ((T*) t)->parent_field = parent_field; }
+            };
         }
         t.destructor_fn = [](MiniMalloc&, void* t) { ((T*) t)->~T(); };
         t.serialize_text_fn = [](std::ostream& os, const void* t) { os << *(const T*) t; };
@@ -126,8 +135,8 @@ private:
             t.check_fn = [](const MiniMalloc& mm_alloc, const void* t,
                             const FieldTypeBase* parent_field) {
                 if (((const T*) t)->parent_field != parent_field) {
-                    STST_LOG_WARN() << "invalid parent_field pointer in field of type "
-                                    << T::type_info.name;
+                    throw std::runtime_error("invalid parent_field pointer in field of type " +
+                                             T::type_info.name);
                 }
                 mm_alloc.assert_owned((const T*) t);
                 ((const T*) t)->check(mm_alloc, parent_field);
@@ -143,7 +152,12 @@ private:
         t.cmp_equal_fn = [](const void* t, const void* other) {
             return *(const T*) t == *(const T*) other;
         };
-        t.copy_fn = [](MiniMalloc&, void* t, const void* other) { *(T*) t = *(const T*) other; };
+        t.copy_fn = [](MiniMalloc&, void* t, const void* other) {
+            const FieldTypeBase* parent_field;
+            if constexpr (std::is_class_v<T>) { parent_field = ((T*) t)->parent_field; }
+            *(T*) t = *(const T*) other;
+            if constexpr (std::is_class_v<T>) { ((T*) t)->parent_field = parent_field; }
+        };
         return t;
     }
 
@@ -154,7 +168,7 @@ private:
         ti.type_hash = -1;
         ti.name = name;
         ti.size = sizeof(T);
-        ti.constructor_fn = [](MiniMalloc&, void* t) { *(T**) t = nullptr; };
+        ti.constructor_fn = [](MiniMalloc&, void* t, const FieldTypeBase*) { *(T**) t = nullptr; };
         ti.destructor_fn = [](MiniMalloc&, void* t) { *(T**) t = nullptr; };
         ti.serialize_text_fn = [name](std::ostream& os, const void*) { os << "<" << name << ">"; };
         ti.serialize_yaml_fn = [=](const void*) -> YAML::Node {
@@ -177,7 +191,7 @@ private:
         TypeInfo t;
         t.name = name;
         t.size = 0;
-        t.constructor_fn = [](MiniMalloc&, void*) {};
+        t.constructor_fn = [](MiniMalloc&, void*, const FieldTypeBase*) {};
         t.destructor_fn = [](MiniMalloc&, void*) {};
         t.serialize_text_fn = [](std::ostream& os, const void*) { os << "<empty>"; };
         t.serialize_yaml_fn = [](const void*) { return YAML::Node(YAML::Null); };

@@ -14,12 +14,13 @@ YAML::Node Field::to_yaml() const {
     return type_info.serialize_yaml_fn(data);
 }
 
-void Field::construct_copy_from(MiniMalloc& mm_alloc, const Field& other) {
+void Field::construct_copy_from(MiniMalloc& mm_alloc, const Field& other,
+                                const FieldTypeBase* parent_field) {
     assert_empty();
     type_hash = other.type_hash;
     const auto& type_info = typing::get_type(type_hash);
     data = mm_alloc.allocate(type_info.size);
-    type_info.constructor_fn(mm_alloc, data);
+    type_info.constructor_fn(mm_alloc, data, parent_field);
     type_info.copy_fn(mm_alloc, data, other.data);
 }
 
@@ -41,15 +42,38 @@ void Field::move_from(Field& other) {
 template<>
 FieldView::FieldView(StructStoreShared& store) : field{&*store} {}
 
-::structstore::String& FieldAccess::get_str() { return get<::structstore::String>(); }
+template<>
+::structstore::String& FieldAccess<false>::get_str() {
+    return get<::structstore::String>();
+}
 
 template<>
-FieldAccess& FieldAccess::operator= <const char*>(const char* const& value) {
+::structstore::String& FieldAccess<true>::get_str() {
+    return get<::structstore::String>();
+}
+
+template<>
+template<>
+FieldAccess<false>& FieldAccess<false>::operator= <const char*>(const char* const& value) {
     get<structstore::String>() = value;
     return *this;
 }
 
 template<>
-FieldAccess& FieldAccess::operator= <std::string>(const std::string& value) {
+template<>
+FieldAccess<true>& FieldAccess<true>::operator= <const char*>(const char* const& value) {
+    get<structstore::String>() = value;
+    return *this;
+}
+
+template<>
+template<>
+FieldAccess<false>& FieldAccess<false>::operator= <std::string>(const std::string& value) {
+    return *this = value.c_str();
+}
+
+template<>
+template<>
+FieldAccess<true>& FieldAccess<true>::operator= <std::string>(const std::string& value) {
     return *this = value.c_str();
 }

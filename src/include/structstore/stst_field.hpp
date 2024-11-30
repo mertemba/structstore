@@ -14,11 +14,13 @@ class FieldMap;
 
 class FieldView;
 
+template<bool managed>
 class FieldAccess;
 
 class Field {
 protected:
     friend class FieldView;
+    template<bool managed>
     friend class FieldAccess;
 
     void* data;
@@ -37,7 +39,8 @@ protected:
     template<bool>
     friend class structstore::FieldMap;
 
-    void construct_copy_from(MiniMalloc& mm_alloc, const Field& other);
+    void construct_copy_from(MiniMalloc& mm_alloc, const Field& other,
+                             const FieldTypeBase* parent_field);
 
     void copy_from(MiniMalloc& mm_alloc, const Field& other);
 
@@ -68,6 +71,20 @@ protected:
         type_hash = typing::get_type_hash<T>();
         STST_LOG_DEBUG() << "replacing field data with " << new_data << ", type "
                          << typing::get_type<T>().name;
+    }
+
+    template<typename T>
+    T& get_or_construct(MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) {
+        if (empty()) {
+            StlAllocator<T> tmp_alloc{mm_alloc};
+            void* ptr = tmp_alloc.allocate(1);
+            STST_LOG_DEBUG() << "allocating at " << ptr;
+            const auto& type_info = typing::get_type<T>();
+            STST_LOG_DEBUG() << "constructing field " << type_info.name << " at " << ptr;
+            type_info.constructor_fn(mm_alloc, ptr, parent_field);
+            replace_data<T>(ptr, mm_alloc);
+        }
+        return get<T>();
     }
 
 public:
@@ -143,25 +160,6 @@ public:
     // assignment operations
 
     template<typename T>
-    T& construct(MiniMalloc& mm_alloc) {
-        assert_empty();
-        StlAllocator<T> tmp_alloc{mm_alloc};
-        void* ptr = tmp_alloc.allocate(1);
-        STST_LOG_DEBUG() << "allocating at " << ptr;
-        const auto& type_info = typing::get_type<T>();
-        STST_LOG_DEBUG() << "constructing field " << type_info.name << " at " << ptr;
-        type_info.constructor_fn(mm_alloc, ptr);
-        replace_data<T>(ptr, mm_alloc);
-        return get<T>();
-    }
-
-    template<typename T>
-    T& get_or_construct(MiniMalloc& mm_alloc) {
-        if (empty()) { return construct<T>(mm_alloc); }
-        return get<T>();
-    }
-
-    template<typename T>
     Field& operator=(const T& value) {
         get<T>() = value;
         return *this;
@@ -195,15 +193,17 @@ FieldView::FieldView(structstore::StructStoreShared& data);
 
 class String;
 
-// for managed fields
+template<bool managed>
 class FieldAccess {
     Field& field;
     MiniMalloc& mm_alloc;
+    const FieldTypeBase* parent_field;
 
 public:
     FieldAccess() = delete;
 
-    explicit FieldAccess(Field& field, MiniMalloc& mm_alloc) : field(field), mm_alloc(mm_alloc) {}
+    explicit FieldAccess(Field& field, MiniMalloc& mm_alloc, const FieldTypeBase* parent_field)
+        : field(field), mm_alloc(mm_alloc), parent_field(parent_field) {}
 
     FieldAccess(const FieldAccess& other) = default;
 
@@ -212,7 +212,11 @@ public:
     template<typename T>
     T& get() {
         static_assert(typing::is_field_type<T>);
-        return field.get_or_construct<T>(mm_alloc);
+        if constexpr (managed) {
+            return field.get_or_construct<T>(mm_alloc, parent_field);
+        } else {
+            return field.get<T>();
+        }
     }
 
     ::structstore::String& get_str();
@@ -220,6 +224,12 @@ public:
     template<typename T>
     operator T&() {
         return get<T>();
+    }
+
+    operator FieldAccess<false>() { return FieldAccess<false>{field, mm_alloc, parent_field}; }
+
+    FieldAccess<true> to_managed_access() {
+        return FieldAccess<true>{field, mm_alloc, parent_field};
     }
 
     template<typename T>
@@ -238,20 +248,20 @@ public:
 };
 
 template<>
-inline FieldAccess::operator Field&() {
-    return get_field();
-}
+template<>
+FieldAccess<false>& FieldAccess<false>::operator= <const char*>(const char* const& value);
 
 template<>
-inline FieldAccess::operator const Field&() {
-    return get_field();
-}
+template<>
+FieldAccess<true>& FieldAccess<true>::operator= <const char*>(const char* const& value);
 
 template<>
-FieldAccess& FieldAccess::operator= <const char*>(const char* const& value);
+template<>
+FieldAccess<false>& FieldAccess<false>::operator= <std::string>(const std::string& value);
 
 template<>
-FieldAccess& FieldAccess::operator= <std::string>(const std::string& value);
+template<>
+FieldAccess<true>& FieldAccess<true>::operator= <std::string>(const std::string& value);
 }
 
 #endif
