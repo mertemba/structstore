@@ -74,8 +74,6 @@ protected:
 
     void copy_from_managed(const FieldMap& other, const FieldTypeBase* parent_field);
 
-    void move_from_managed(FieldMap&& other, const FieldTypeBase* parent_field);
-
     Field& get_or_insert(HashString name);
 
 public:
@@ -95,16 +93,10 @@ public:
 
     FieldMap& operator=(FieldMap&& other) = delete;
 
-
     inline void copy_from(const FieldMap& other, const FieldTypeBase* parent_field) {
         static_assert(managed,
                       "cannot copy from unmanaged FieldMap; use assignment operator instead");
         copy_from_managed(other, parent_field);
-    }
-
-    inline void move_from(FieldMap&& other, const FieldTypeBase* parent_field) {
-        static_assert(managed, "cannot move from unmanaged FieldMap");
-        move_from_managed(std::move(other), parent_field);
     }
 
     ~FieldMap() noexcept(false) {

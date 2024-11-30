@@ -28,17 +28,13 @@ public:
 
     StructStore(const StructStore& other) : StructStore{static_alloc} { *this = other; }
 
-    StructStore(StructStore&& other) : StructStore{static_alloc} { *this = std::move(other); }
-
     StructStore& operator=(const StructStore& other) {
         field_map.copy_from(other.field_map, this);
         return *this;
     }
 
-    StructStore& operator=(StructStore&& other) {
-        field_map.move_from(std::move(other.field_map), this);
-        return *this;
-    }
+    StructStore(StructStore&& other) = delete;
+    StructStore& operator=(StructStore&& other) = delete;
 
     ~StructStore() {
         STST_LOG_DEBUG() << "deconstructing StructStore at " << this;

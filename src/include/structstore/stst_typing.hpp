@@ -152,12 +152,7 @@ private:
         t.cmp_equal_fn = [](const void* t, const void* other) {
             return *(const T*) t == *(const T*) other;
         };
-        t.copy_fn = [](MiniMalloc&, void* t, const void* other) {
-            const FieldTypeBase* parent_field;
-            if constexpr (std::is_class_v<T>) { parent_field = ((T*) t)->parent_field; }
-            *(T*) t = *(const T*) other;
-            if constexpr (std::is_class_v<T>) { ((T*) t)->parent_field = parent_field; }
-        };
+        t.copy_fn = [](MiniMalloc&, void* t, const void* other) { *(T*) t = *(const T*) other; };
         return t;
     }
 

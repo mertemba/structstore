@@ -82,24 +82,6 @@ void FieldMap<true>::copy_from_managed(const FieldMap<true>& other,
 }
 
 template<>
-void FieldMap<true>::move_from_managed(FieldMap<true>&& other, const FieldTypeBase* parent_field) {
-    // managed move: clear and move or copy fields
-    STST_LOG_DEBUG() << "moving FieldMap from " << &other << " into " << this;
-    if (&mm_alloc == &other.mm_alloc) {
-        clear();
-        for (const HashString& str: other.slots) {
-            slots.emplace_back(str);
-            Field& field = fields.emplace(str, Field{}).first->second;
-            field.move_from(other.fields.at(str));
-        }
-        other.slots.clear();
-        other.fields.clear();
-    } else {
-        copy_from(other, parent_field);
-    }
-}
-
-template<>
 Field& FieldMap<true>::get_or_insert(HashString name) {
     auto it = fields.find(name);
     if (it == fields.end()) {
