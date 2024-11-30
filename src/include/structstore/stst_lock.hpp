@@ -4,16 +4,17 @@
 #include "structstore/stst_utils.hpp"
 
 #include <atomic>
+#include <cstdint>
 #include <unistd.h>
 
 namespace structstore {
 
 class SpinMutex {
-    std::atomic_int flag{0};
-    int lock_level = 0;
+    std::atomic_int32_t flag{0};
+    int32_t lock_level = 0;
 
     // too many keywords
-    inline static thread_local const int tid = gettid();
+    inline static thread_local const int32_t tid = gettid();
 
 public:
 
@@ -29,7 +30,7 @@ public:
 
     void lock() {
         STST_LOG_DEBUG() << "locking " << this;
-        int v = flag.load(std::memory_order_relaxed);
+        int32_t v = flag.load(std::memory_order_relaxed);
         if (v == tid) {
             ++lock_level;
             STST_LOG_DEBUG() << "already locked " << this << " at level " << lock_level;
