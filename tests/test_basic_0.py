@@ -72,11 +72,12 @@ class TestBasic0(unittest.TestCase):
             "lst": [1, 2, 3, 5, 8],
             "tuple": [0, 0],
         })
+        state.lst.append(42)
         state.lst.insert(0, 42)
-        self.assertEqual(len(state.lst), 6)
+        self.assertEqual(len(state.lst), 7)
         self.assertEqual(state.lst.pop(0), 42)
         state.lst.extend([2, 3, 4])
-        self.assertEqual(len(state.lst), 8)
+        self.assertEqual(len(state.lst), 9)
 
         # check list types
         state.lst2 = []

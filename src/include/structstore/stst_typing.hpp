@@ -26,6 +26,7 @@ class FieldTypeBase {
 protected:
     template<bool write>
     friend class ScopedFieldLock;
+    friend class py;
 
     const FieldTypeBase* parent_field = nullptr;
     mutable SpinMutex mutex = {};

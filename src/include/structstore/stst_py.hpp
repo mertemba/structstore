@@ -101,7 +101,14 @@ public:
 
     template<typename T>
     static nb::object default_to_python_cast_fn(const Field& field) {
-        return nb::cast(field.get<T>(), nb::rv_policy::reference);
+        T& t = field.get<T>();
+        if constexpr (std::is_class_v<T>) {
+            if (t.parent_field) {
+                auto lock = nb::cast(t.parent_field->read_lock(), nb::rv_policy::move);
+                return nb::cast(t, nb::rv_policy::reference_internal, lock);
+            }
+        }
+        return nb::cast(t, nb::rv_policy::reference);
     };
 
     template<typename T>
@@ -319,7 +326,7 @@ public:
         cls.def(
                 "__getattr__",
                 [](T& t, const std::string& name) { return get_field(get_field_map(t), name); },
-                nb::arg("name"), nb::rv_policy::reference_internal);
+                nb::arg("name"));
 
         cls.def(
                 "__setattr__",
@@ -339,7 +346,7 @@ public:
                     // => attach a read lock to the return value?
                     return get_field(get_field_map(t), name);
                 },
-                nb::arg("name"), nb::rv_policy::reference_internal);
+                nb::arg("name"));
 
         cls.def(
                 "__setitem__",
