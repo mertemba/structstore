@@ -2,11 +2,18 @@
 #include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
 
+#include <random>
+
 using namespace structstore;
+
+thread_local uint32_t SpinMutex::tid = std::random_device{}();
 
 void SpinMutex::read_lock() {
     STST_LOG_DEBUG() << "read locking " << this;
-    int_fast32_t v;
+    if (write_lock_tid == tid) {
+        throw std::runtime_error("trying to acquire read lock while current thread has write lock");
+    }
+    int32_t v;
     do {
         while ((v = level.load(std::memory_order_relaxed)) < 0) {}
     } while (!level.compare_exchange_weak(v, v + 1, std::memory_order_acquire));
@@ -15,22 +22,31 @@ void SpinMutex::read_lock() {
 
 void SpinMutex::read_unlock() {
     STST_LOG_DEBUG() << "read unlocking " << this;
-    int_fast32_t v = level.load(std::memory_order_relaxed);
+    int32_t v = level.load(std::memory_order_relaxed);
     while (!level.compare_exchange_weak(v, v - 1, std::memory_order_acquire));
     STST_LOG_DEBUG() << "read unlocked at " << this << " at level " << v - 1;
 }
 
 void SpinMutex::write_lock() {
     STST_LOG_DEBUG() << "write locking " << this;
-    int_fast32_t v;
+    int32_t v;
+    if (write_lock_tid == tid) {
+        v = level.load(std::memory_order_relaxed);
+        level.store(v - 1, std::memory_order_relaxed);
+        return;
+    }
     do {
         while ((v = level.load(std::memory_order_relaxed)) != 0) {}
     } while (!level.compare_exchange_weak(v, -1, std::memory_order_acquire));
+    if (write_lock_tid != 0) { throw std::runtime_error("internal error: write_lock_tid != 0"); }
+    write_lock_tid = tid;
     STST_LOG_DEBUG() << "write locked at " << this;
 }
 
 void SpinMutex::write_unlock() {
-    level.store(0, std::memory_order_release);
+    int32_t v = level.load(std::memory_order_relaxed);
+    level.store(v + 1, std::memory_order_release);
+    if (v + 1 == 0) { write_lock_tid = 0; }
     STST_LOG_DEBUG() << "write unlocked " << this;
 }
 
