@@ -70,8 +70,6 @@ private:
     static void set_field(FieldMap<true>& field_map, const std::string& name,
                           const nb::handle& value, const FieldTypeBase& parent_field);
 
-    static ScopedLock lock(StructStore& store);
-
     static nb::object __repr__(StructStore& store);
 
     static nb::object copy(StructStore& store);
@@ -249,6 +247,26 @@ public:
             }
             return false;
         });
+        cls.def(
+                "read_lock",
+                [](T& t) {
+                    if constexpr (std::is_same_v<T, StructStoreShared>) {
+                        return t->read_lock();
+                    } else {
+                        return t.read_lock();
+                    }
+                },
+                nb::rv_policy::move);
+        cls.def(
+                "write_lock",
+                [](T& t) {
+                    if constexpr (std::is_same_v<T, StructStoreShared>) {
+                        return t->write_lock();
+                    } else {
+                        return t.write_lock();
+                    }
+                },
+                nb::rv_policy::move);
     }
 
     template<typename T>
@@ -340,18 +358,6 @@ public:
     template<typename T>
     static void register_structstore_funcs(nb::class_<T>& cls) {
         register_field_map_funcs<T>(cls);
-
-        cls.def(
-                "lock",
-                [](T& t) {
-                    // todo: WARNING:root:Function is not valid python code: lock(self) -> structstore::ScopedLock
-                    if constexpr (std::is_same_v<T, StructStoreShared>) {
-                        return t->read_lock();
-                    } else {
-                        return t.read_lock();
-                    }
-                },
-                nb::rv_policy::move);
 
         cls.def("clear", [](T& t) {
             if constexpr (std::is_same_v<T, StructStoreShared>) {

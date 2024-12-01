@@ -2,6 +2,7 @@
 #define STST_ALLOC_HPP
 
 #include "structstore/stst_lock.hpp"
+#include "structstore/stst_utils.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -333,7 +334,6 @@ class MiniMalloc {
 public:
     MiniMalloc(size_t size, void* buffer)
         : buffer{(byte*) buffer}, blocksize{size}, allocated{0}, block_node{nullptr} {
-        ScopedLock lock{mutex};
         if (buffer == nullptr) {
             return;
         }
@@ -372,7 +372,7 @@ public:
         if (field_size == 0) {
             field_size = ALIGN;
         }
-        ScopedLock lock{mutex};
+        ScopedLock<true> lock{mutex};
         if (free_nodes == nullptr) {
             throw std::runtime_error("internal allocator error: free_nodes not initialized");
         }
@@ -389,7 +389,7 @@ public:
     }
 
     void deallocate(void* ptr) {
-        ScopedLock lock{mutex};
+        ScopedLock<true> lock{mutex};
         auto* node = (memnode*) (((byte*) ptr) - ALLOC_NODE_SIZE);
         allocated -= node->size;
         mm_free(ptr);

@@ -15,11 +15,23 @@ namespace nb = nanobind;
 NB_MODULE(MODULE_NAME, m) {
     // API types:
 
-    nb::class_<ScopedLock>(m, "ScopedLock")
-            .def("__enter__", [](ScopedLock&) {})
-            .def("__exit__", [](ScopedLock& con_man, nb::handle, nb::handle, nb::handle) {
-                con_man.unlock();
-            }, nb::arg().none(), nb::arg().none(), nb::arg().none());
+    nb::class_<ScopedFieldLock<false>>(m, "ScopedReadLock")
+            .def("__enter__", [](ScopedFieldLock<false>&) {})
+            .def(
+                    "__exit__",
+                    [](ScopedFieldLock<false>& con_man, nb::handle, nb::handle, nb::handle) {
+                        con_man.unlock();
+                    },
+                    nb::arg().none(), nb::arg().none(), nb::arg().none());
+
+    nb::class_<ScopedFieldLock<true>>(m, "ScopedWriteLock")
+            .def("__enter__", [](ScopedFieldLock<true>&) {})
+            .def(
+                    "__exit__",
+                    [](ScopedFieldLock<true>& con_man, nb::handle, nb::handle, nb::handle) {
+                        con_man.unlock();
+                    },
+                    nb::arg().none(), nb::arg().none(), nb::arg().none());
 
     nb::enum_<CleanupMode>(m, "CleanupMode")
             .value("NEVER", NEVER)
@@ -192,7 +204,6 @@ NB_MODULE(MODULE_NAME, m) {
     };
     py::register_type<List>(list_from_python_fn, list_to_python_fn);
     py::register_complex_type_funcs<List>(list_cls);
-    list_cls.def("lock", [](List& list) { return list.read_lock(); }, nb::rv_policy::move);
     list_cls.def("__len__", [](List& list) {
         auto lock = list.read_lock();
         return list.size();

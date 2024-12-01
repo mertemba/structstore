@@ -3,6 +3,7 @@
 
 #include "structstore/stst_alloc.hpp"
 #include "structstore/stst_hashstring.hpp"
+#include "structstore/stst_lock.hpp"
 #include "structstore/stst_utils.hpp"
 
 #include <functional>
@@ -21,25 +22,33 @@ class StructStore;
 template<typename T>
 class Struct;
 
+class FieldTypeBase {
+protected:
+    template<bool write>
+    friend class ScopedFieldLock;
+
+    const FieldTypeBase* parent_field = nullptr;
+    mutable SpinMutex mutex = {};
+
+    FieldTypeBase() {}
+    FieldTypeBase(const FieldTypeBase&) {}
+    FieldTypeBase(FieldTypeBase&&) {}
+    FieldTypeBase& operator=(const FieldTypeBase&) { return *this; }
+    FieldTypeBase& operator=(FieldTypeBase&&) { return *this; }
+
+    void read_lock_() const;
+    void read_unlock_() const;
+    void write_lock_() const;
+    void write_unlock_() const;
+
+public:
+    [[nodiscard]] ScopedFieldLock<false> read_lock() const { return ScopedFieldLock<false>(*this); }
+
+    [[nodiscard]] ScopedFieldLock<true> write_lock() const { return ScopedFieldLock<true>(*this); }
+};
+
 class typing {
 public:
-    class FieldTypeBase {
-    protected:
-        const FieldTypeBase* parent_field = nullptr;
-        mutable SpinMutex mutex = {};
-
-        FieldTypeBase() {}
-        FieldTypeBase(const FieldTypeBase&) {}
-        FieldTypeBase(FieldTypeBase&&) {}
-        FieldTypeBase& operator=(const FieldTypeBase&) { return *this; }
-        FieldTypeBase& operator=(FieldTypeBase&&) { return *this; }
-
-    public:
-        [[nodiscard]] ScopedLock write_lock() { return ScopedLock(mutex); }
-
-        [[nodiscard]] ScopedLock read_lock() const { return ScopedLock(mutex); }
-    };
-
     template<typename T>
     class FieldType : public FieldTypeBase {
     private:
@@ -112,13 +121,13 @@ private:
             t.constructor_fn = [](MiniMalloc& mm_alloc, void* t,
                                   const FieldTypeBase* parent_field) {
                 new (t) T(mm_alloc);
-                if constexpr (std::is_class_v<T>) { ((T*) t)->parent_field = parent_field; }
+                ((T*) t)->parent_field = parent_field;
             };
         } else if constexpr (std::is_constructible_v<T, const StlAllocator<T>&>) {
             t.constructor_fn = [](MiniMalloc& mm_alloc, void* t,
                                   const FieldTypeBase* parent_field) {
                 new (t) T(StlAllocator<T>{mm_alloc});
-                if constexpr (std::is_class_v<T>) { ((T*) t)->parent_field = parent_field; }
+                ((T*) t)->parent_field = parent_field;
             };
         } else {
             t.constructor_fn = [](MiniMalloc&, void* t, const FieldTypeBase* parent_field) {
@@ -293,7 +302,6 @@ public:
 };
 
 using TypeInfo = typing::TypeInfo;
-using FieldTypeBase = typing::FieldTypeBase;
 template<typename T>
 using FieldType = typing::FieldType<T>;
 

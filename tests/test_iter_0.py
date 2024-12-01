@@ -13,6 +13,6 @@ class TestIter0(unittest.TestCase):
             self.assertEqual(num, i)
         state.lst2 = []
         state.lst2.append(stst.StructStore())
-        with state.lst2.lock():
+        with state.lst2.read_lock():
             for subs in state.lst2:
                 self.assertEqual(str(subs), "{}")

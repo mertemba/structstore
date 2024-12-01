@@ -63,6 +63,7 @@ set(STRUCTSTORE_SRC_FILES
         ${PROJECT_SOURCE_DIR}/src/stst_containers.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_field.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_fieldmap.cpp
+        ${PROJECT_SOURCE_DIR}/src/stst_lock.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_shared.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_structstore.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_typing.cpp
