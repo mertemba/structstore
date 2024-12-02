@@ -275,7 +275,9 @@ NB_MODULE(MODULE_NAME, m) {
             return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()),
                             nb::rv_policy::copy);
         } else { // non-recursive convert
-            return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()));
+            return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(),
+                                                                         m.shape(), nb::handle()),
+                            nb::rv_policy::reference);
         }
     };
     py::FromPythonFn matrix_from_python_fn = [](FieldAccess<true> access,

@@ -20,7 +20,7 @@ export PYTHONPATH="$PYTHONPATH:$builddir"
 
 # test
 ctest --test-dir build --output-on-failure
-pytest -vv "$srcdir/tests"
+timeout 5 pytest -vv "$srcdir/tests"
 
 # coverage analysis
 gcovr --cobertura-pretty --exclude-unreachable-branches --print-summary \

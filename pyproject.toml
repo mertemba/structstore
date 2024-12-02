@@ -12,7 +12,7 @@ dynamic = ['version']
 [build-system]
 requires = [
     'py-build-cmake~=0.1.8',
-    'nanobind~=2.1.0',
+    'nanobind~=2.2.0',
     'nanobind-stubgen~=0.1.5',
 ]
 build-backend = 'py_build_cmake.build'
@@ -61,7 +61,7 @@ version = '0'
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
 py-build-cmake = "^0.1.8"
-nanobind = "^2.1.0"
+nanobind = "^2.2.0"
 nanobind-stubgen = "^0.1.5"
 numpy = "<2"
 build = "^1.2.2"
