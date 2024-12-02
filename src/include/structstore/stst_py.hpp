@@ -92,12 +92,12 @@ public:
         }
         STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name << " failed";
         return false;
-    };
+    }
 
     template<typename T, typename T_py>
     static nb::object default_to_python_fn(const Field& field, ToPythonMode) {
         return T_py(field.get<T>());
-    };
+    }
 
     template<typename T>
     static nb::object default_to_python_cast_fn(const Field& field) {
@@ -109,7 +109,7 @@ public:
             }
         }
         return nb::cast(t, nb::rv_policy::reference);
-    };
+    }
 
     template<typename T>
     static void register_type(FromPythonFn from_python_fn, ToPythonFn to_python_fn,
