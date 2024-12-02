@@ -2,11 +2,37 @@
 #include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
 
+#include <chrono>
 #include <random>
+#include <stdexcept>
+#include <thread>
 
 using namespace structstore;
 
 thread_local uint32_t SpinMutex::tid = std::random_device{}();
+
+#define TIMEOUT_CHECK_INIT                                                                         \
+    int cnt = 0;                                                                                   \
+    double start_time = 0.0;
+
+#define TIMEOUT_CHECK(lock_type)                                                                   \
+    do {                                                                                           \
+        ++cnt;                                                                                     \
+        if (cnt > 1'000'000) {                                                                     \
+            std::this_thread::yield();                                                             \
+            cnt = 0;                                                                               \
+            double now = std::chrono::duration<double>(                                            \
+                                 std::chrono::steady_clock::now().time_since_epoch())              \
+                                 .count();                                                         \
+            if (start_time == 0.0) {                                                               \
+                start_time = now;                                                                  \
+            } else {                                                                               \
+                if (now - start_time > 1.0) {                                                      \
+                    throw std::runtime_error("timeout while getting " lock_type);                  \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+    } while (0)
 
 void SpinMutex::read_lock() {
     STST_LOG_DEBUG() << "read locking " << this;
@@ -14,8 +40,9 @@ void SpinMutex::read_lock() {
         throw std::runtime_error("trying to acquire read lock while current thread has write lock");
     }
     int32_t v;
+    TIMEOUT_CHECK_INIT
     do {
-        while ((v = level.load(std::memory_order_relaxed)) < 0) {}
+        while ((v = level.load(std::memory_order_relaxed)) < 0) { TIMEOUT_CHECK("read lock"); }
     } while (!level.compare_exchange_weak(v, v + 1, std::memory_order_acquire));
     STST_LOG_DEBUG() << "read locked at " << this << " at level " << v + 1;
 }
@@ -35,8 +62,9 @@ void SpinMutex::write_lock() {
         level.store(v - 1, std::memory_order_relaxed);
         return;
     }
+    TIMEOUT_CHECK_INIT
     do {
-        while ((v = level.load(std::memory_order_relaxed)) != 0) {}
+        while ((v = level.load(std::memory_order_relaxed)) != 0) { TIMEOUT_CHECK("write lock"); }
     } while (!level.compare_exchange_weak(v, -1, std::memory_order_acquire));
     if (write_lock_tid != 0) { throw std::runtime_error("internal error: write_lock_tid != 0"); }
     write_lock_tid = tid;
