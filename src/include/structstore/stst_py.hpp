@@ -332,8 +332,10 @@ public:
                 "__setattr__",
                 [](T& t, const std::string& name, const nb::handle& value) {
                     if constexpr (std::is_same_v<T, StructStoreShared>) {
+                        auto lock = t->write_lock();
                         return set_field(get_field_map(t), name, value, *t);
                     } else {
+                        auto lock = t.write_lock();
                         return set_field(get_field_map(t), name, value, t);
                     }
                 },
@@ -352,8 +354,10 @@ public:
                 "__setitem__",
                 [](T& t, const std::string& name, const nb::handle& value) {
                     if constexpr (std::is_same_v<T, StructStoreShared>) {
+                        auto lock = t->write_lock();
                         return set_field(get_field_map(t), name, value, *t);
                     } else {
+                        auto lock = t.write_lock();
                         return set_field(get_field_map(t), name, value, t);
                     }
                 },

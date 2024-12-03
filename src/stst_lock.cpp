@@ -27,7 +27,7 @@ thread_local uint32_t SpinMutex::tid = std::random_device{}();
             if (start_time == 0.0) {                                                               \
                 start_time = now;                                                                  \
             } else {                                                                               \
-                if (now - start_time > 1.0) {                                                      \
+                if (now - start_time > 0.1) {                                                      \
                     throw std::runtime_error("timeout while getting " lock_type);                  \
                 }                                                                                  \
             }                                                                                      \

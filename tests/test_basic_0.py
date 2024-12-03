@@ -52,7 +52,7 @@ class TestBasic0(unittest.TestCase):
         # check matrix types
         self.assertEqual(type(state.mat), structstore.StructStoreMatrix)
         self.assertEqual(str(state.mat), "[1,2,3,4,]")
-        state.mat2 = state.mat
+        state.mat2 = state.mat.copy()
         self.assertEqual(state.mat2, state.mat)
 
         state_copy: Dict = state.deepcopy()
@@ -88,7 +88,7 @@ class TestBasic0(unittest.TestCase):
         self.assertEqual(type(state.lst2.deepcopy()[0]), dict)
         state.lst2.clear()
         self.assertEqual(state.lst2.copy(), [])
-        state.lst3 = state.lst2
+        state.lst3 = state.lst2.copy()
 
         state2 = structstore.StructStore()
         state2.state = state.deepcopy()

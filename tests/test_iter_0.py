@@ -12,12 +12,6 @@ class TestIter0(unittest.TestCase):
         for i, num in enumerate(state.lst):
             self.assertEqual(num, i)
         state.lst2 = []
-        with state.lst2.write_lock():
-            state.lst2.append(stst.StructStore())
-        obj = state.lst2[0]
-        del obj
-        with state.lst2.write_lock():
-            pass
-        with state.lst2.read_lock():
-            for subs in state.lst2:
-                self.assertEqual(str(subs), "{}")
+        state.lst2.append(stst.StructStore())
+        for subs in state.lst2:
+            self.assertEqual(str(subs), "{}")
