@@ -26,6 +26,6 @@ class TestShared0(unittest.TestCase):
     def test_shared_0(self):
         shmem = structstore.StructStoreShared("/dyn_shdata_store", 16384)
         shmem.revalidate()
-        with shmem.lock():
+        with shmem.write_lock():
             shmem.state = State(5, 3.14, "foo", True, Substate(42), [0, 1])
         self.assertEqual(shmem.deepcopy(), shmem.store.deepcopy())

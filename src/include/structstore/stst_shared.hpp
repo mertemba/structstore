@@ -162,12 +162,12 @@ public:
         return sh_data_ptr->data;
     }
 
-    FieldAccess operator[](HashString name) {
+    FieldAccess<true> operator[](HashString name) {
         assert_valid();
         return sh_data_ptr->data.at(name);
     }
 
-    FieldAccess operator[](const char* name) {
+    FieldAccess<true> operator[](const char* name) {
         assert_valid();
         return sh_data_ptr->data[name];
     }

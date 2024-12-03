@@ -1,4 +1,5 @@
-#include "structstore/structstore.hpp"
+#include "structstore/stst_containers.hpp"
+#include "structstore/stst_field.hpp"
 #include "structstore/stst_py.hpp"
 #include "structstore/stst_utils.hpp"
 
@@ -14,11 +15,23 @@ namespace nb = nanobind;
 NB_MODULE(MODULE_NAME, m) {
     // API types:
 
-    nb::class_<ScopedLock>(m, "ScopedLock")
-            .def("__enter__", [](ScopedLock&) {})
-            .def("__exit__", [](ScopedLock& con_man, nb::handle, nb::handle, nb::handle) {
-                con_man.unlock();
-            }, nb::arg().none(), nb::arg().none(), nb::arg().none());
+    nb::class_<ScopedFieldLock<false>>(m, "ScopedReadLock")
+            .def("__enter__", [](ScopedFieldLock<false>&) {})
+            .def(
+                    "__exit__",
+                    [](ScopedFieldLock<false>& con_man, nb::handle, nb::handle, nb::handle) {
+                        con_man.unlock();
+                    },
+                    nb::arg().none(), nb::arg().none(), nb::arg().none());
+
+    nb::class_<ScopedFieldLock<true>>(m, "ScopedWriteLock")
+            .def("__enter__", [](ScopedFieldLock<true>&) {})
+            .def(
+                    "__exit__",
+                    [](ScopedFieldLock<true>& con_man, nb::handle, nb::handle, nb::handle) {
+                        con_man.unlock();
+                    },
+                    nb::arg().none(), nb::arg().none(), nb::arg().none());
 
     nb::enum_<CleanupMode>(m, "CleanupMode")
             .value("NEVER", NEVER)
@@ -43,10 +56,9 @@ NB_MODULE(MODULE_NAME, m) {
         auto& store = field.get<StructStore>();
         return py::structstore_to_python(store, mode);
     };
-    py::FromPythonFn structstore_from_python_fn = [](FieldAccess access, const nanobind::handle& value) {
-        if (py::copy_cast_from_python<StructStore>(access, value)) {
-            return true;
-        }
+    py::FromPythonFn structstore_from_python_fn = [](FieldAccess<true> access,
+                                                     const nanobind::handle& value) {
+        if (py::copy_cast_from_python<StructStore>(access, value)) { return true; }
         // todo: strict check if this is one of dict, SimpleNamespace, StructStore
         if (nb::hasattr(value, "__dict__")) {
             auto dict = nb::dict(value.attr("__dict__"));
@@ -95,35 +107,32 @@ NB_MODULE(MODULE_NAME, m) {
 
     auto shcls = nb::class_<StructStoreShared>(m, "StructStoreShared");
     py::register_structstore_funcs(shcls);
-    shcls.def("__init__",
-              [](StructStoreShared* s, const std::string& path, size_t size, bool reinit, bool use_file,
-                 CleanupMode cleanup, uintptr_t target_addr) {
-                  new(s) StructStoreShared{path, size, reinit, use_file, cleanup, (void*) target_addr};
-              },
-              nb::arg("path"),
-              nb::arg("size") = 2048,
-              nb::arg("reinit") = false,
-              nb::arg("use_file") = false,
-              nb::arg("cleanup") = IF_LAST,
-              nb::arg("target_addr") = 0);
-    shcls.def("__init__", [](StructStoreShared* s, int fd, bool init) {
-                  new(s) StructStoreShared{fd, init};
-              },
-              nb::arg("fd"),
-              nb::arg("init"));
+    shcls.def(
+            "__init__",
+            [](StructStoreShared* s, const std::string& path, size_t size, bool reinit,
+               bool use_file, CleanupMode cleanup, uintptr_t target_addr) {
+                new (s) StructStoreShared{path,     size,    reinit,
+                                          use_file, cleanup, (void*) target_addr};
+            },
+            nb::arg("path"), nb::arg("size") = 2048, nb::arg("reinit") = false,
+            nb::arg("use_file") = false, nb::arg("cleanup") = IF_LAST, nb::arg("target_addr") = 0);
+    shcls.def(
+            "__init__",
+            [](StructStoreShared* s, int fd, bool init) { new (s) StructStoreShared{fd, init}; },
+            nb::arg("fd"), nb::arg("init"));
     shcls.def("valid", &StructStoreShared::valid);
-    shcls.def("revalidate", [](StructStoreShared& shs, bool block) {
-                  bool res = false;
-                  do {
-                      // necessary to get out of the loop on interrupting signal
-                      if (PyErr_CheckSignals() != 0) {
-                          throw nb::python_error();
-                      }
-                      res = shs.revalidate(false);
-                  } while (res == false && block);
-                  return res;
-              },
-              nb::arg("block") = true);
+    shcls.def(
+            "revalidate",
+            [](StructStoreShared& shs, bool block) {
+                bool res = false;
+                do {
+                    // necessary to get out of the loop on interrupting signal
+                    if (PyErr_CheckSignals() != 0) { throw nb::python_error(); }
+                    res = shs.revalidate(false);
+                } while (res == false && block);
+                return res;
+            },
+            nb::arg("block") = true);
     shcls.def("addr", [](StructStoreShared& shs) {
         return uintptr_t(shs.addr());
     });
@@ -147,7 +156,7 @@ NB_MODULE(MODULE_NAME, m) {
 
     // structstore::string
     py::register_type<structstore::String>(
-            [](FieldAccess access, const nb::handle& value) {
+            [](FieldAccess<true> access, const nb::handle& value) {
                 if (nb::isinstance<nb::str>(value)) {
                     access.get<structstore::String>() = nb::cast<std::string>(value).c_str();
                     return true;
@@ -175,10 +184,9 @@ NB_MODULE(MODULE_NAME, m) {
         }
         return ret;
     };
-    py::FromPythonFn list_from_python_fn = [](FieldAccess access, const nanobind::handle& value) {
-        if (py::copy_cast_from_python<List>(access, value)) {
-            return true;
-        }
+    py::FromPythonFn list_from_python_fn = [](FieldAccess<true> access,
+                                              const nanobind::handle& value) {
+        if (py::copy_cast_from_python<List>(access, value)) { return true; }
         if (nb::isinstance<nb::list>(value) || nb::isinstance<nb::tuple>(value)) {
             List& list = access.get<List>();
             list.clear();
@@ -193,9 +201,6 @@ NB_MODULE(MODULE_NAME, m) {
     };
     py::register_type<List>(list_from_python_fn, list_to_python_fn);
     py::register_complex_type_funcs<List>(list_cls);
-    list_cls.def("lock", [](List& list) {
-        return ScopedLock(list.get_mutex());
-    }, nb::rv_policy::move);
     list_cls.def("__len__", [](List& list) {
         auto lock = list.read_lock();
         return list.size();
@@ -267,19 +272,21 @@ NB_MODULE(MODULE_NAME, m) {
             return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()),
                             nb::rv_policy::copy);
         } else { // non-recursive convert
-            return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()));
+            return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(),
+                                                                         m.shape(), nb::handle()),
+                            nb::rv_policy::reference);
         }
     };
-    py::FromPythonFn matrix_from_python_fn = [](FieldAccess access, const nanobind::handle& value) {
-        if (py::copy_cast_from_python<Matrix>(access, value)) {
-            return true;
-        }
+    py::FromPythonFn matrix_from_python_fn = [](FieldAccess<true> access,
+                                                const nanobind::handle& value) {
+        if (py::copy_cast_from_python<Matrix>(access, value)) { return true; }
         if (nb::ndarray_check(value)) {
             auto array = nb::cast<nb::ndarray<const double, nb::c_contig>>(value);
             if (array.ndim() > Matrix::MAX_DIMS) {
                 throw std::runtime_error("Incompatible buffer dimension!");
             }
-            access.get<Matrix>().from(array.ndim(), (const size_t*) array.shape_ptr(), array.data());
+            access.get<Matrix>().from(array.ndim(), (const size_t*) array.shape_ptr(),
+                                      array.data());
             return true;
         }
         return false;

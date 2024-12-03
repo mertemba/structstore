@@ -98,13 +98,15 @@ TEST(StructStoreTestBasic, cmpEqualShared) {
     EXPECT_NE(store1, store2);
 }
 
-TEST(StructStoreTestBasic, moveStore) {
+TEST(StructStoreTestBasic, copyStore) {
     stst::StructStore store(stst::static_alloc);
     int& num = store["num"];
     num = 5;
-    stst::StructStore store2 = std::move(store);
-    EXPECT_TRUE(store.empty());
+    store["str"].get_str() = "foo";
+    stst::StructStore store2 = store;
     EXPECT_EQ(store2["num"].get<int>(), 5);
+    store.check();
+    store2.check();
 }
 
 int main(int argc, char** argv) {

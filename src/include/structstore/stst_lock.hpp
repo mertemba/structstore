@@ -1,23 +1,23 @@
 #ifndef STST_LOCK_HPP
 #define STST_LOCK_HPP
 
-#include "structstore/stst_utils.hpp"
-
 #include <atomic>
-#include <unistd.h>
 
 namespace structstore {
 
 class SpinMutex {
-    std::atomic_int flag{0};
-    int lock_level = 0;
+    template<bool write>
+    friend class ScopedLock;
 
-    // too many keywords
-    inline static thread_local const int tid = gettid();
+    friend class FieldTypeBase;
 
-public:
+    // randomly assigned pseudo thread id
+    static thread_local uint32_t tid;
 
-    SpinMutex() = default;
+    // >0 is read-locked, 0 is unlocked, <0 is write-locked
+    std::atomic_int32_t level{0};
+    // thread id currently holding the write lock, or zero
+    uint32_t write_lock_tid{0};
 
     SpinMutex(SpinMutex&&) = delete;
 
@@ -27,55 +27,26 @@ public:
 
     SpinMutex& operator=(const SpinMutex&) = delete;
 
-    void lock() {
-        STST_LOG_DEBUG() << "locking " << this;
-        int v = flag.load(std::memory_order_relaxed);
-        if (v == tid) {
-            ++lock_level;
-            STST_LOG_DEBUG() << "already locked " << this << " at level " << lock_level;
-            return;
-        }
-        v = 0;
-        while (!flag.compare_exchange_strong(v, tid, std::memory_order_acquire)) {
-            while ((v = flag.load(std::memory_order_relaxed)) != 0) { }
-        }
-        ++lock_level;
-        STST_LOG_DEBUG() << "got lock at " << this << " at level " << lock_level;
-    }
+    void read_lock();
+    void read_unlock();
 
-    void unlock() {
-        if ((--lock_level) == 0) {
-            STST_LOG_DEBUG() << "completely unlocked " << this;
-            flag.store(0, std::memory_order_release);
-        }
-        STST_LOG_DEBUG() << "unlocking " << this << " to level " << lock_level;
-    }
+    void write_lock();
+    void write_unlock();
+
+public:
+    SpinMutex() = default;
 };
 
+template<bool write>
 class ScopedLock {
     SpinMutex* mutex = nullptr;
 
     ScopedLock() : mutex{nullptr} {}
 
 public:
-    explicit ScopedLock(SpinMutex& mutex) : mutex(&mutex) {
-        mutex.lock();
-    }
+    explicit ScopedLock(SpinMutex& mutex);
 
-    void unlock() {
-        if (mutex) {
-            mutex->unlock();
-            mutex = nullptr;
-        }
-    }
-
-    ~ScopedLock() {
-        unlock();
-    }
-
-    ScopedLock(ScopedLock&& other) noexcept: ScopedLock() {
-        *this = std::move(other);
-    }
+    ScopedLock(ScopedLock&& other) noexcept : ScopedLock() { *this = std::move(other); }
 
     ScopedLock& operator=(ScopedLock&& other) noexcept {
         std::swap(mutex, other.mutex);
@@ -83,10 +54,50 @@ public:
     }
 
     ScopedLock(const ScopedLock&) = delete;
-
     ScopedLock& operator=(const ScopedLock&) = delete;
+
+    ~ScopedLock() { unlock(); }
+
+    void unlock();
 };
 
+template<>
+ScopedLock<false>::ScopedLock(SpinMutex& mutex);
+template<>
+ScopedLock<true>::ScopedLock(SpinMutex& mutex);
+
+class FieldTypeBase;
+
+template<bool write>
+class ScopedFieldLock {
+    const FieldTypeBase* field = nullptr;
+
+    ScopedFieldLock() : field{nullptr} {}
+
+public:
+    explicit ScopedFieldLock(const FieldTypeBase& field);
+
+    ScopedFieldLock(ScopedFieldLock&& other) noexcept : ScopedFieldLock() {
+        *this = std::move(other);
+    }
+
+    ScopedFieldLock& operator=(ScopedFieldLock&& other) noexcept {
+        std::swap(field, other.field);
+        return *this;
+    }
+
+    ScopedFieldLock(const ScopedFieldLock&) = delete;
+    ScopedFieldLock& operator=(const ScopedFieldLock&) = delete;
+
+    ~ScopedFieldLock() { unlock(); }
+
+    void unlock();
+};
+
+template<>
+ScopedFieldLock<false>::ScopedFieldLock(const FieldTypeBase& field);
+template<>
+ScopedFieldLock<true>::ScopedFieldLock(const FieldTypeBase& field);
 }
 
 #endif

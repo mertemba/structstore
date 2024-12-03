@@ -1,4 +1,5 @@
 #include "structstore/stst_shared.hpp"
+#include "structstore/stst_alloc.hpp"
 
 using namespace structstore;
 
@@ -231,7 +232,7 @@ void StructStoreShared::mmap_existing_fd() {
     ++sh_data_ptr->usage_count;
 
 #ifndef NDEBUG
-    sh_data_ptr->data.check(sh_data_ptr->mm_alloc);
+    sh_data_ptr->data.check(sh_data_ptr->mm_alloc, nullptr);
 #endif
 }
 
@@ -297,6 +298,8 @@ void StructStoreShared::close() {
         bool expected = false;
         // if cleanup == ALWAYS this ensure that unlink is done exactly once
         if (sh_data_ptr->invalidated.compare_exchange_strong(expected, true, std::memory_order_acquire)) {
+            sh_data_ptr->data.~StructStore();
+            sh_data_ptr->mm_alloc.~MiniMalloc();
             if (use_file) {
                 unlink(path.c_str());
             } else {

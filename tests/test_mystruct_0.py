@@ -17,12 +17,20 @@ class TestMystruct0(unittest.TestCase):
         state = structstore.StructStore()
         state.frame = frame
         self.assertEqual(state.frame.t, 2.5)
-        state.frame2 = state.frame
+        state.frame2 = state.frame.copy()
         state.frame2.t = 3.0
         self.assertEqual(state.frame.t, 2.5)
+
+        self.assertEqual(state.frame.t_ptr, 2.5)
+        state.frame.t_ptr += 10.0
+        self.assertEqual(state.frame.t, 12.5)
 
         track = Track()
         self.assertEqual(track.frame1, track.frame2)
         state.track = track
         state.track.frame2 = state.frame
         self.assertNotEqual(state.track.frame1, state.track.frame2)
+        state.track.frame_ptr = state.frame
+        self.assertEqual(type(state.track.frame_ptr), Frame)
+        self.assertEqual(type(state.track.frame_ptr.copy()), dict)
+        self.assertEqual(state.track.frame_ptr, state.frame)
