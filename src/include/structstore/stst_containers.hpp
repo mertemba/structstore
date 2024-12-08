@@ -19,7 +19,7 @@ public:
 
     YAML::Node to_yaml() const { return YAML::Node(c_str()); }
 
-    void check(const MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) const;
+    void check(const MiniMalloc* mm_alloc = nullptr) const;
 
     String& operator=(const char* const& value);
 };
@@ -139,7 +139,7 @@ public:
 
     YAML::Node to_yaml() const;
 
-    void check(const MiniMalloc&, const FieldTypeBase*) const;
+    void check(const MiniMalloc* mm_alloc = nullptr) const;
 
     bool operator==(const List& other) const;
 };
@@ -241,13 +241,9 @@ public:
 
     YAML::Node to_yaml() const;
 
-    void check(const MiniMalloc&, const FieldTypeBase*) const;
+    void check(const MiniMalloc* mm_alloc = nullptr) const;
 
     bool operator==(const Matrix& other) const;
-
-    inline bool operator!=(const Matrix& other) const {
-        return !(*this == other);
-    }
 };
 }
 

@@ -51,6 +51,7 @@ TEST(StructStoreTestBasic, structInStaticStore) {
     std::ostringstream str;
     str << store;
     EXPECT_EQ(str.str(), "{\"num\":5,\"value\":3.14,\"flag\":1,\"str\":foo,\"subsettings\":{\"subnum\":42,\"substr\":bar,},}");
+    store.check();
 }
 
 TEST(StructStoreTestBasic, structInSharedStore) {
@@ -60,6 +61,7 @@ TEST(StructStoreTestBasic, structInSharedStore) {
 
     stst::StructStoreShared shsettings_store("/shsettings_store");
     to_store(*shsettings_store, settings);
+    shsettings_store.check();
 
     Settings settings2;
     from_store(*shsettings_store, settings2);

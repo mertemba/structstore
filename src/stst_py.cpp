@@ -85,9 +85,6 @@ py::from_python(FieldAccess<true> access, const nb::handle& value, const std::st
     }
     if (!access.get_field().empty()) {
         STST_LOG_DEBUG() << "at field " << field_name << " of type " << typing::get_type(access.get_type_hash()).name;
-#ifndef NDEBUG
-        // access.check();
-#endif
         auto from_python_fn = py::get_from_python_fn(access.get_type_hash());
         bool success = from_python_fn(access, value);
         if (success) {

@@ -26,6 +26,7 @@ class TestBytes0(unittest.TestCase):
             "/dyn_shdata_store", 2048, reinit=True, cleanup=structstore.CleanupMode.ALWAYS)
         shmem.state = State(5, 3.14, 'foo', True, Substate(42), [0, 1])
         print(shmem.deepcopy())
+        shmem.check()
         buf = shmem.to_bytes()
         addr = shmem.addr()
         del shmem
@@ -35,3 +36,4 @@ class TestBytes0(unittest.TestCase):
             target_addr=addr)
         shmem.from_bytes(buf)
         print(shmem.deepcopy())
+        shmem.check()

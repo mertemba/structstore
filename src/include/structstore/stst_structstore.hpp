@@ -47,9 +47,7 @@ public:
 
     inline YAML::Node to_yaml() const { return field_map.to_yaml(); }
 
-    void check() const;
-
-    void check(const MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) const;
+    void check(const MiniMalloc* mm_alloc = nullptr) const;
 
     inline bool operator==(const StructStore& other) const { return field_map == other.field_map; }
 

@@ -89,12 +89,14 @@ class TestBasic0(unittest.TestCase):
         state.lst2.clear()
         self.assertEqual(state.lst2.copy(), [])
         state.lst3 = state.lst2.copy()
+        state.check()
 
         state2 = structstore.StructStore()
         state2.state = state.deepcopy()
         self.assertEqual(state2.state, state)
         state.sub.vec.copy()[0] += 1.0
         self.assertNotEqual(state2.state, state)
+        state2.check()
         state2.clear()
         self.assertTrue(state2.empty())
         self.assertEqual(str(state2), "{}")

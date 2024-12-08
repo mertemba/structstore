@@ -1,9 +1,18 @@
 #include "structstore/stst_shared.hpp"
 #include "structstore/stst_alloc.hpp"
+#include "structstore/stst_callstack.hpp"
+#include "structstore/stst_structstore.hpp"
 
 using namespace structstore;
 
 std::random_device structstore::rnd_dev;
+
+StructStoreShared::SharedData::SharedData(size_t size, size_t bufsize, void* buffer)
+    : original_ptr{this}, size{size}, usage_count{1}, mm_alloc{bufsize, buffer},
+      invalidated{false} {
+    store = StlAllocator<StructStore>(mm_alloc).allocate(1);
+    new (store) StructStore(mm_alloc);
+}
 
 StructStoreShared::StructStoreShared(
         const std::string& path,
@@ -232,7 +241,7 @@ void StructStoreShared::mmap_existing_fd() {
     ++sh_data_ptr->usage_count;
 
 #ifndef NDEBUG
-    sh_data_ptr->data.check(sh_data_ptr->mm_alloc, nullptr);
+    check();
 #endif
 }
 
@@ -298,7 +307,8 @@ void StructStoreShared::close() {
         bool expected = false;
         // if cleanup == ALWAYS this ensure that unlink is done exactly once
         if (sh_data_ptr->invalidated.compare_exchange_strong(expected, true, std::memory_order_acquire)) {
-            sh_data_ptr->data.~StructStore();
+            sh_data_ptr->store->~StructStore();
+            sh_data_ptr->mm_alloc.deallocate(sh_data_ptr->store);
             sh_data_ptr->mm_alloc.~MiniMalloc();
             if (use_file) {
                 unlink(path.c_str());
@@ -334,5 +344,11 @@ void StructStoreShared::from_buffer(void* buffer, size_t bufsize) {
 bool StructStoreShared::operator==(const StructStoreShared& other) const {
     assert_valid();
     other.assert_valid();
-    return sh_data_ptr->data == other.sh_data_ptr->data;
+    return *sh_data_ptr->store == *other.sh_data_ptr->store;
+}
+
+void StructStoreShared::check() const {
+    CallstackEntry entry{"structstore::StructStoreShared::check()"};
+    stst_assert(sh_data_ptr->mm_alloc.is_owned(sh_data_ptr->store));
+    sh_data_ptr->store->check(&sh_data_ptr->mm_alloc);
 }

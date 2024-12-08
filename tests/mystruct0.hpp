@@ -15,17 +15,15 @@ struct Frame : public stst::Struct<Frame> {
     Frame() : Frame(stst::static_alloc) {}
 
     explicit Frame(stst::MiniMalloc& mm_alloc) : Struct(mm_alloc) {
-        field_map.store_ref("t", t);
-        field_map.store_ref("flag", flag);
-        field_map.store_ref("t_ptr", t_ptr);
+        store_ref("t", t);
+        store_ref("flag", flag);
+        store_ref("t_ptr", t_ptr);
     }
 
     Frame(const Frame& other) : Frame() { *this = other; }
 
-    Frame(Frame&& other) : Frame() { *this = std::move(other); }
-
     Frame& operator=(const Frame& other) {
-        field_map = other.field_map;
+        copy_from(other);
         t_ptr = &t;
         return *this;
     }

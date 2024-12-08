@@ -9,6 +9,7 @@ TEST(StructStoreTestStruct, nestedStruct) {
     stst::StructStore store(stst::static_alloc);
     Track track;
     store["track"] = track;
+    store.check();
 
     std::string yaml_str = (std::ostringstream() << store.to_yaml()).str();
     EXPECT_EQ(yaml_str,
@@ -19,6 +20,7 @@ TEST(StructStoreTestStruct, nestedStruct) {
     EXPECT_EQ(store, store2);
     store2["track"].get<Track>().frame1.t = 1.0;
     EXPECT_NE(store, store2);
+    store2.check();
 }
 
 int main(int argc, char** argv) {

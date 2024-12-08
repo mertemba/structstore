@@ -1,6 +1,7 @@
 #ifndef STST_ALLOC_HPP
 #define STST_ALLOC_HPP
 
+#include "structstore/stst_callstack.hpp"
 #include "structstore/stst_lock.hpp"
 #include "structstore/stst_utils.hpp"
 
@@ -403,13 +404,20 @@ public:
         return allocated;
     }
 
-    void assert_owned(const void* ptr) const {
+    bool is_owned(const void* ptr) const {
         if (ptr == nullptr) {
-            throw std::runtime_error("pointer is NULL");
+#ifndef NDEBUG
+            Callstack::warn_with_trace("checked pointer is null");
+#endif
+            return false;
         }
         if (ptr < buffer || ptr >= buffer + blocksize) {
-            throw std::runtime_error("pointer not inside managed memory");
+#ifndef NDEBUG
+            Callstack::warn_with_trace("checked pointer is outside arena");
+#endif
+            return false;
         }
+        return true;
     }
 };
 

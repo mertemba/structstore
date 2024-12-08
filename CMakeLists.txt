@@ -60,6 +60,7 @@ file(GLOB STRUCTSTORE_INC_FILES
 
 set(STRUCTSTORE_SRC_FILES
         ${PROJECT_SOURCE_DIR}/src/stst_alloc.cpp
+        ${PROJECT_SOURCE_DIR}/src/stst_callstack.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_containers.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_field.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_fieldmap.cpp

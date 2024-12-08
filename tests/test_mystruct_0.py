@@ -20,6 +20,7 @@ class TestMystruct0(unittest.TestCase):
         state.frame2 = state.frame.copy()
         state.frame2.t = 3.0
         self.assertEqual(state.frame.t, 2.5)
+        state.check()
 
         self.assertEqual(state.frame.t_ptr, 2.5)
         state.frame.t_ptr += 10.0
@@ -34,3 +35,4 @@ class TestMystruct0(unittest.TestCase):
         self.assertEqual(type(state.track.frame_ptr), Frame)
         self.assertEqual(type(state.track.frame_ptr.copy()), dict)
         self.assertEqual(state.track.frame_ptr, state.frame)
+        state.check()

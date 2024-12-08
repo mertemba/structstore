@@ -121,14 +121,7 @@ public:
 
     YAML::Node to_yaml() const;
 
-    void check(const MiniMalloc& mm_alloc, const FieldTypeBase& parent_field) const {
-        if (data) {
-            try_with_info("in field data ptr: ", mm_alloc.assert_owned(data););
-            const TypeInfo& type_info = typing::get_type(type_hash);
-            try_with_info("in field data content: ",
-                          type_info.check_fn(mm_alloc, data, &parent_field););
-        }
-    }
+    void check(const MiniMalloc& mm_alloc, const FieldTypeBase& parent_field) const;
 
     bool operator==(const Field& other) const {
         if (!data) { return !other.data; }
@@ -225,6 +218,10 @@ public:
     operator T&() {
         return get<T>();
     }
+
+    FieldAccess<true> operator[](const char* name) { return get<StructStore>()[name]; }
+
+    FieldAccess<true> operator[](HashString name) { return get<StructStore>()[name]; }
 
     operator FieldAccess<false>() { return FieldAccess<false>{field, mm_alloc, parent_field}; }
 

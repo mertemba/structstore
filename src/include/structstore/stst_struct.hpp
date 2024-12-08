@@ -2,6 +2,7 @@
 #define STST_STRUCT_HPP
 
 #include "structstore/stst_alloc.hpp"
+#include "structstore/stst_callstack.hpp"
 #include "structstore/stst_fieldmap.hpp"
 
 namespace structstore {
@@ -14,10 +15,10 @@ class Struct : public FieldType<T> {
 
     friend class FieldMap<false>;
 
-protected:
+private:
     FieldMap<false> field_map;
 
-public:
+protected:
     // constructor, assignment, destructor
 
     Struct() : Struct(static_alloc) {}
@@ -31,24 +32,30 @@ public:
 
     ~Struct() { field_map.clear_unmanaged(); }
 
+    // management functions
+
+    template<typename U>
+    inline void store_ref(HashString name, U& u) {
+        field_map.store_ref<U>(name, u, *this);
+    }
+
+    template<typename U>
+    inline void store_ref(const char* name, U& u) {
+        field_map.store_ref<U>(HashString{name}, u, *this);
+    }
+
+    void copy_from(const Struct<T>& other) { field_map = other.field_map; }
+
+public:
     // FieldTypeBase utility functions
 
     inline void to_text(std::ostream& os) const { field_map.to_text(os); }
 
     inline YAML::Node to_yaml() const { return field_map.to_yaml(); }
 
-    void check(const MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) const {
-        if (&mm_alloc != &field_map.get_alloc()) {
-            throw std::runtime_error("internal error: allocators are not the same");
-        }
-        if (this->parent_field != parent_field) {
-            throw std::runtime_error("invalid parent_field pointer in field of type " +
-                                     T::type_info.name);
-        }
-        field_map.check();
-        for (const auto& [key, value]: field_map.get_fields()) {
-            try_with_info("in field '" << key.str << "' value: ", value.check(mm_alloc, *this););
-        }
+    void check(const MiniMalloc* mm_alloc = nullptr) const {
+        CallstackEntry entry{"structstore::Struct::check()"};
+        field_map.check(mm_alloc, *this);
     }
 
     inline bool operator==(const Struct& other) const { return field_map == other.field_map; }

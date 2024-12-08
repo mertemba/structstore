@@ -1,4 +1,6 @@
 #include "structstore/stst_fieldmap.hpp"
+#include "structstore/stst_alloc.hpp"
+#include "structstore/stst_callstack.hpp"
 
 using namespace structstore;
 
@@ -43,15 +45,23 @@ YAML::Node FieldMapBase::to_yaml() const {
     return root;
 }
 
-void FieldMapBase::check() const {
+void FieldMapBase::check(const MiniMalloc* mm_alloc, const FieldTypeBase& parent_field) const {
+    CallstackEntry entry{"structstore::FieldMap::check()"};
+    if (mm_alloc) {
+        stst_assert(&this->mm_alloc == mm_alloc);
+    } else {
+        // use our own reference instead
+        mm_alloc = &this->mm_alloc;
+    }
+    // this could be allocated on regular stack/heap if the owning StructStore is not in shared mem
+    stst_assert(mm_alloc == &static_alloc || mm_alloc->is_owned(this));
     if (slots.size() != fields.size()) {
-        throw std::runtime_error("internal error: slots and fields with different size");
+        throw std::runtime_error("in FieldMap: slots and fields with different size");
     }
-    for (const HashString& str: slots) {
-        try_with_info("in slot '" << str.str << "' name: ", mm_alloc.assert_owned(str.str););
-    }
+    for (const HashString& str: slots) { stst_assert(mm_alloc->is_owned(str.str)); }
     for (const auto& [key, value]: fields) {
-        try_with_info("in field '" << key.str << "' name: ", mm_alloc.assert_owned(key.str););
+        stst_assert(mm_alloc->is_owned(key.str));
+        value.check(*mm_alloc, parent_field);
     }
 }
 

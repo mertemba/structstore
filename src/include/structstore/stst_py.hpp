@@ -380,11 +380,7 @@ public:
 
         cls.def("check", [](T& t) {
             STST_LOG_DEBUG() << "checking from python ...";
-            if constexpr (std::is_same_v<T, StructStoreShared>) {
-                t->check();
-            } else {
-                t.check();
-            }
+            t.check();
         });
 
         cls.def(

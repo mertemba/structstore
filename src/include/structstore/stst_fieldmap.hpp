@@ -38,7 +38,7 @@ public:
 
     YAML::Node to_yaml() const;
 
-    void check() const;
+    void check(const MiniMalloc* mm_alloc, const FieldTypeBase& parent_field) const;
 
     bool operator==(const FieldMapBase& other) const;
 
@@ -117,7 +117,7 @@ public:
     inline Field& operator[](const char* name) { return (*this)[HashString{name}]; }
 
     template<typename T>
-    void store_ref(HashString name, T& t) {
+    void store_ref(HashString name, T& t, const FieldTypeBase& parent_field) {
         static_assert(!managed, "storing ref in managed FieldMap is not supported");
         if constexpr (std::is_base_of_v<Struct<T>, T>) {
             if (&t.field_map.mm_alloc != &mm_alloc) {
@@ -135,14 +135,14 @@ public:
         if (!ret.second) { throw std::runtime_error("field name already exists"); }
         slots.emplace_back(name_int);
         STST_LOG_DEBUG() << "field " << name.str << " at " << &t;
-#ifndef NDEBUG
-        check();
-#endif
+        if constexpr (std::is_class_v<T>) {
+            t.parent_field = &parent_field;
+        }
     }
 
     template<typename T>
-    inline void store_ref(const char* name, T& t) {
-        store_ref(HashString{name}, t);
+    inline void store_ref(const char* name, T& t, const FieldTypeBase& parent_field) {
+        store_ref(HashString{name}, t, parent_field);
     }
 
     // remove operations
@@ -151,9 +151,6 @@ public:
         static_assert(managed, "removing fields from unmanaged FieldMap is not supported");
         STST_LOG_DEBUG() << "clearing FieldMap at " << this << "with alloc at " << &mm_alloc;
         if (&mm_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is using the static_alloc)";
-#ifndef NDEBUG
-        check();
-#endif
         for (auto& [key, value]: fields) { value.clear(mm_alloc); }
         fields.clear();
         for (const HashString& str: slots) { mm_alloc.deallocate((void*) str.str); }
@@ -164,9 +161,6 @@ public:
         static_assert(!managed);
         STST_LOG_DEBUG() << "clearing FieldMap at " << this << "with alloc at " << &mm_alloc;
         if (&mm_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is using the static_alloc)";
-#ifndef NDEBUG
-        check();
-#endif
         for (auto& [key, value]: fields) { value.clear_unmanaged(); }
         fields.clear();
         for (const HashString& str: slots) { mm_alloc.deallocate((void*) str.str); }
