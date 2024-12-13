@@ -311,6 +311,14 @@ public:
             return dict;
         });
 
+        cls.def("__dir__", [](T& t) {
+            nb::list slots;
+            for (const auto& str : get_field_map(t).get_slots()) {
+                slots.append(nb::str(str.str));
+            }
+            return slots;
+        });
+
         if constexpr (typing::is_field_type<T>) {
             cls.def("__setstate__", [](T& t, nb::handle value) {
                 typing::get_type<T>().constructor_fn(static_alloc, &t, nullptr);
