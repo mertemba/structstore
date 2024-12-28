@@ -44,6 +44,7 @@ test_devel_coverage-aarch64:
 
 test_devel_sanitize-amd64:
   extends: [.test_devel_sanitize, .amd64]
+  allow_failure: true  # numpy >=2.1 on Python >=3.13 fails with address sanitizer
 test_devel_sanitize-aarch64:
   extends: [.test_devel_sanitize, .aarch64]
 .test_devel_sanitize:
