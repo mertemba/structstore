@@ -32,12 +32,20 @@ public:
     static const TypeInfo& type_info;
 
     class Iterator {
-        // todo: store scoped lock
-        const List& list;
+        ScopedFieldLock<false> scoped_lock;
+        List& list;
         size_t index;
 
     public:
-        Iterator(const List& list, size_t index) : list(list), index(index) {}
+        Iterator(List& list, size_t index, ScopedFieldLock<false>&& scoped_lock)
+            : scoped_lock(std::move(scoped_lock)), list(list), index(index) {}
+
+        Iterator(Iterator&& other) = default;
+        ~Iterator() = default;
+
+        Iterator(const Iterator& other) = delete;
+        Iterator& operator=(const Iterator& other) = delete;
+        Iterator& operator=(Iterator&& other) = delete;
 
         bool operator==(const Iterator& other) const {
             return &list == &other.list && index == other.index;
@@ -90,8 +98,8 @@ public:
     }
 
     template<typename T>
-    void push_back(const T& value) {
-        data.emplace_back(StlAllocator<T>(mm_alloc).allocate(1)) = value;
+    inline void push_back(const T& value) {
+        push_back() = value;
     }
 
     FieldAccess<true> insert(size_t index) {
@@ -110,13 +118,9 @@ public:
 
     FieldAccess<true> at(size_t index) { return FieldAccess<true>{data.at(index), mm_alloc, this}; }
 
-    Iterator begin() const {
-        return {*this, 0};
-    }
+    Iterator begin() const { return {(List&) *this, 0, read_lock()}; }
 
-    Iterator end() const {
-        return {*this, data.size()};
-    }
+    Iterator end() const { return {(List&) *this, data.size(), read_lock()}; }
 
     size_t size() {
         return data.size();

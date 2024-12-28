@@ -20,17 +20,13 @@ class TestLock0(unittest.TestCase):
         with state.lst2.write_lock():
             state.lst2.append(stst.StructStore())
 
-        # implicitly get read lock in 'obj'
+        # this does not create a read lock anymore
         obj = state.lst2[0]
         self.assertEqual(str(obj), "{}")
-        # write lock cannot be used now
-        self.assertRaises(RuntimeError, lambda: state.lst2.write_lock())
+        # write lock can still be used now
+        state.lst2.write_lock()
 
         del obj
-
-        # successfully get write lock, as 'obj' is deleted now
-        with state.lst2.write_lock():
-            pass
 
         with state.lst2.write_lock():
             # cannot use write lock and read lock at the same time

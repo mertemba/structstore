@@ -102,12 +102,6 @@ public:
     template<typename T>
     static nb::object default_to_python_cast_fn(const Field& field) {
         T& t = field.get<T>();
-        if constexpr (std::is_class_v<T>) {
-            if (t.parent_field) {
-                auto lock = nb::cast(t.parent_field->read_lock(), nb::rv_policy::move);
-                return nb::cast(t, nb::rv_policy::reference_internal, lock);
-            }
-        }
         return nb::cast(t, nb::rv_policy::reference);
     }
 

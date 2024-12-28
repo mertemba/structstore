@@ -45,6 +45,13 @@ TEST(StructStoreTestBasic, refStructInLocalStore) {
         ++i;
     }
     EXPECT_EQ(list.size(), 2);
+    list.push_back(stst::StructStore(stst::static_alloc));
+    list.check();
+    EXPECT_EQ(list.size(), 3);
+    for (stst::Field& field: list) {
+        field.to_text(std::cout);
+        std::cout << std::endl;
+    }
 
     stst::List& strlist = store["strlist"];
     strlist.push_back((const char*) "foo");
@@ -55,7 +62,7 @@ TEST(StructStoreTestBasic, refStructInLocalStore) {
     EXPECT_EQ(strlist[0].get<stst::String>().size(), 6);
 
     std::string yaml_str = (std::ostringstream() << store.to_yaml()).str();
-    EXPECT_EQ(yaml_str, "num: 42\nvalue: 3.1400000000000001\nflag: true\nstr: foo\nsubsettings:\n  subnum: 43\n  substr: bar\nlist:\n  - 6\n  - 43\nstrlist:\n  - foobar");
+    EXPECT_EQ(yaml_str, "num: 42\nvalue: 3.1400000000000001\nflag: true\nstr: foo\nsubsettings:\n  subnum: 43\n  substr: bar\nlist:\n  - 6\n  - 43\n  - {}\nstrlist:\n  - foobar");
 
     store.check();
 }
