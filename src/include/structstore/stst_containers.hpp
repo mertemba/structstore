@@ -39,11 +39,11 @@ public:
     public:
         Iterator(const List& list, size_t index) : list(list), index(index) {}
 
-        bool operator==(Iterator& other) const {
+        bool operator==(const Iterator& other) const {
             return &list == &other.list && index == other.index;
         }
 
-        bool operator!=(Iterator& other) const {
+        bool operator!=(const Iterator& other) const {
             return !(*this == other);
         }
 
