@@ -8,7 +8,7 @@ using namespace structstore;
 std::random_device structstore::rnd_dev;
 
 StructStoreShared::SharedData::SharedData(size_t size, size_t bufsize, void* buffer)
-    : original_ptr{this}, size{size}, usage_count{1}, mm_alloc{bufsize, buffer},
+    : original_ptr{this}, size{size}, usage_count{1}, mm_alloc{buffer, bufsize},
       invalidated{false} {
     store = StlAllocator<StructStore>(mm_alloc).allocate(1);
     new (store) StructStore(mm_alloc);

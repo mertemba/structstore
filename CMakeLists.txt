@@ -59,6 +59,7 @@ file(GLOB STRUCTSTORE_INC_FILES
         ${PROJECT_SOURCE_DIR}/src/include/*.hpp)
 
 set(STRUCTSTORE_SRC_FILES
+        ${PROJECT_SOURCE_DIR}/src/mini_malloc.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_alloc.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_callstack.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_containers.cpp

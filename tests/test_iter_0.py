@@ -14,5 +14,6 @@ class TestIter0(unittest.TestCase):
         state.lst2 = []
         state.lst2.append(stst.StructStore())
         state.check()
+        state.lst2.check()
         for subs in state.lst2:
             self.assertEqual(str(subs), "{}")

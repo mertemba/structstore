@@ -106,14 +106,9 @@ class StructStoreShared {
     CleanupMode cleanup{};
 
 public:
-
-    explicit StructStoreShared(
-            const std::string& path,
-            size_t bufsize = 2048,
-            bool reinit = false,
-            bool use_file = false,
-            CleanupMode cleanup = IF_LAST,
-            void* target_addr = nullptr);
+    explicit StructStoreShared(const std::string& path, size_t bufsize = 4096, bool reinit = false,
+                               bool use_file = false, CleanupMode cleanup = IF_LAST,
+                               void* target_addr = nullptr);
 
     explicit StructStoreShared(int fd, bool init);
 
