@@ -62,10 +62,6 @@ public:
         Field& operator*() { return ((List&) list).data.at(index); }
     };
 
-    List() : mm_alloc(static_alloc), data(StlAllocator<Field>(static_alloc)) {
-        throw std::runtime_error("List should not be constructed without an allocator");
-    }
-
     explicit List(MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), data(StlAllocator<Field>(mm_alloc)) {
         STST_LOG_DEBUG() << "constructing List at " << this;
     }
@@ -75,10 +71,7 @@ public:
         clear();
     }
 
-    List(const List& other) : List() {
-        *this = other;
-    }
-
+    List(const List& other) = delete;
     List(List&&) = delete;
 
     List& operator=(const List& other) {
@@ -178,10 +171,7 @@ public:
     }
 
     Matrix(Matrix&&) = delete;
-
-    Matrix(const Matrix& other) : Matrix(0, 0, other.mm_alloc) {
-        *this = other;
-    }
+    Matrix(const Matrix&) = delete;
 
     Matrix& operator=(Matrix&& other) {
         if (&mm_alloc != &other.mm_alloc) {

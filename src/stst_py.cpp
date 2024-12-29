@@ -41,6 +41,20 @@ py::field_map_to_python(const FieldMapBase& field_map, py::ToPythonMode mode) {
     return dict;
 }
 
+__attribute__((__visibility__("default"))) void
+py::field_map_from_python(FieldMap<false>& field_map, const nb::dict& dict,
+                          const FieldTypeBase& parent_field) {
+    STST_LOG_DEBUG() << "copying __dict__ to " << &field_map;
+    if (field_map.get_slots().size() != dict.size()) {
+        Callstack::throw_with_trace<std::runtime_error>(
+                "cannot copy dict with wrong fields into struct");
+    }
+    for (const shr_string* str: field_map.get_slots()) {
+        std::string key_str = str->c_str();
+        py::set_field(field_map, key_str, dict[str->c_str()], parent_field);
+    }
+}
+
 __attribute__((__visibility__("default"))) nb::object py::to_python(const Field& field,
                                                                     ToPythonMode mode) {
     if (field.empty()) {

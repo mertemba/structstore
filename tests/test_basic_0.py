@@ -43,6 +43,10 @@ class TestBasic0(unittest.TestCase):
         del state.flag
         self.assertFalse(hasattr(state, 'flag'))
 
+        state2 = structstore.StructStore()
+        state2.state = state.deepcopy()
+        state2.check()
+
         # check dict types
         self.assertEqual(type(state.sub), structstore.StructStore)
         self.assertEqual(type(state.copy()), dict)

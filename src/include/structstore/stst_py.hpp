@@ -120,6 +120,9 @@ public:
 
     static nb::object field_map_to_python(const FieldMapBase& field_map, py::ToPythonMode mode);
 
+    static void field_map_from_python(FieldMap<false>& field_map, const nb::dict& dict,
+                                      const FieldTypeBase& parent_field);
+
     inline static nb::object structstore_to_python(const StructStore& store,
                                                    py::ToPythonMode mode) {
         return field_map_to_python(store.field_map, mode);
@@ -134,18 +137,22 @@ public:
                 STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name
                                  << " succeeded";
                 T& t = nb::cast<T&>(value, false);
+                if (!access.get_alloc().is_owned(&t)) {
+                    Callstack::throw_with_trace<std::runtime_error>(
+                            "cannot assign pointer to different memory region");
+                }
                 access.get<T*>() = &t;
                 return true;
             }
             STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name << " failed";
             return false;
         };
-        py::ToPythonFn to_python_fn = [](const Field& field, py::ToPythonMode) {
+        py::ToPythonFn to_python_fn = [](const Field& field, py::ToPythonMode mode) {
             T* t_ptr = field.get<T*>();
             if (t_ptr == nullptr) {
                 return nb::none();
             }
-            return nb::cast(*t_ptr, nb::rv_policy::reference);
+            return field_map_to_python(t_ptr->field_map, mode);
         };
         py::ToPythonCastFn to_python_cast_fn = [](const Field& field) {
             T* t_ptr = field.get<T*>();
@@ -165,7 +172,28 @@ public:
             Struct<T>& t = field.get<T>();
             return field_map_to_python(t.field_map, mode);
         };
-        register_type<T>(default_from_python_fn<T, nb::class_<T>>, to_python_fn);
+        auto from_python_fn = [](FieldAccess<true> access, const nb::handle& value) {
+            if (py::copy_cast_from_python<T>(access, value)) { return true; }
+            nb::dict dict;
+            bool is_dict = false;
+            if (nb::hasattr(value, "__dict__")) {
+                dict = nb::dict(value.attr("__dict__"));
+                is_dict = true;
+            }
+            if (nb::isinstance<nb::dict>(value)) {
+                dict = nb::cast<nb::dict>(value);
+                is_dict = true;
+            }
+            if (is_dict) {
+                T& t = access.get<T>();
+                FieldMap<false>& field_map = t.field_map;
+                field_map_from_python(field_map, dict, t);
+                return true;
+            }
+            STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name << " failed";
+            return false;
+        };
+        register_type<T>(from_python_fn, to_python_fn);
         register_struct_ptr_type<T>();
         register_field_map_funcs(cls);
     }

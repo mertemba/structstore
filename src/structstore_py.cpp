@@ -60,12 +60,28 @@ NB_MODULE(MODULE_NAME, m) {
                                                      const nanobind::handle& value) {
         if (py::copy_cast_from_python<StructStore>(access, value)) { return true; }
         // todo: strict check if this is one of dict, SimpleNamespace, StructStore
+        nb::dict dict;
+        bool is_dict = false;
         if (nb::hasattr(value, "__dict__")) {
-            auto dict = nb::dict(value.attr("__dict__"));
+            dict = nb::dict(value.attr("__dict__"));
+            is_dict = true;
+        }
+        if (nb::isinstance<nb::dict>(value)) {
+            dict = nb::cast<nb::dict>(value);
+            is_dict = true;
+        }
+        if (is_dict) {
             StructStore& store = access.get<StructStore>();
             STST_LOG_DEBUG() << "copying __dict__ to " << &store;
             store.clear();
             for (const auto& [key, val]: dict) {
+                if (!nb::isinstance<nb::str>(key)) {
+                    std::ostringstream msg;
+                    msg << "Key '" << nb::cast<std::string>(nb::str(key))
+                        << "' has unsupported type '" << nb::cast<std::string>(nb::str(key.type()))
+                        << "'! Only string keys are supported.";
+                    throw nb::type_error(msg.str().c_str());
+                }
                 std::string key_str = nb::cast<std::string>(key);
                 py::from_python(store[key_str.c_str()], dict[key], key_str);
             }
@@ -79,24 +95,6 @@ NB_MODULE(MODULE_NAME, m) {
             for (const auto& key: slots) {
                 std::string key_str = nb::cast<std::string>(key);
                 py::from_python(store[key_str.c_str()], nb::getattr(value, key), key_str);
-            }
-            return true;
-        }
-        if (nb::isinstance<nb::dict>(value)) {
-            nb::dict dict = nb::cast<nb::dict>(value);
-            StructStore& store = access.get<StructStore>();
-            STST_LOG_DEBUG() << "copying nb::dict to " << &store;
-            store.clear();
-            for (const auto& [key, val]: dict) {
-                if (!nb::isinstance<nb::str>(key)) {
-                    std::ostringstream msg;
-                    msg << "Key '" << nb::cast<std::string>(nb::str(key))
-                        << "' has unsupported type '" << nb::cast<std::string>(nb::str(key.type()))
-                        << "'! Only string keys are supported.";
-                    throw nb::type_error(msg.str().c_str());
-                }
-                std::string key_str = nb::cast<std::string>(key);
-                py::from_python(store[key_str.c_str()], dict[key], key_str);
             }
             return true;
         }
@@ -172,6 +170,9 @@ NB_MODULE(MODULE_NAME, m) {
 
     // structstore::List
     auto list_cls = nb::class_<List>(m, "StructStoreList");
+    list_cls.def("__init__", [](List* list) {
+        new (list) List(static_alloc);
+    });
     py::ToPythonFn list_to_python_fn = [](const Field& field, py::ToPythonMode mode) -> nb::object {
         auto& list = field.get<List>();
         auto ret = nb::list();
