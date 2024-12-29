@@ -20,10 +20,18 @@ MiniMalloc::~MiniMalloc() noexcept(false) {
 }
 
 const shr_string* StringStorage::internalize(const std::string& str) {
-    return &*data.insert(shr_string{str, StlAllocator<int>{mm_alloc}}).first;
+    shr_string str_{str, StlAllocator<int>{mm_alloc}};
+    {
+        ScopedLock<false> lock{mutex};
+        auto it = data.find(str_);
+        if (it != data.end()) { return &*it; }
+    }
+    ScopedLock<true> lock{mutex};
+    return &*data.insert(str_).first;
 }
 
 const shr_string* StringStorage::get(const std::string& str) {
+    ScopedLock<false> lock{mutex};
     auto it = data.find(shr_string{str, StlAllocator<int>{mm_alloc}});
     if (it != data.end()) { return &*it; }
     return nullptr;

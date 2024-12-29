@@ -145,6 +145,7 @@ using shr_unordered_set = std::unordered_set<T, std::hash<T>, std::equal_to<T>, 
 class StringStorage {
     MiniMalloc& mm_alloc;
     shr_unordered_set<shr_string> data;
+    SpinMutex mutex;
 
 public:
     StringStorage(MiniMalloc& mm_alloc) : mm_alloc{mm_alloc}, data{StlAllocator<int>(mm_alloc)} {}
