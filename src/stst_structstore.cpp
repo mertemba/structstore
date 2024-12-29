@@ -11,10 +11,10 @@ void StructStore::check(const MiniMalloc* mm_alloc) const {
     field_map.check(mm_alloc, *this);
 }
 
-FieldAccess<true> StructStore::at(HashString name) {
+FieldAccess<true> StructStore::at(const std::string& name) {
     return FieldAccess<true>{field_map.at(name), field_map.get_alloc(), this};
 }
 
-FieldAccess<true> StructStore::operator[](HashString name) {
+FieldAccess<true> StructStore::operator[](const std::string& name) {
     return FieldAccess<true>{field_map[name], field_map.get_alloc(), this};
 }

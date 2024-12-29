@@ -19,12 +19,12 @@
 // make customized STL containers opaque to nanobind
 namespace nanobind::detail {
 template<class T>
-class type_caster<structstore::vector<T>>
-    : public type_caster_base<structstore::vector<T>> {};
+class type_caster<structstore::shr_vector<T>>
+    : public type_caster_base<structstore::shr_vector<T>> {};
 
 template<class K, class T>
-class type_caster<structstore::unordered_map<K, T>>
-    : public type_caster_base<structstore::unordered_map<K, T>> {};
+class type_caster<structstore::shr_unordered_map<K, T>>
+    : public type_caster_base<structstore::shr_unordered_map<K, T>> {};
 } // namespace nanobind::detail
 
 namespace structstore {
@@ -307,8 +307,8 @@ public:
 
         cls.def("__dir__", [](T& t) {
             nb::list slots;
-            for (const auto& str : get_field_map(t).get_slots()) {
-                slots.append(nb::str(str.str));
+            for (const shr_string* str : get_field_map(t).get_slots()) {
+                slots.append(nb::str(str->c_str()));
             }
             return slots;
         });

@@ -3,7 +3,6 @@
 
 #include "structstore/stst_alloc.hpp"
 #include "structstore/stst_field.hpp"
-#include "structstore/stst_hashstring.hpp"
 #include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
 
@@ -18,10 +17,8 @@ namespace structstore {
 class FieldMapBase {
 protected:
     MiniMalloc& mm_alloc;
-    unordered_map<HashString, Field> fields;
-    vector<HashString> slots;
-
-    HashString internalize_string(const HashString& str);
+    shr_unordered_map<const shr_string*, Field> fields;
+    shr_vector<const shr_string*> slots;
 
     // constructor, assignment, destructor
 
@@ -40,6 +37,8 @@ public:
 
     void check(const MiniMalloc* mm_alloc, const FieldTypeBase& parent_field) const;
 
+    bool equal_slots(const FieldMapBase& other) const;
+
     bool operator==(const FieldMapBase& other) const;
 
     inline bool operator!=(const FieldMapBase& other) const { return !(*this == other); }
@@ -52,17 +51,25 @@ public:
 
     inline const MiniMalloc& get_alloc() const { return mm_alloc; }
 
-    inline const unordered_map<HashString, Field>& get_fields() const { return fields; }
+    inline const shr_unordered_map<const shr_string*, Field>& get_fields() const { return fields; }
 
-    inline const vector<HashString>& get_slots() const { return slots; }
+    inline const shr_vector<const shr_string*>& get_slots() const { return slots; }
 
-    Field* try_get_field(HashString name);
+    Field* try_get_field(const std::string& name);
 
-    const Field* try_get_field(HashString name) const;
+    const Field* try_get_field(const std::string& name) const;
 
-    inline Field& at(HashString name) { return fields.at(name); }
+    inline Field& at(const std::string& name) {
+        return fields.at(mm_alloc.strings().get(name));
+    }
 
-    inline const Field& at(HashString name) const { return fields.at(name); }
+    inline const Field& at(const std::string& name) const {
+        return fields.at(mm_alloc.strings().get(name));
+    }
+
+    inline Field& at(const shr_string* name) { return fields.at(name); }
+
+    inline const Field& at(const shr_string* name) const { return fields.at(name); }
 };
 
 // managed means the contained fields are allocated and constructed.
@@ -74,7 +81,7 @@ protected:
 
     void copy_from_managed(const FieldMap& other, const FieldTypeBase* parent_field);
 
-    Field& get_or_insert(HashString name);
+    Field& get_or_insert(const std::string& name);
 
 public:
     // constructor, assignment, destructor
@@ -108,21 +115,19 @@ public:
 
     // insert operations
 
-    inline Field& operator[](HashString name) {
+    inline Field& operator[](const std::string& name) {
         static_assert(managed, "potentially creating fields in unmanaged FieldMap is not supported "
                                "(use .at() instead)");
         return get_or_insert(name);
     }
 
-    inline Field& operator[](const char* name) { return (*this)[HashString{name}]; }
-
     template<typename T>
-    void store_ref(HashString name, T& t, const FieldTypeBase& parent_field) {
+    void store_ref(const std::string& name, T& t, const FieldTypeBase& parent_field) {
         static_assert(!managed, "storing ref in managed FieldMap is not supported");
         if constexpr (std::is_base_of_v<Struct<T>, T>) {
             if (&t.field_map.mm_alloc != &mm_alloc) {
                 std::ostringstream str;
-                str << "registering Struct field '" << name.str << "' with a different allocator "
+                str << "registering Struct field '" << name << "' with a different allocator "
                     << "than this FieldMap, this is probably not what you want";
                 throw std::runtime_error(str.str());
             }
@@ -130,19 +135,14 @@ public:
         STST_LOG_DEBUG() << "registering unmanaged data at " << &t << "in FieldMap at " << this
                          << " with alloc at " << &mm_alloc
                          << " (static alloc: " << (&mm_alloc == &static_alloc) << ")";
-        HashString name_int = internalize_string(name);
+        const shr_string* name_int = mm_alloc.strings().internalize(name);
         auto ret = fields.emplace(name_int, Field{&t});
         if (!ret.second) { throw std::runtime_error("field name already exists"); }
         slots.emplace_back(name_int);
-        STST_LOG_DEBUG() << "field " << name.str << " at " << &t;
+        STST_LOG_DEBUG() << "field " << name << " at " << &t;
         if constexpr (std::is_class_v<T>) {
             t.parent_field = &parent_field;
         }
-    }
-
-    template<typename T>
-    inline void store_ref(const char* name, T& t, const FieldTypeBase& parent_field) {
-        store_ref(HashString{name}, t, parent_field);
     }
 
     // remove operations
@@ -153,7 +153,6 @@ public:
         if (&mm_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is using the static_alloc)";
         for (auto& [key, value]: fields) { value.clear(mm_alloc); }
         fields.clear();
-        for (const HashString& str: slots) { mm_alloc.deallocate((void*) str.str); }
         slots.clear();
     }
 
@@ -163,21 +162,18 @@ public:
         if (&mm_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is using the static_alloc)";
         for (auto& [key, value]: fields) { value.clear_unmanaged(); }
         fields.clear();
-        for (const HashString& str: slots) { mm_alloc.deallocate((void*) str.str); }
         slots.clear();
     }
 
-    void remove(HashString name) {
+    void remove(const std::string& name) {
         static_assert(managed, "removing fields from unmanaged FieldMap is not supported");
-        Field& field = fields.at(name);
+        const shr_string* name_ = mm_alloc.strings().get(name);
+        Field& field = fields.at(name_);
         field.clear(mm_alloc);
-        fields.erase(name);
-        auto slot_it = std::find(slots.begin(), slots.end(), name);
-        mm_alloc.deallocate((void*) slot_it->str);
+        fields.erase(name_);
+        auto slot_it = std::find(slots.begin(), slots.end(), name_);
         slots.erase(slot_it);
     }
-
-    void remove(const char* name) { remove(HashString{name}); }
 };
 
 } // namespace structstore

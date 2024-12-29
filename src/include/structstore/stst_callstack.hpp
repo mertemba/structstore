@@ -7,12 +7,12 @@
 namespace structstore {
 
 class Callstack {
-    std::vector<const char*> entries;
+    std::vector<std::string> entries;
 
 public:
     static Callstack& cur();
 
-    void push(const char* what);
+    void push(const std::string& what);
 
     void pop();
 
@@ -30,10 +30,10 @@ struct CallstackEntry {
     CallstackEntry() = delete;
 
 #ifndef NDEBUG
-    inline CallstackEntry(const char* what) { Callstack::cur().push(what); }
+    inline CallstackEntry(const std::string& what) { Callstack::cur().push(what); }
     inline ~CallstackEntry() { Callstack::cur().pop(); }
 #else
-    inline CallstackEntry(const char*) {}
+    inline CallstackEntry(const std::string&) {}
     inline ~CallstackEntry() {}
 #endif
 };

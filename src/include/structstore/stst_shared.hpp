@@ -19,7 +19,7 @@ extern std::random_device rnd_dev;
 
 class not_ready_error : public std::runtime_error {
 public:
-    not_ready_error(const char* what) : std::runtime_error(what) {}
+    not_ready_error(const std::string& what) : std::runtime_error(what) {}
 };
 
 enum CleanupMode {
@@ -155,12 +155,7 @@ public:
         return *sh_data_ptr->store;
     }
 
-    FieldAccess<true> operator[](HashString name) {
-        assert_valid();
-        return (*sh_data_ptr->store)[name];
-    }
-
-    FieldAccess<true> operator[](const char* name) {
+    FieldAccess<true> operator[](const std::string& name) {
         assert_valid();
         return (*sh_data_ptr->store)[name];
     }

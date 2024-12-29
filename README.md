@@ -22,7 +22,7 @@ int main() {
         ++i;
     }
     stst::List& strlist = store["strlist"];
-    strlist.push_back((const char*) "foo");
+    strlist.push_back("foo");
     std::cout << "store: " << store << std::endl;
     return 0;
 }
@@ -35,7 +35,7 @@ struct Subsettings {
     stst::StructStore& store;
     
     int& subnum = store["subnum"] = 42;
-    stst::string& substr = store["substr"] = (const char*) "bar";
+    stst::string& substr = store["substr"] = "bar";
     
     explicit Subsettings(stst::StructStore& store) : store(store) {}
 };

@@ -203,7 +203,7 @@ mini_malloc* structstore::init_mini_malloc(void* buffer, size_t blocksize) {
     return mm;
 }
 
-void* structstore::mm_alloc(mini_malloc* mm, size_t size) {
+void* structstore::mm_allocate(mini_malloc* mm, size_t size) {
     if (size == 0) return NULL;
 
     if (size % ALIGN) { size += ALIGN - size % ALIGN; }

@@ -129,6 +129,8 @@ public:
         return typing::get_type(type_hash).cmp_equal_fn(data, other.data);
     }
 
+    inline bool operator!=(const Field& other) const { return !(*this == other); }
+
     // query operations
 
     [[nodiscard]] bool empty() const { return !data; }
@@ -219,9 +221,7 @@ public:
         return get<T>();
     }
 
-    FieldAccess<true> operator[](const char* name) { return get<StructStore>()[name]; }
-
-    FieldAccess<true> operator[](HashString name) { return get<StructStore>()[name]; }
+    FieldAccess<true> operator[](const std::string& name) { return get<StructStore>()[name]; }
 
     operator FieldAccess<false>() { return FieldAccess<false>{field, mm_alloc, parent_field}; }
 
@@ -235,6 +235,17 @@ public:
         return *this;
     }
 
+    template<std::size_t N>
+    FieldAccess& operator=(const char (&value)[N]) {
+        get<String>() = value;
+        return *this;
+    }
+
+    FieldAccess& operator=(const std::string& str) {
+        get<String>() = str;
+        return *this;
+    }
+
     Field& get_field() { return field; }
 
     MiniMalloc& get_alloc() { return mm_alloc; }
@@ -243,22 +254,6 @@ public:
 
     void clear() { field.clear(mm_alloc); }
 };
-
-template<>
-template<>
-FieldAccess<false>& FieldAccess<false>::operator= <const char*>(const char* const& value);
-
-template<>
-template<>
-FieldAccess<true>& FieldAccess<true>::operator= <const char*>(const char* const& value);
-
-template<>
-template<>
-FieldAccess<false>& FieldAccess<false>::operator= <std::string>(const std::string& value);
-
-template<>
-template<>
-FieldAccess<true>& FieldAccess<true>::operator= <std::string>(const std::string& value);
 }
 
 #endif

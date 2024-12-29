@@ -12,7 +12,7 @@ struct mini_malloc;
 mini_malloc* init_mini_malloc(void* buffer, size_t blocksize);
 
 // returns a pointer to size bytes of memory, aligned to 8 bytes
-void* mm_alloc(mini_malloc*, size_t size);
+void* mm_allocate(mini_malloc*, size_t size);
 
 // free a block of memory previously allocated by mm_alloc
 void mm_free(mini_malloc*, void* ptr);

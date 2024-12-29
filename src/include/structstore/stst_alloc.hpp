@@ -8,10 +8,14 @@
 #include <cassert>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <sstream>
 #include <stdexcept>
+#include <unordered_set>
 
 namespace structstore {
+
+class StringStorage;
 
 class MiniMalloc {
     using byte = uint8_t;
@@ -22,14 +26,12 @@ class MiniMalloc {
     SpinMutex mutex;
     byte* const buffer;
     const size_t blocksize;
+    StringStorage* string_storage;
 
 public:
-    MiniMalloc(void* buffer, size_t size) : mm{nullptr}, buffer{(byte*) buffer}, blocksize{size} {
-        if (buffer == nullptr) { return; }
-        mm = init_mini_malloc(buffer, size);
-    }
+    MiniMalloc(void* buffer, size_t size);
 
-    ~MiniMalloc() noexcept(false) { mm_assert_all_freed(mm); }
+    ~MiniMalloc() noexcept(false);
 
     MiniMalloc() = delete;
 
@@ -48,7 +50,7 @@ public:
     void* allocate(size_t field_size) {
         if (field_size == 0) { field_size = ALIGN; }
         ScopedLock<true> lock{mutex};
-        void* ptr = mm_alloc(mm, field_size);
+        void* ptr = mm_allocate(mm, field_size);
         if (ptr == nullptr) {
             std::ostringstream str;
             str << "insufficient space in mm_alloc region, requested: " << field_size;
@@ -77,6 +79,8 @@ public:
         }
         return true;
     }
+
+    inline StringStorage& strings() { return *string_storage; }
 };
 
 extern MiniMalloc static_alloc;
@@ -125,6 +129,31 @@ public:
 
     MiniMalloc& get_alloc() { return mm_alloc; }
 };
+
+using shr_string = std::basic_string<char, std::char_traits<char>, StlAllocator<char>>;
+
+template<class T>
+using shr_vector = std::vector<T, StlAllocator<T>>;
+
+template<class K, class T>
+using shr_unordered_map = std::unordered_map<K, T, std::hash<K>, std::equal_to<K>,
+                                             StlAllocator<std::pair<const K, T>>>;
+
+template<class T>
+using shr_unordered_set = std::unordered_set<T, std::hash<T>, std::equal_to<T>, StlAllocator<T>>;
+
+class StringStorage {
+    MiniMalloc& mm_alloc;
+    shr_unordered_set<shr_string> data;
+
+public:
+    StringStorage(MiniMalloc& mm_alloc) : mm_alloc{mm_alloc}, data{StlAllocator<int>(mm_alloc)} {}
+
+    const shr_string* internalize(const std::string& str);
+
+    const shr_string* get(const std::string& str);
+};
+
 } // namespace structstore
 
 #endif

@@ -13,8 +13,8 @@ void String::check(const MiniMalloc* mm_alloc) const {
     if (mm_alloc && !empty()) { stst_assert(mm_alloc->is_owned(data())); }
 }
 
-String& String::operator=(const char* const& value) {
-    static_cast<std_string&>(*this) = value;
+String& String::operator=(const std::string& value) {
+    static_cast<shr_string&>(*this) = value;
     return *this;
 }
 
@@ -47,11 +47,6 @@ void List::check(const MiniMalloc* mm_alloc) const {
         mm_alloc = &this->mm_alloc;
     }
     for (const Field& field: data) { field.check(*mm_alloc, *this); }
-}
-
-template<>
-void List::push_back<const char*>(const char* const& value) {
-    push_back().get<structstore::String>() = value;
 }
 
 bool List::operator==(const List& other) const {

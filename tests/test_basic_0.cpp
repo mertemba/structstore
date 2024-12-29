@@ -8,7 +8,7 @@ struct Subsettings {
     stst::StructStore& store;
 
     int& subnum = store["subnum"] = 42;
-    stst::String& substr = store["substr"] = (const char*) "bar";
+    stst::String& substr = store["substr"] = "bar";
 
     explicit Subsettings(stst::StructStore& store) : store(store) {}
 };
@@ -19,7 +19,7 @@ struct Settings {
     int& num = store["num"] = 5;
     double& value = store["value"] = 3.14;
     bool& flag = store["flag"] = true;
-    stst::String& str = store["str"] = (const char*) "foo";
+    stst::String& str = store["str"] = "foo";
     Subsettings subsettings{store.substore("subsettings")};
 
     explicit Settings(stst::StructStore& store) : store(store) {}
@@ -54,7 +54,7 @@ TEST(StructStoreTestBasic, refStructInLocalStore) {
     }
 
     stst::List& strlist = store["strlist"];
-    strlist.push_back((const char*) "foo");
+    strlist.push_back("foo");
     for (stst::String& str: strlist) {
         str += "bar";
     }

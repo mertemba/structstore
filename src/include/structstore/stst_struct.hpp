@@ -35,13 +35,8 @@ protected:
     // management functions
 
     template<typename U>
-    inline void store_ref(HashString name, U& u) {
+    inline void store_ref(const std::string& name, U& u) {
         field_map.store_ref<U>(name, u, *this);
-    }
-
-    template<typename U>
-    inline void store_ref(const char* name, U& u) {
-        field_map.store_ref<U>(HashString{name}, u, *this);
     }
 
     void copy_from(const Struct<T>& other) { field_map = other.field_map; }

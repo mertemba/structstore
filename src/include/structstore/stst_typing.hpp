@@ -3,7 +3,6 @@
 
 #include "structstore/stst_alloc.hpp"
 #include "structstore/stst_callstack.hpp"
-#include "structstore/stst_hashstring.hpp"
 #include "structstore/stst_lock.hpp"
 #include "structstore/stst_utils.hpp"
 
@@ -312,12 +311,6 @@ inline void StlAllocator<T>::construct(T* p) {
         new (p) T;
     }
 }
-
-template<class T>
-using vector = std::vector<T, StlAllocator<T>>;
-
-template<class K, class T>
-using unordered_map = std::unordered_map<K, T, std::hash<K>, std::equal_to<K>, StlAllocator<std::pair<const K, T>>>;
 
 } // namespace structstore
 

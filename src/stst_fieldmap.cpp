@@ -4,25 +4,33 @@
 
 using namespace structstore;
 
-HashString FieldMapBase::internalize_string(const HashString& str) {
-    size_t len = std::strlen(str.str);
-    char* buf = (char*) mm_alloc.allocate(len + 1);
-    std::strcpy(buf, str.str);
-    return {buf, str.hash};
+bool FieldMapBase::equal_slots(const FieldMapBase& other) const {
+    if (slots.size() != other.slots.size()) return false;
+    for (auto it1 = slots.begin(), it2 = other.slots.begin(); it1 != slots.end(); ++it1, ++it2) {
+        if (**it1 != **it2) { return false; }
+    }
+    return true;
 }
 
 bool FieldMapBase::operator==(const FieldMapBase& other) const {
-    return slots == other.slots && fields == other.fields;
+    if (slots.size() != other.slots.size()) return false;
+    for (auto it1 = slots.begin(), it2 = other.slots.begin(); it1 != slots.end(); ++it1, ++it2) {
+        if (**it1 != **it2) { return false; }
+        if (fields.at(*it1) != other.fields.at(*it2)) { return false; }
+    }
+    return true;
 }
 
-Field* FieldMapBase::try_get_field(HashString name) {
-    auto it = fields.find(name);
+Field* FieldMapBase::try_get_field(const std::string& name) {
+    const shr_string* name_ = mm_alloc.strings().get(name);
+    auto it = fields.find(name_);
     if (it == fields.end()) { return nullptr; }
     return &it->second;
 }
 
-const Field* FieldMapBase::try_get_field(HashString name) const {
-    auto it = fields.find(name);
+const Field* FieldMapBase::try_get_field(const std::string& name) const {
+    const shr_string* name_ = mm_alloc.strings().get(name);
+    auto it = fields.find(name_);
     if (it == fields.end()) { return nullptr; }
     return &it->second;
 }
@@ -30,9 +38,9 @@ const Field* FieldMapBase::try_get_field(HashString name) const {
 void FieldMapBase::to_text(std::ostream& os) const {
     STST_LOG_DEBUG() << "serializing StructStore at " << this;
     os << "{";
-    for (const auto& name: slots) {
-        STST_LOG_DEBUG() << "field " << &name << " is at " << &fields.at(name);
-        os << '"' << name.str << "\":";
+    for (const shr_string* name: slots) {
+        STST_LOG_DEBUG() << "field " << *name << " is at " << &fields.at(name);
+        os << '"' << *name << "\":";
         fields.at(name).to_text(os);
         os << ",";
     }
@@ -41,7 +49,7 @@ void FieldMapBase::to_text(std::ostream& os) const {
 
 YAML::Node FieldMapBase::to_yaml() const {
     YAML::Node root(YAML::NodeType::Map);
-    for (const auto& name: slots) { root[name.str] = fields.at(name).to_yaml(); }
+    for (const shr_string* name: slots) { root[name->c_str()] = fields.at(name).to_yaml(); }
     return root;
 }
 
@@ -58,9 +66,9 @@ void FieldMapBase::check(const MiniMalloc* mm_alloc, const FieldTypeBase& parent
     if (slots.size() != fields.size()) {
         throw std::runtime_error("in FieldMap: slots and fields with different size");
     }
-    for (const HashString& str: slots) { stst_assert(mm_alloc->is_owned(str.str)); }
+    for (const shr_string* str: slots) { stst_assert(mm_alloc->is_owned(str)); }
     for (const auto& [key, value]: fields) {
-        stst_assert(mm_alloc->is_owned(key.str));
+        stst_assert(mm_alloc->is_owned(key));
         value.check(*mm_alloc, parent_field);
     }
 }
@@ -69,11 +77,12 @@ template<>
 void FieldMap<false>::copy_from_unmanaged(const FieldMap<false>& other) {
     // unmanaged copy: slots have to be the same
     STST_LOG_DEBUG() << "copying FieldMap from " << &other << " into " << this;
-    if (slots != other.get_slots()) {
-        throw std::runtime_error("copying into unmanaged FieldMap with different fields");
+    if (!equal_slots(other)) {
+        throw std::runtime_error("copying into unmanaged FieldMap with different field names");
     }
-    for (const HashString& str: slots) {
-        fields.at(str).copy_from(mm_alloc, other.get_fields().at(str));
+    for (auto it1 = get_slots().begin(), it2 = other.slots.begin(); it1 != slots.end();
+         ++it1, ++it2) {
+        fields.at(*it1).copy_from(mm_alloc, other.get_fields().at(*it2));
     }
 }
 
@@ -83,8 +92,8 @@ void FieldMap<true>::copy_from_managed(const FieldMap<true>& other,
     // managed copy: clear and insert the other contents
     STST_LOG_DEBUG() << "copying FieldMap from " << &other << " into " << this;
     clear();
-    for (const HashString& str: other.get_slots()) {
-        HashString name_int = internalize_string(str);
+    for (const shr_string* str: other.get_slots()) {
+        const shr_string* name_int = mm_alloc.strings().internalize(std::string(*str));
         slots.emplace_back(name_int);
         Field& field = fields.emplace(name_int, Field{}).first->second;
         field.construct_copy_from(mm_alloc, other.get_fields().at(str), parent_field);
@@ -92,10 +101,10 @@ void FieldMap<true>::copy_from_managed(const FieldMap<true>& other,
 }
 
 template<>
-Field& FieldMap<true>::get_or_insert(HashString name) {
-    auto it = fields.find(name);
+Field& FieldMap<true>::get_or_insert(const std::string& name) {
+    auto it = fields.find(mm_alloc.strings().get(name));
     if (it == fields.end()) {
-        HashString name_int = internalize_string(name);
+        const shr_string* name_int = mm_alloc.strings().internalize(name);
         it = fields.emplace(name_int, Field{}).first;
         slots.emplace_back(name_int);
     }

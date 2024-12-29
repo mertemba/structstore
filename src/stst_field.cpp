@@ -63,29 +63,3 @@ template<>
 ::structstore::String& FieldAccess<true>::get_str() {
     return get<::structstore::String>();
 }
-
-template<>
-template<>
-FieldAccess<false>& FieldAccess<false>::operator= <const char*>(const char* const& value) {
-    get<structstore::String>() = value;
-    return *this;
-}
-
-template<>
-template<>
-FieldAccess<true>& FieldAccess<true>::operator= <const char*>(const char* const& value) {
-    get<structstore::String>() = value;
-    return *this;
-}
-
-template<>
-template<>
-FieldAccess<false>& FieldAccess<false>::operator= <std::string>(const std::string& value) {
-    return *this = value.c_str();
-}
-
-template<>
-template<>
-FieldAccess<true>& FieldAccess<true>::operator= <std::string>(const std::string& value) {
-    return *this = value.c_str();
-}

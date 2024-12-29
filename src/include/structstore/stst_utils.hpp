@@ -1,6 +1,7 @@
 #ifndef STST_UTILS_HPP
 #define STST_UTILS_HPP
 
+#include <cstdint>
 #include <iostream>
 #include <sstream>
 
@@ -64,6 +65,12 @@ class NilLog {
                     "assertion failed: " #expr);                                                   \
         }                                                                                          \
     } while (0)
+
+constexpr uint64_t const_hash(const char* input) {
+    // FNV1a hash of reversed string
+    return *input != 0 ? (const_hash(input + 1) ^ uint64_t((uint8_t) *input)) * 0x100000001b3ull
+                       : 0xcbf29ce484222325ull;
+}
 
 } // namespace structstore
 
