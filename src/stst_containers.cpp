@@ -1,21 +1,20 @@
 #include "structstore/stst_containers.hpp"
 #include "structstore/stst_alloc.hpp"
+#include "structstore/stst_callstack.hpp"
+#include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
 
 using namespace structstore;
 
 const TypeInfo& String::type_info = typing::register_type<String>("structstore::String");
 
-void String::check(const MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) const {
-    if (this->parent_field != parent_field) {
-        throw std::runtime_error("invalid parent_field pointer in field of type " + type_info.name);
-    }
-    try_with_info("string: ", mm_alloc.assert_owned(this););
-    if (!empty()) { try_with_info("string data: ", mm_alloc.assert_owned(data());); }
+void String::check(const MiniMalloc* mm_alloc) const {
+    CallstackEntry entry{"structstore::String::check()"};
+    if (mm_alloc && !empty()) { stst_assert(mm_alloc->is_owned(data())); }
 }
 
-String& String::operator=(const char* const& value) {
-    static_cast<std_string&>(*this) = value;
+String& String::operator=(const std::string& value) {
+    static_cast<shr_string&>(*this) = value;
     return *this;
 }
 
@@ -39,19 +38,15 @@ YAML::Node List::to_yaml() const {
     return node;
 }
 
-void List::check(const MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) const {
-    if (this->parent_field != parent_field) {
-        throw std::runtime_error("invalid parent_field pointer in field of type " + type_info.name);
+void List::check(const MiniMalloc* mm_alloc) const {
+    CallstackEntry entry{"structstore::List::check()"};
+    if (mm_alloc) {
+        stst_assert(&this->mm_alloc == mm_alloc);
+    } else {
+        // use our own reference instead
+        mm_alloc = &this->mm_alloc;
     }
-    try_with_info("List*: ", mm_alloc.assert_owned(this););
-    for (const Field& field: data) {
-        try_with_info("in List iter: ", field.check(mm_alloc, *this););
-    }
-}
-
-template<>
-void List::push_back<const char*>(const char* const& value) {
-    push_back().get<structstore::String>() = value;
+    for (const Field& field: data) { field.check(*mm_alloc, *this); }
 }
 
 bool List::operator==(const List& other) const {
@@ -76,14 +71,15 @@ YAML::Node Matrix::to_yaml() const {
     throw std::runtime_error("serialize_yaml_fn not implemented for structstore::Matrix");
 }
 
-void Matrix::check(const MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) const {
-    if (this->parent_field != parent_field) {
-        throw std::runtime_error("invalid parent_field pointer in field of type " + type_info.name);
+void Matrix::check(const MiniMalloc* mm_alloc) const {
+    CallstackEntry entry{"structstore::Matrix::check()"};
+    if (mm_alloc) {
+        stst_assert(&this->mm_alloc == mm_alloc);
+    } else {
+        // use our own reference instead
+        mm_alloc = &this->mm_alloc;
     }
-    try_with_info("Matrix*: ", mm_alloc.assert_owned(this););
-    if (_data) {
-        try_with_info("Matrix data: ", mm_alloc.assert_owned(_data););
-    }
+    if (_data) { stst_assert(mm_alloc->is_owned(_data)); }
 }
 
 bool Matrix::operator==(const Matrix& other) const {

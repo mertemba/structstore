@@ -19,12 +19,12 @@
 // make customized STL containers opaque to nanobind
 namespace nanobind::detail {
 template<class T>
-class type_caster<structstore::vector<T>>
-    : public type_caster_base<structstore::vector<T>> {};
+class type_caster<structstore::shr_vector<T>>
+    : public type_caster_base<structstore::shr_vector<T>> {};
 
 template<class K, class T>
-class type_caster<structstore::unordered_map<K, T>>
-    : public type_caster_base<structstore::unordered_map<K, T>> {};
+class type_caster<structstore::shr_unordered_map<K, T>>
+    : public type_caster_base<structstore::shr_unordered_map<K, T>> {};
 } // namespace nanobind::detail
 
 namespace structstore {
@@ -102,12 +102,6 @@ public:
     template<typename T>
     static nb::object default_to_python_cast_fn(const Field& field) {
         T& t = field.get<T>();
-        if constexpr (std::is_class_v<T>) {
-            if (t.parent_field) {
-                auto lock = nb::cast(t.parent_field->read_lock(), nb::rv_policy::move);
-                return nb::cast(t, nb::rv_policy::reference_internal, lock);
-            }
-        }
         return nb::cast(t, nb::rv_policy::reference);
     }
 
@@ -311,6 +305,14 @@ public:
             return dict;
         });
 
+        cls.def("__dir__", [](T& t) {
+            nb::list slots;
+            for (const shr_string* str : get_field_map(t).get_slots()) {
+                slots.append(nb::str(str->c_str()));
+            }
+            return slots;
+        });
+
         if constexpr (typing::is_field_type<T>) {
             cls.def("__setstate__", [](T& t, nb::handle value) {
                 typing::get_type<T>().constructor_fn(static_alloc, &t, nullptr);
@@ -380,11 +382,7 @@ public:
 
         cls.def("check", [](T& t) {
             STST_LOG_DEBUG() << "checking from python ...";
-            if constexpr (std::is_same_v<T, StructStoreShared>) {
-                t->check();
-            } else {
-                t.check();
-            }
+            t.check();
         });
 
         cls.def(

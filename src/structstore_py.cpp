@@ -114,7 +114,7 @@ NB_MODULE(MODULE_NAME, m) {
                 new (s) StructStoreShared{path,     size,    reinit,
                                           use_file, cleanup, (void*) target_addr};
             },
-            nb::arg("path"), nb::arg("size") = 2048, nb::arg("reinit") = false,
+            nb::arg("path"), nb::arg("size") = 4096, nb::arg("reinit") = false,
             nb::arg("use_file") = false, nb::arg("cleanup") = IF_LAST, nb::arg("target_addr") = 0);
     shcls.def(
             "__init__",
@@ -261,6 +261,10 @@ NB_MODULE(MODULE_NAME, m) {
     list_cls.def("clear", [](List& list) {
         auto lock = list.write_lock();
         list.clear();
+    });
+    list_cls.def("check", [](List& list) {
+        STST_LOG_DEBUG() << "checking from python ...";
+        list.check();
     });
 
 

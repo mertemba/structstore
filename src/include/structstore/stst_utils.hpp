@@ -1,6 +1,7 @@
 #ifndef STST_UTILS_HPP
 #define STST_UTILS_HPP
 
+#include <cstdint>
 #include <iostream>
 #include <sstream>
 
@@ -57,18 +58,19 @@ class NilLog {
 #define STST_LOG_ERROR()                                                                           \
     if (structstore::Log::Level::ERROR >= structstore::Log::level) structstore::Log("error: ")
 
-#define try_with_info(info_stream, stmt)                               \
-    do {                                                               \
-        try {                                                          \
-            STST_LOG_DEBUG() << "checking " << info_stream;            \
-            stmt                                                       \
-        } catch (std::runtime_error & _e) {                            \
-            STST_LOG_DEBUG() << info_stream << "error: " << _e.what(); \
-            std::ostringstream _str;                                   \
-            _str << info_stream << _e.what();                          \
-            throw std::runtime_error(_str.str());                      \
-        }                                                              \
+#define stst_assert(expr)                                                                          \
+    do {                                                                                           \
+        if (!(expr)) {                                                                             \
+            structstore::Callstack::throw_with_trace<std::runtime_error>(                          \
+                    "assertion failed: " #expr);                                                   \
+        }                                                                                          \
     } while (0)
+
+constexpr uint64_t const_hash(const char* input) {
+    // FNV1a hash of reversed string
+    return *input != 0 ? (const_hash(input + 1) ^ uint64_t((uint8_t) *input)) * 0x100000001b3ull
+                       : 0xcbf29ce484222325ull;
+}
 
 } // namespace structstore
 

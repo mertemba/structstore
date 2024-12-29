@@ -29,3 +29,4 @@ class TestShared0(unittest.TestCase):
         with shmem.write_lock():
             shmem.state = State(5, 3.14, "foo", True, Substate(42), [0, 1])
         self.assertEqual(shmem.deepcopy(), shmem.store.deepcopy())
+        shmem.check()

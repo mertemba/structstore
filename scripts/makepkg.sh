@@ -8,6 +8,7 @@ cp "$srcdir/PKGBUILD" ./
 mkdir src
 rsync -a --exclude build "$srcdir" src/
 
+export PKGEXT=".pkg.tar.zst"
 makepkg --noextract --holdver
 
 namcap structstore-*.pkg.tar.zst | tee -a namcap.log | (! grep -v ' W: ')

@@ -19,7 +19,7 @@ extern std::random_device rnd_dev;
 
 class not_ready_error : public std::runtime_error {
 public:
-    not_ready_error(const char* what) : std::runtime_error(what) {}
+    not_ready_error(const std::string& what) : std::runtime_error(what) {}
 };
 
 enum CleanupMode {
@@ -81,12 +81,10 @@ class StructStoreShared {
         size_t size;
         std::atomic_int32_t usage_count;
         MiniMalloc mm_alloc;
-        StructStore data;
+        StructStore* store;
         std::atomic_bool invalidated;
 
-        SharedData(size_t size, size_t bufsize, void* buffer)
-                : original_ptr{this}, size{size}, usage_count{1},
-                  mm_alloc{bufsize, buffer}, data{mm_alloc}, invalidated{false} {}
+        SharedData(size_t size, size_t bufsize, void* buffer);
 
         SharedData() = delete;
 
@@ -108,14 +106,9 @@ class StructStoreShared {
     CleanupMode cleanup{};
 
 public:
-
-    explicit StructStoreShared(
-            const std::string& path,
-            size_t bufsize = 2048,
-            bool reinit = false,
-            bool use_file = false,
-            CleanupMode cleanup = IF_LAST,
-            void* target_addr = nullptr);
+    explicit StructStoreShared(const std::string& path, size_t bufsize = 4096, bool reinit = false,
+                               bool use_file = false, CleanupMode cleanup = IF_LAST,
+                               void* target_addr = nullptr);
 
     explicit StructStoreShared(int fd, bool init);
 
@@ -154,22 +147,17 @@ public:
 
     StructStore* operator->() {
         assert_valid();
-        return &sh_data_ptr->data;
+        return sh_data_ptr->store;
     }
 
     StructStore& operator*() {
         assert_valid();
-        return sh_data_ptr->data;
+        return *sh_data_ptr->store;
     }
 
-    FieldAccess<true> operator[](HashString name) {
+    FieldAccess<true> operator[](const std::string& name) {
         assert_valid();
-        return sh_data_ptr->data.at(name);
-    }
-
-    FieldAccess<true> operator[](const char* name) {
-        assert_valid();
-        return sh_data_ptr->data[name];
+        return (*sh_data_ptr->store)[name];
     }
 
     ~StructStoreShared() {
@@ -198,6 +186,8 @@ public:
     inline bool operator!=(const StructStoreShared& other) const {
         return !(*this == other);
     }
+
+    void check() const;
 };
 
 }  // namespace structstore

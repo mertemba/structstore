@@ -30,8 +30,8 @@ const py::PyType& py::get_py_type(uint64_t type_hash) {
 __attribute__((__visibility__("default"))) nb::object
 py::field_map_to_python(const FieldMapBase& field_map, py::ToPythonMode mode) {
     auto dict = nb::dict();
-    for (HashString str: field_map.get_slots()) {
-        auto key = nb::cast<std::string>(str.str);
+    for (const shr_string* str: field_map.get_slots()) {
+        auto key = nb::str(str->c_str());
         if (mode == py::ToPythonMode::RECURSIVE) {
             dict[key] = py::to_python(field_map.at(str), py::ToPythonMode::RECURSIVE);
         } else { // non-recursive convert
@@ -85,9 +85,6 @@ py::from_python(FieldAccess<true> access, const nb::handle& value, const std::st
     }
     if (!access.get_field().empty()) {
         STST_LOG_DEBUG() << "at field " << field_name << " of type " << typing::get_type(access.get_type_hash()).name;
-#ifndef NDEBUG
-        // access.check();
-#endif
         auto from_python_fn = py::get_from_python_fn(access.get_type_hash());
         bool success = from_python_fn(access, value);
         if (success) {
@@ -110,7 +107,7 @@ py::from_python(FieldAccess<true> access, const nb::handle& value, const std::st
 
 __attribute__((__visibility__("default"))) nb::object py::get_field(const FieldMapBase& field_map,
                                                                     const std::string& name) {
-    const Field* field = field_map.try_get_field(HashString{name.c_str()});
+    const Field* field = field_map.try_get_field(name);
     if (field == nullptr) {
         throw nb::attribute_error();
     }
@@ -122,7 +119,7 @@ __attribute__((__visibility__("default"))) void py::set_field(FieldMap<false>& f
                                                               const nb::handle& value,
                                                               const FieldTypeBase& parent_field) {
     STST_LOG_DEBUG() << "setting field to type " << nb::repr(value.type()).c_str();
-    Field* field = field_map.try_get_field(HashString{name.c_str()});
+    Field* field = field_map.try_get_field(name);
     if (field == nullptr) { throw nb::attribute_error(); }
     auto access = FieldAccess<false>{*field, field_map.get_alloc(), &parent_field};
     from_python(access, value, name);
@@ -133,7 +130,6 @@ __attribute__((__visibility__("default"))) void py::set_field(FieldMap<true>& fi
                                                               const nb::handle& value,
                                                               const FieldTypeBase& parent_field) {
     STST_LOG_DEBUG() << "setting field to type " << nb::repr(value.type()).c_str();
-    auto access = FieldAccess<true>{field_map[HashString{name.c_str()}], field_map.get_alloc(),
-                                    &parent_field};
+    auto access = FieldAccess<true>{field_map[name], field_map.get_alloc(), &parent_field};
     from_python(access, value, name);
 }

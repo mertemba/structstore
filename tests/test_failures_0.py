@@ -27,3 +27,8 @@ class TestFailures0(unittest.TestCase):
             state.vec.to_yaml()
 
         self.assertRaises(RuntimeError, matrix_to_yaml)
+
+        def access_foo():
+            print(state.foo)
+
+        self.assertRaises(AttributeError, access_foo)

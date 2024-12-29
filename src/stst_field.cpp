@@ -1,4 +1,6 @@
 #include "structstore/stst_field.hpp"
+#include "structstore/stst_alloc.hpp"
+#include "structstore/stst_callstack.hpp"
 #include "structstore/stst_containers.hpp"
 #include "structstore/stst_shared.hpp"
 
@@ -39,6 +41,16 @@ void Field::move_from(Field& other) {
     std::swap(data, other.data);
 }
 
+void Field::check(const MiniMalloc& mm_alloc, const FieldTypeBase& parent_field) const {
+    CallstackEntry entry{"structstore::Field::check()"};
+    stst_assert(mm_alloc.is_owned(this));
+    if (data) {
+        stst_assert(mm_alloc.is_owned(data));
+        const TypeInfo& type_info = typing::get_type(type_hash);
+        type_info.check_fn(mm_alloc, data, parent_field);
+    }
+}
+
 template<>
 FieldView::FieldView(StructStoreShared& store) : field{&*store} {}
 
@@ -50,30 +62,4 @@ template<>
 template<>
 ::structstore::String& FieldAccess<true>::get_str() {
     return get<::structstore::String>();
-}
-
-template<>
-template<>
-FieldAccess<false>& FieldAccess<false>::operator= <const char*>(const char* const& value) {
-    get<structstore::String>() = value;
-    return *this;
-}
-
-template<>
-template<>
-FieldAccess<true>& FieldAccess<true>::operator= <const char*>(const char* const& value) {
-    get<structstore::String>() = value;
-    return *this;
-}
-
-template<>
-template<>
-FieldAccess<false>& FieldAccess<false>::operator= <std::string>(const std::string& value) {
-    return *this = value.c_str();
-}
-
-template<>
-template<>
-FieldAccess<true>& FieldAccess<true>::operator= <std::string>(const std::string& value) {
-    return *this = value.c_str();
 }

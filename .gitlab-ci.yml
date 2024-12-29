@@ -1,5 +1,4 @@
 variables:
-  image: archlinux:latest
   pacman_deps: cmake ninja gcc yaml-cpp
   pacman_deps_makepkg: rsync fakeroot git namcap
   pacman_deps_py: python python-pip
@@ -11,9 +10,19 @@ stages:
   - build
   - test
 
-test_devel_coverage:
+.amd64:
+  image: archlinux:latest
+  tags: [amd64]
+.aarch64:
+  image: lopsided/archlinux-arm64v8:latest
+  tags: [aarch64]
+
+test_devel_coverage-amd64:
+  extends: [.test_devel_coverage, .amd64]
+test_devel_coverage-aarch64:
+  extends: [.test_devel_coverage, .aarch64]
+.test_devel_coverage:
   stage: test
-  image: ${image}
   needs: []
   artifacts:
     expire_in: 2 days
@@ -28,35 +37,48 @@ test_devel_coverage:
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
     - chmod a+rX -R .
+    - usermod -e -1 nobody
     - su nobody -s /bin/bash -c "BUILD_WITH_COVERAGE=ON ./scripts/devel_setup.sh"
     - su nobody -s /bin/bash -c "cmake --build build"
     - su nobody -s /bin/bash -c "./scripts/devel_test.sh"
 
-test_devel_sanitize:
+test_devel_sanitize-amd64:
+  extends: [.test_devel_sanitize, .amd64]
+  allow_failure: true  # numpy >=2.1 on Python >=3.13 fails with address sanitizer
+test_devel_sanitize-aarch64:
+  extends: [.test_devel_sanitize, .aarch64]
+.test_devel_sanitize:
   stage: test
-  image: ${image}
   needs: []
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
     - chmod a+rX -R .
+    - usermod -e -1 nobody
     - su nobody -s /bin/bash -c "BUILD_WITH_SANITIZER=ON ./scripts/devel_setup.sh"
     - su nobody -s /bin/bash -c "cmake --build build"
     - su nobody -s /bin/bash -c "./scripts/devel_test.sh"
 
-test_devel_clang:
+test_devel_clang-amd64:
+  extends: [.test_devel_clang, .amd64]
+test_devel_clang-aarch64:
+  extends: [.test_devel_clang, .aarch64]
+.test_devel_clang:
   stage: test
-  image: ${image}
   needs: []
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test} ${pacman_deps_clang}
     - chmod a+rX -R .
+    - usermod -e -1 nobody
     - su nobody -s /bin/bash -c "CC=clang CXX=clang++ ./scripts/devel_setup.sh"
     - su nobody -s /bin/bash -c "cmake --build build"
     - su nobody -s /bin/bash -c "./scripts/devel_test.sh"
 
-build_archlinux:
+build_archlinux-amd64:
+  extends: [.build_archlinux, .amd64]
+build_archlinux-aarch64:
+  extends: [.build_archlinux, .aarch64]
+.build_archlinux:
   stage: build
-  image: ${image}
   needs: []
   artifacts:
     paths:
@@ -65,32 +87,46 @@ build_archlinux:
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_makepkg}
     - chmod a+rX -R .
+    - usermod -e -1 nobody
     - su nobody -s /bin/bash -c ./scripts/makepkg.sh
     - cp /tmp/structstore_build/structstore{,_py}-*.pkg.tar.zst ./
 
-test_archlinux_cpp:
+test_archlinux_cpp-amd64:
+  extends: [.test_archlinux_cpp, .amd64]
+  needs: [build_archlinux-amd64]
+test_archlinux_cpp-aarch64:
+  extends: [.test_archlinux_cpp, .aarch64]
+  needs: [build_archlinux-aarch64]
+.test_archlinux_cpp:
   stage: test
-  image: ${image}
-  needs: [build_archlinux]
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_test}
     - pacman -U --noconfirm ./structstore-*.pkg.tar.zst
     - chmod a+rX -R .
+    - usermod -e -1 nobody
     - su nobody -s /bin/bash -c ./scripts/test.sh
 
-test_archlinux_py:
+test_archlinux_py-amd64:
+  extends: [.test_archlinux_py, .amd64]
+  needs: [build_archlinux-amd64]
+test_archlinux_py-aarch64:
+  extends: [.test_archlinux_py, .aarch64]
+  needs: [build_archlinux-aarch64]
+.test_archlinux_py:
   stage: test
-  image: ${image}
-  needs: [build_archlinux]
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test} ${pacman_deps_pytest}
     - pacman -U --noconfirm ./structstore{,_py}-*.pkg.tar.zst
     - chmod a+rX -R .
+    - usermod -e -1 nobody
     - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 ./scripts/test.sh"
 
-build_pyproj:
+build_pyproj-amd64:
+  extends: [.build_pyproj, .amd64]
+build_pyproj-aarch64:
+  extends: [.build_pyproj, .aarch64]
+.build_pyproj:
   stage: build
-  image: ${image}
   needs: []
   artifacts:
     paths:
@@ -99,22 +135,33 @@ build_pyproj:
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py}
     - chmod a+rX -R .
+    - usermod -e -1 nobody
     - su nobody -s /bin/bash -c ./scripts/build_pyproj.sh
 
-test_py_tarball:
+test_py_tarball-amd64:
+  extends: [.test_py_tarball, .amd64]
+  needs: [build_pyproj-amd64]
+test_py_tarball-aarch64:
+  extends: [.test_py_tarball, .aarch64]
+  needs: [build_pyproj-aarch64]
+.test_py_tarball:
   stage: test
-  image: ${image}
-  needs: [build_pyproj]
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
     - chmod a+rX -R .
+    - usermod -e -1 nobody
     - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 BUILD_WITH_VENV=1 INSTALL_PY_TARBALL=1 ./scripts/test.sh"
 
-test_py_wheel:
+test_py_wheel-amd64:
+  extends: [.test_py_wheel, .amd64]
+  needs: [build_pyproj-amd64]
+test_py_wheel-aarch64:
+  extends: [.test_py_wheel, .aarch64]
+  needs: [build_pyproj-aarch64]
+.test_py_wheel:
   stage: test
-  image: ${image}
-  needs: [build_pyproj]
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
     - chmod a+rX -R .
+    - usermod -e -1 nobody
     - su nobody -s /bin/bash -c "BUILD_WITH_PYTHON=1 BUILD_WITH_VENV=1 INSTALL_PY_WHEEL=1 ./scripts/test.sh"

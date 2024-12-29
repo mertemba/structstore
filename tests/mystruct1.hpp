@@ -17,17 +17,16 @@ struct Track : public stst::Struct<Track> {
 
     explicit Track(stst::MiniMalloc& mm_alloc)
         : Struct(mm_alloc), frame1{mm_alloc}, frame2{mm_alloc} {
-        field_map.store_ref("frame1", frame1);
-        field_map.store_ref("frame2", frame2);
-        field_map.store_ref("frame_ptr", frame_ptr);
+        store_ref("frame1", frame1);
+        store_ref("frame2", frame2);
+        store_ref("frame_ptr", frame_ptr);
     }
 
     Track(const Track& other) : Track() { *this = other; }
 
-    Track(Track&& other) : Track() { *this = std::move(other); }
-
     Track& operator=(const Track& other) {
-        field_map = other.field_map;
+        copy_from(other);
+        frame_ptr = &frame1;
         return *this;
     }
 };

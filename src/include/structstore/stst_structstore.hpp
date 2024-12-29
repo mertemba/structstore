@@ -4,7 +4,6 @@
 #include "structstore/stst_alloc.hpp"
 #include "structstore/stst_field.hpp"
 #include "structstore/stst_fieldmap.hpp"
-#include "structstore/stst_hashstring.hpp"
 #include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
 
@@ -47,9 +46,7 @@ public:
 
     inline YAML::Node to_yaml() const { return field_map.to_yaml(); }
 
-    void check() const;
-
-    void check(const MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) const;
+    void check(const MiniMalloc* mm_alloc = nullptr) const;
 
     inline bool operator==(const StructStore& other) const { return field_map == other.field_map; }
 
@@ -59,35 +56,24 @@ public:
 
     inline MiniMalloc& get_alloc() { return field_map.get_alloc(); }
 
-    FieldAccess<true> at(HashString name);
-
-    inline FieldAccess<true> at(const char* name) { return at(HashString{name}); }
+    FieldAccess<true> at(const std::string& name);
 
     // insert operations
 
-    FieldAccess<true> operator[](HashString name);
-
-    inline FieldAccess<true> operator[](const char* name) { return operator[](HashString{name}); }
+    FieldAccess<true> operator[](const std::string& name);
 
     template<typename T>
-    T& get(const char* name) {
-        return (*this)[HashString{name}];
-    }
-
-    template<typename T>
-    T& get(HashString name) {
+    T& get(const std::string& name) {
         return (*this)[name];
     }
 
-    inline StructStore& substore(const char* name) { return get<StructStore>(name); }
+    inline StructStore& substore(const std::string& name) { return get<StructStore>(name); }
 
     // remove operations
 
     inline void clear() { field_map.clear(); }
 
-    inline void remove(HashString name) { field_map.remove(name); }
-
-    inline void remove(const char* name) { remove(HashString{name}); }
+    inline void remove(const std::string& name) { field_map.remove(name); }
 };
 } // namespace structstore
 

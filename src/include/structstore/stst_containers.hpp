@@ -4,46 +4,53 @@
 #include "structstore/stst_alloc.hpp"
 #include "structstore/stst_field.hpp"
 #include "structstore/stst_typing.hpp"
+#include "structstore/stst_utils.hpp"
 
 namespace structstore {
 
-using std_string = std::basic_string<char, std::char_traits<char>, StlAllocator<char>>;
-
-class String : public FieldType<String>, public std_string {
+class String : public FieldType<String>, public shr_string {
 public:
     static const TypeInfo& type_info;
 
-    String(const StlAllocator<String>& alloc) : std_string(alloc) {}
+    String(const StlAllocator<String>& alloc) : shr_string(alloc) {}
 
-    void to_text(std::ostream& os) const { os << static_cast<const std_string&>(*this); }
+    void to_text(std::ostream& os) const { os << static_cast<const shr_string&>(*this); }
 
     YAML::Node to_yaml() const { return YAML::Node(c_str()); }
 
-    void check(const MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) const;
+    void check(const MiniMalloc* mm_alloc = nullptr) const;
 
-    String& operator=(const char* const& value);
+    String& operator=(const std::string& value);
 };
 
 class List : public FieldType<List> {
     MiniMalloc& mm_alloc;
-    ::structstore::vector<Field> data;
+    shr_vector<Field> data;
 
 public:
     static const TypeInfo& type_info;
 
     class Iterator {
-        // todo: store scoped lock
-        const List& list;
+        ScopedFieldLock<false> scoped_lock;
+        List& list;
         size_t index;
 
     public:
-        Iterator(const List& list, size_t index) : list(list), index(index) {}
+        Iterator(List& list, size_t index, ScopedFieldLock<false>&& scoped_lock)
+            : scoped_lock(std::move(scoped_lock)), list(list), index(index) {}
 
-        bool operator==(Iterator& other) const {
+        Iterator(Iterator&& other) = default;
+        ~Iterator() = default;
+
+        Iterator(const Iterator& other) = delete;
+        Iterator& operator=(const Iterator& other) = delete;
+        Iterator& operator=(Iterator&& other) = delete;
+
+        bool operator==(const Iterator& other) const {
             return &list == &other.list && index == other.index;
         }
 
-        bool operator!=(Iterator& other) const {
+        bool operator!=(const Iterator& other) const {
             return !(*this == other);
         }
 
@@ -90,8 +97,8 @@ public:
     }
 
     template<typename T>
-    void push_back(const T& value) {
-        data.emplace_back(StlAllocator<T>(mm_alloc).allocate(1)) = value;
+    inline void push_back(const T& value) {
+        push_back() = value;
     }
 
     FieldAccess<true> insert(size_t index) {
@@ -110,13 +117,9 @@ public:
 
     FieldAccess<true> at(size_t index) { return FieldAccess<true>{data.at(index), mm_alloc, this}; }
 
-    Iterator begin() const {
-        return {*this, 0};
-    }
+    Iterator begin() const { return {(List&) *this, 0, read_lock()}; }
 
-    Iterator end() const {
-        return {*this, data.size()};
-    }
+    Iterator end() const { return {(List&) *this, data.size(), read_lock()}; }
 
     size_t size() {
         return data.size();
@@ -139,13 +142,10 @@ public:
 
     YAML::Node to_yaml() const;
 
-    void check(const MiniMalloc&, const FieldTypeBase*) const;
+    void check(const MiniMalloc* mm_alloc = nullptr) const;
 
     bool operator==(const List& other) const;
 };
-
-template<>
-void List::push_back<const char*>(const char* const& value);
 
 class Matrix : public FieldType<Matrix> {
 public:
@@ -241,13 +241,9 @@ public:
 
     YAML::Node to_yaml() const;
 
-    void check(const MiniMalloc&, const FieldTypeBase*) const;
+    void check(const MiniMalloc* mm_alloc = nullptr) const;
 
     bool operator==(const Matrix& other) const;
-
-    inline bool operator!=(const Matrix& other) const {
-        return !(*this == other);
-    }
 };
 }
 

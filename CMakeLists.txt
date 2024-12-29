@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(structstore VERSION 0.3.0)
+project(structstore VERSION 0.4.0)
 
 # build options
 
@@ -44,7 +44,7 @@ include(GNUInstallDirs)
 find_package(yaml-cpp REQUIRED)
 
 if(${BUILD_WITH_PYTHON})
-    find_package(Python 3.9 COMPONENTS Interpreter Development REQUIRED)
+    find_package(Python 3.10 COMPONENTS Interpreter Development REQUIRED)
     execute_process(
             COMMAND "${Python_EXECUTABLE}" -c "import nanobind; print(nanobind.cmake_dir())"
             OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_DIR)
@@ -59,7 +59,9 @@ file(GLOB STRUCTSTORE_INC_FILES
         ${PROJECT_SOURCE_DIR}/src/include/*.hpp)
 
 set(STRUCTSTORE_SRC_FILES
+        ${PROJECT_SOURCE_DIR}/src/mini_malloc.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_alloc.cpp
+        ${PROJECT_SOURCE_DIR}/src/stst_callstack.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_containers.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_field.cpp
         ${PROJECT_SOURCE_DIR}/src/stst_fieldmap.cpp
@@ -153,7 +155,7 @@ endif()
 # install
 
 set(STRUCTSTORE_INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR}/structstore)
-set(STRUCTSTORE_INSTALL_LIBDIR_PY ${CMAKE_INSTALL_LIBDIR}/python3.12/site-packages/structstore)
+set(STRUCTSTORE_INSTALL_LIBDIR_PY ${CMAKE_INSTALL_LIBDIR}/python3.${Python_VERSION_MINOR}/site-packages/structstore)
 set(STRUCTSTORE_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
 set(STRUCTSTORE_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake/structstore)
 set(STRUCTSTORE_INSTALL_LICENSEDIR ${CMAKE_INSTALL_DATADIR}/licenses/structstore)
