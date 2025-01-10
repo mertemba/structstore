@@ -18,13 +18,13 @@ public:
 
     YAML::Node to_yaml() const { return YAML::Node(c_str()); }
 
-    void check(const MiniMalloc* mm_alloc = nullptr) const;
+    void check(const SharedAlloc* sh_alloc = nullptr) const;
 
     String& operator=(const std::string& value);
 };
 
 class List : public FieldType<List> {
-    MiniMalloc& mm_alloc;
+    SharedAlloc& sh_alloc;
     shr_vector<Field> data;
 
 public:
@@ -62,7 +62,7 @@ public:
         Field& operator*() { return ((List&) list).data.at(index); }
     };
 
-    explicit List(MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), data(StlAllocator<Field>(mm_alloc)) {
+    explicit List(SharedAlloc& sh_alloc) : sh_alloc(sh_alloc), data(StlAllocator<Field>(sh_alloc)) {
         STST_LOG_DEBUG() << "constructing List at " << this;
     }
 
@@ -86,7 +86,7 @@ public:
 
     FieldAccess<true> push_back() {
         STST_LOG_DEBUG() << "this: " << this << ", cur size: " << data.size();
-        return FieldAccess<true>{data.emplace_back(), mm_alloc, this};
+        return FieldAccess<true>{data.emplace_back(), sh_alloc, this};
     }
 
     template<typename T>
@@ -98,17 +98,17 @@ public:
         if (index > data.size()) {
             throw std::out_of_range("index out of bounds: " + std::to_string(index));
         }
-        return FieldAccess<true>{*data.emplace(data.begin() + index), mm_alloc, this};
+        return FieldAccess<true>{*data.emplace(data.begin() + index), sh_alloc, this};
     }
 
     FieldAccess<true> operator[](size_t index) {
         if (index >= data.size()) {
             throw std::out_of_range("index out of bounds: " + std::to_string(index));
         }
-        return FieldAccess<true>{data.at(index), mm_alloc, this};
+        return FieldAccess<true>{data.at(index), sh_alloc, this};
     }
 
-    FieldAccess<true> at(size_t index) { return FieldAccess<true>{data.at(index), mm_alloc, this}; }
+    FieldAccess<true> at(size_t index) { return FieldAccess<true>{data.at(index), sh_alloc, this}; }
 
     Iterator begin() const { return {(List&) *this, 0, read_lock()}; }
 
@@ -127,7 +127,7 @@ public:
     }
 
     void clear() {
-        for (Field& field: data) { FieldAccess<true>{field, mm_alloc, this}.clear(); }
+        for (Field& field: data) { FieldAccess<true>{field, sh_alloc, this}.clear(); }
         data.clear();
     }
 
@@ -135,7 +135,7 @@ public:
 
     YAML::Node to_yaml() const;
 
-    void check(const MiniMalloc* mm_alloc = nullptr) const;
+    void check(const SharedAlloc* sh_alloc = nullptr) const;
 
     bool operator==(const List& other) const;
 };
@@ -147,16 +147,16 @@ public:
     static const TypeInfo& type_info;
 
 protected:
-    MiniMalloc& mm_alloc;
+    SharedAlloc& sh_alloc;
     size_t _ndim;
     size_t _shape[MAX_DIMS] = {};
     double* _data;
 
 public:
-    Matrix(MiniMalloc& mm_alloc) : Matrix(0, 0, mm_alloc) {}
+    Matrix(SharedAlloc& sh_alloc) : Matrix(0, 0, sh_alloc) {}
 
-    Matrix(size_t ndim, const size_t* shape, MiniMalloc& mm_alloc)
-            : mm_alloc(mm_alloc), _ndim(ndim) {
+    Matrix(size_t ndim, const size_t* shape, SharedAlloc& sh_alloc)
+        : sh_alloc(sh_alloc), _ndim(ndim) {
         if (ndim == 0) {
             _data = nullptr;
         } else {
@@ -165,16 +165,14 @@ public:
     }
 
     ~Matrix() {
-        if (_data != nullptr) {
-            mm_alloc.deallocate(_data);
-        }
+        if (_data != nullptr) { sh_alloc.deallocate(_data); }
     }
 
     Matrix(Matrix&&) = delete;
     Matrix(const Matrix&) = delete;
 
     Matrix& operator=(Matrix&& other) {
-        if (&mm_alloc != &other.mm_alloc) {
+        if (&sh_alloc != &other.sh_alloc) {
             throw std::runtime_error("move assignment of structstore::Matrix between different StructStores is not supported");
         }
         std::swap(_ndim, other._ndim);
@@ -207,7 +205,7 @@ public:
             return;
         }
         if (_data != nullptr) {
-            mm_alloc.deallocate(_data);
+            sh_alloc.deallocate(_data);
             _data = nullptr;
         }
         _ndim = ndim;
@@ -220,7 +218,7 @@ public:
             size *= shape[i];
         }
         if (size > 0) {
-            _data = (double*) mm_alloc.allocate(size);
+            _data = (double*) sh_alloc.allocate(size);
             if (data != nullptr) {
                 std::memcpy(_data, data, size);
             }
@@ -231,7 +229,7 @@ public:
 
     YAML::Node to_yaml() const;
 
-    void check(const MiniMalloc* mm_alloc = nullptr) const;
+    void check(const SharedAlloc* sh_alloc = nullptr) const;
 
     bool operator==(const Matrix& other) const;
 };

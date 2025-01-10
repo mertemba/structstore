@@ -23,7 +23,7 @@ protected:
 public:
     // constructor, assignment, destructor
 
-    explicit StructStore(MiniMalloc& mm_alloc) : field_map(mm_alloc) {}
+    explicit StructStore(SharedAlloc& sh_alloc) : field_map(sh_alloc) {}
 
     StructStore(const StructStore& other) : StructStore{static_alloc} { *this = other; }
 
@@ -46,7 +46,7 @@ public:
 
     inline YAML::Node to_yaml() const { return field_map.to_yaml(); }
 
-    void check(const MiniMalloc* mm_alloc = nullptr) const;
+    void check(const SharedAlloc* sh_alloc = nullptr) const;
 
     inline bool operator==(const StructStore& other) const { return field_map == other.field_map; }
 
@@ -54,7 +54,7 @@ public:
 
     inline bool empty() const { return field_map.empty(); }
 
-    inline MiniMalloc& get_alloc() { return field_map.get_alloc(); }
+    inline SharedAlloc& get_alloc() { return field_map.get_alloc(); }
 
     FieldAccess<true> at(const std::string& name);
 

@@ -61,7 +61,7 @@ public:
                     std::is_same_v<decltype(std::declval<const T>().to_text(std::cout)), void>);
             static_assert(std::is_same_v<decltype(std::declval<const T>().to_yaml()), YAML::Node>);
             static_assert(std::is_same_v<decltype(std::declval<const T>().check(
-                                                 std::declval<const MiniMalloc*>())),
+                                                 std::declval<const SharedAlloc*>())),
                                          void>);
             static_assert(
                     std::is_same_v<decltype(std::declval<const T>() == std::declval<const T>()),
@@ -82,19 +82,19 @@ public:
     template<typename T>
     constexpr static bool is_field_type = std::is_base_of_v<FieldType<T>, T> || !std::is_class_v<T>;
 
-    using ConstructorFn = std::function<void(MiniMalloc&, void*, const FieldTypeBase*)>;
+    using ConstructorFn = std::function<void(SharedAlloc&, void*, const FieldTypeBase*)>;
 
-    using DestructorFn = std::function<void(MiniMalloc&, void*)>;
+    using DestructorFn = std::function<void(SharedAlloc&, void*)>;
 
     using SerializeTextFn = std::function<void(std::ostream&, const void*)>;
 
     using SerializeYamlFn = std::function<YAML::Node(const void*)>;
 
-    using CheckFn = std::function<void(const MiniMalloc&, const void*, const FieldTypeBase&)>;
+    using CheckFn = std::function<void(const SharedAlloc&, const void*, const FieldTypeBase&)>;
 
     using CmpEqualFn = std::function<bool(const void*, const void*)>;
 
-    using CopyFn = std::function<void(MiniMalloc&, void*, const void*)>;
+    using CopyFn = std::function<void(SharedAlloc&, void*, const void*)>;
 
     struct TypeInfo {
         uint64_t type_hash;
@@ -117,50 +117,50 @@ private:
         ti.type_hash = -1;
         ti.name = name;
         ti.size = sizeof(T);
-        if constexpr (std::is_constructible_v<T, MiniMalloc&>) {
-            ti.constructor_fn = [](MiniMalloc& mm_alloc, void* t,
+        if constexpr (std::is_constructible_v<T, SharedAlloc&>) {
+            ti.constructor_fn = [](SharedAlloc& sh_alloc, void* t,
                                    const FieldTypeBase* parent_field) {
-                new (t) T(mm_alloc);
+                new (t) T(sh_alloc);
                 ((T*) t)->parent_field = parent_field;
             };
         } else if constexpr (std::is_constructible_v<T, const StlAllocator<T>&>) {
-            ti.constructor_fn = [](MiniMalloc& mm_alloc, void* t,
+            ti.constructor_fn = [](SharedAlloc& sh_alloc, void* t,
                                    const FieldTypeBase* parent_field) {
-                new (t) T(StlAllocator<T>{mm_alloc});
+                new (t) T(StlAllocator<T>{sh_alloc});
                 ((T*) t)->parent_field = parent_field;
             };
         } else {
-            ti.constructor_fn = [](MiniMalloc&, void* t, const FieldTypeBase* parent_field) {
+            ti.constructor_fn = [](SharedAlloc&, void* t, const FieldTypeBase* parent_field) {
                 new (t) T();
                 if constexpr (std::is_class_v<T>) { ((T*) t)->parent_field = parent_field; }
             };
         }
-        ti.destructor_fn = [](MiniMalloc&, void* t) { ((T*) t)->~T(); };
+        ti.destructor_fn = [](SharedAlloc&, void* t) { ((T*) t)->~T(); };
         ti.serialize_text_fn = [](std::ostream& os, const void* t) { os << *(const T*) t; };
         if constexpr (std::is_class_v<T>) {
             ti.serialize_yaml_fn = [](const void* t) -> YAML::Node {
                 return ((const T*) t)->to_yaml();
             };
-            ti.check_fn = [](const MiniMalloc& mm_alloc, const void* t,
+            ti.check_fn = [](const SharedAlloc& sh_alloc, const void* t,
                              const FieldTypeBase& parent_field) {
                 CallstackEntry entry{"structstore::typing::check()"};
-                stst_assert(mm_alloc.is_owned(t));
+                stst_assert(sh_alloc.is_owned(t));
                 stst_assert(((const T*) t)->parent_field == &parent_field);
-                ((const T*) t)->check(&mm_alloc);
+                ((const T*) t)->check(&sh_alloc);
             };
         } else {
             ti.serialize_yaml_fn = [](const void* t) -> YAML::Node {
                 return YAML::Node(*(const T*) t);
             };
-            ti.check_fn = [](const MiniMalloc& mm_alloc, const void* t, const FieldTypeBase&) {
+            ti.check_fn = [](const SharedAlloc& sh_alloc, const void* t, const FieldTypeBase&) {
                 CallstackEntry entry{"structstore::typing::check()"};
-                stst_assert(mm_alloc.is_owned(t));
+                stst_assert(sh_alloc.is_owned(t));
             };
         }
         ti.cmp_equal_fn = [](const void* t, const void* other) {
             return *(const T*) t == *(const T*) other;
         };
-        ti.copy_fn = [](MiniMalloc&, void* t, const void* other) { *(T*) t = *(const T*) other; };
+        ti.copy_fn = [](SharedAlloc&, void* t, const void* other) { *(T*) t = *(const T*) other; };
         return ti;
     }
 
@@ -171,21 +171,21 @@ private:
         ti.type_hash = -1;
         ti.name = name;
         ti.size = sizeof(T);
-        ti.constructor_fn = [](MiniMalloc&, void* t, const FieldTypeBase*) { *(T*) t = nullptr; };
-        ti.destructor_fn = [](MiniMalloc&, void* t) { *(T*) t = nullptr; };
+        ti.constructor_fn = [](SharedAlloc&, void* t, const FieldTypeBase*) { *(T*) t = nullptr; };
+        ti.destructor_fn = [](SharedAlloc&, void* t) { *(T*) t = nullptr; };
         ti.serialize_text_fn = [name](std::ostream& os, const void*) { os << "<" << name << ">"; };
         ti.serialize_yaml_fn = [=](const void*) -> YAML::Node {
             return YAML::Node{"<" + name + ">"};
         };
-        ti.check_fn = [](const MiniMalloc& mm_alloc, const void* t, const FieldTypeBase&) {
+        ti.check_fn = [](const SharedAlloc& sh_alloc, const void* t, const FieldTypeBase&) {
             CallstackEntry entry{"structstore::typing::check()"};
-            stst_assert(mm_alloc.is_owned(t));
-            if (*(const T*) t != nullptr) { stst_assert(mm_alloc.is_owned(*(const T*) t)); }
+            stst_assert(sh_alloc.is_owned(t));
+            if (*(const T*) t != nullptr) { stst_assert(sh_alloc.is_owned(*(const T*) t)); }
         };
         ti.cmp_equal_fn = [](const void* t, const void* other) {
             return *(const T*) t == *(const T*) other || **(const T*) t == **(const T*) other;
         };
-        ti.copy_fn = [](MiniMalloc&, void* t, const void* other) { *(T*) t = *(const T*) other; };
+        ti.copy_fn = [](SharedAlloc&, void* t, const void* other) { *(T*) t = *(const T*) other; };
         return ti;
     }
 
@@ -193,17 +193,17 @@ private:
         TypeInfo t;
         t.name = name;
         t.size = 0;
-        t.constructor_fn = [](MiniMalloc&, void*, const FieldTypeBase*) {};
-        t.destructor_fn = [](MiniMalloc&, void*) {};
+        t.constructor_fn = [](SharedAlloc&, void*, const FieldTypeBase*) {};
+        t.destructor_fn = [](SharedAlloc&, void*) {};
         t.serialize_text_fn = [](std::ostream& os, const void*) { os << "<empty>"; };
         t.serialize_yaml_fn = [](const void*) { return YAML::Node(YAML::Null); };
-        t.check_fn = [](const MiniMalloc&, const void* t, const FieldTypeBase&) {
+        t.check_fn = [](const SharedAlloc&, const void* t, const FieldTypeBase&) {
             if (t != nullptr) {
                 throw std::runtime_error("internal error: empty data ptr is not nullptr");
             }
         };
         t.cmp_equal_fn = [](const void*, const void*) { return true; };
-        t.copy_fn = [](MiniMalloc&, void*, const void*) {};
+        t.copy_fn = [](SharedAlloc&, void*, const void*) {};
         return t;
     }
 
@@ -306,7 +306,7 @@ using FieldType = typing::FieldType<T>;
 template<typename T>
 inline void StlAllocator<T>::construct(T* p) {
     if constexpr (std::is_base_of_v<FieldType<T>, T>) {
-        T::type_info.constructor_fn(mm_alloc, p);
+        T::type_info.constructor_fn(sh_alloc, p);
     } else {
         new (p) T;
     }

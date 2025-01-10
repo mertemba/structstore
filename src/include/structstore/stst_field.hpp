@@ -39,20 +39,20 @@ protected:
     template<bool>
     friend class structstore::FieldMap;
 
-    void construct_copy_from(MiniMalloc& mm_alloc, const Field& other,
+    void construct_copy_from(SharedAlloc& sh_alloc, const Field& other,
                              const FieldTypeBase* parent_field);
 
-    void copy_from(MiniMalloc& mm_alloc, const Field& other);
+    void copy_from(SharedAlloc& sh_alloc, const Field& other);
 
     void move_from(Field& other);
 
-    void clear(MiniMalloc& mm_alloc) {
+    void clear(SharedAlloc& sh_alloc) {
         if (data) {
             const auto& type_info = typing::get_type(type_hash);
             STST_LOG_DEBUG() << "deconstructing field " << type_info.name << " at " << data;
-            type_info.destructor_fn(mm_alloc, data);
+            type_info.destructor_fn(sh_alloc, data);
             STST_LOG_DEBUG() << "deallocating at " << data;
-            mm_alloc.deallocate(data);
+            sh_alloc.deallocate(data);
         }
         data = nullptr;
         type_hash = 0;
@@ -64,9 +64,9 @@ protected:
     }
 
     template<typename T>
-    void replace_data(void* new_data, MiniMalloc& mm_alloc) {
+    void replace_data(void* new_data, SharedAlloc& sh_alloc) {
         assert_empty();
-        clear(mm_alloc);
+        clear(sh_alloc);
         data = new_data;
         type_hash = typing::get_type_hash<T>();
         STST_LOG_DEBUG() << "replacing field data with " << new_data << ", type "
@@ -74,15 +74,15 @@ protected:
     }
 
     template<typename T>
-    T& get_or_construct(MiniMalloc& mm_alloc, const FieldTypeBase* parent_field) {
+    T& get_or_construct(SharedAlloc& sh_alloc, const FieldTypeBase* parent_field) {
         if (empty()) {
-            StlAllocator<T> tmp_alloc{mm_alloc};
+            StlAllocator<T> tmp_alloc{sh_alloc};
             void* ptr = tmp_alloc.allocate(1);
             STST_LOG_DEBUG() << "allocating at " << ptr;
             const auto& type_info = typing::get_type<T>();
             STST_LOG_DEBUG() << "constructing field " << type_info.name << " at " << ptr;
-            type_info.constructor_fn(mm_alloc, ptr, parent_field);
-            replace_data<T>(ptr, mm_alloc);
+            type_info.constructor_fn(sh_alloc, ptr, parent_field);
+            replace_data<T>(ptr, sh_alloc);
         }
         return get<T>();
     }
@@ -121,7 +121,7 @@ public:
 
     YAML::Node to_yaml() const;
 
-    void check(const MiniMalloc& mm_alloc, const FieldTypeBase& parent_field) const;
+    void check(const SharedAlloc& sh_alloc, const FieldTypeBase& parent_field) const;
 
     bool operator==(const Field& other) const {
         if (!data) { return !other.data; }
@@ -191,14 +191,14 @@ class String;
 template<bool managed>
 class FieldAccess {
     Field& field;
-    MiniMalloc& mm_alloc;
+    SharedAlloc& sh_alloc;
     const FieldTypeBase* parent_field;
 
 public:
     FieldAccess() = delete;
 
-    explicit FieldAccess(Field& field, MiniMalloc& mm_alloc, const FieldTypeBase* parent_field)
-        : field(field), mm_alloc(mm_alloc), parent_field(parent_field) {}
+    explicit FieldAccess(Field& field, SharedAlloc& sh_alloc, const FieldTypeBase* parent_field)
+        : field(field), sh_alloc(sh_alloc), parent_field(parent_field) {}
 
     FieldAccess(const FieldAccess& other) = default;
 
@@ -208,7 +208,7 @@ public:
     T& get() {
         static_assert(typing::is_field_type<T>);
         if constexpr (managed) {
-            return field.get_or_construct<T>(mm_alloc, parent_field);
+            return field.get_or_construct<T>(sh_alloc, parent_field);
         } else {
             return field.get<T>();
         }
@@ -223,10 +223,10 @@ public:
 
     FieldAccess<true> operator[](const std::string& name) { return get<StructStore>()[name]; }
 
-    operator FieldAccess<false>() { return FieldAccess<false>{field, mm_alloc, parent_field}; }
+    operator FieldAccess<false>() { return FieldAccess<false>{field, sh_alloc, parent_field}; }
 
     FieldAccess<true> to_managed_access() {
-        return FieldAccess<true>{field, mm_alloc, parent_field};
+        return FieldAccess<true>{field, sh_alloc, parent_field};
     }
 
     template<typename T>
@@ -248,11 +248,11 @@ public:
 
     Field& get_field() { return field; }
 
-    MiniMalloc& get_alloc() { return mm_alloc; }
+    SharedAlloc& get_alloc() { return sh_alloc; }
 
     [[nodiscard]] uint64_t get_type_hash() const { return field.get_type_hash(); }
 
-    void clear() { field.clear(mm_alloc); }
+    void clear() { field.clear(sh_alloc); }
 };
 }
 

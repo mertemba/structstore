@@ -165,10 +165,9 @@ static void prepend_free_node(mini_malloc* mm, memnode* node, size_index_type si
     attach_free_nodes(node, old_first_free);
 }
 
-mini_malloc* structstore::init_mini_malloc(void* buffer, size_t blocksize) {
-    mini_malloc* mm = (mini_malloc*) buffer;
+void structstore::init_mini_malloc(mini_malloc* mm, size_t blocksize) {
     static_assert((sizeof(mini_malloc) % ALIGN) == 0);
-    buffer = (byte*) buffer + sizeof(mini_malloc);
+    byte* buffer = (byte*) mm + sizeof(mini_malloc);
     blocksize -= sizeof(mini_malloc);
 
     // ensure alignment
@@ -200,7 +199,6 @@ mini_malloc* structstore::init_mini_malloc(void* buffer, size_t blocksize) {
     last_node->size = 0;
     set_next_free_node(get_free_nodes_head(mm, SIZES_COUNT - 1), block_node);
     assert((byte*) last_node + ALLOC_NODE_SIZE == (byte*) buffer + blocksize);
-    return mm;
 }
 
 void* structstore::mm_allocate(mini_malloc* mm, size_t size) {

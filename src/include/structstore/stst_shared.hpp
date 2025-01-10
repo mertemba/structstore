@@ -80,7 +80,7 @@ class StructStoreShared {
         SharedData* original_ptr;
         size_t size;
         std::atomic_int32_t usage_count;
-        MiniMalloc mm_alloc;
+        SharedAlloc sh_alloc;
         StructStore* store;
         std::atomic_bool invalidated;
 

@@ -9,7 +9,7 @@ TEST(StructStoreTestAlloc, bigAlloc) {
     EXPECT_THROW(
             try { stst::static_alloc.allocate(10'000'000); } catch (const std::runtime_error& e) {
                 EXPECT_STREQ(e.what(),
-                             "prefix: insufficient space in mm_alloc region, requested: 10000000");
+                             "prefix: insufficient space in sh_alloc region, requested: 10000000");
                 throw;
             },
             std::runtime_error);

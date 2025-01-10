@@ -12,6 +12,7 @@ endforeach()
 
 set(TEST_TARGETS "")
 list(APPEND TEST_TARGETS test_alloc)
+list(APPEND TEST_TARGETS test_offsetptr)
 list(APPEND TEST_TARGETS test_basic_0)
 list(APPEND TEST_TARGETS test_basic_1)
 list(APPEND TEST_TARGETS test_mystruct0)

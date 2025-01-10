@@ -15,8 +15,8 @@ struct Track : public stst::Struct<Track> {
 
     Track() : Track(stst::static_alloc) {}
 
-    explicit Track(stst::MiniMalloc& mm_alloc)
-        : Struct(mm_alloc), frame1{mm_alloc}, frame2{mm_alloc} {
+    explicit Track(stst::SharedAlloc& sh_alloc)
+        : Struct(sh_alloc), frame1{sh_alloc}, frame2{sh_alloc} {
         store_ref("frame1", frame1);
         store_ref("frame2", frame2);
         store_ref("frame_ptr", frame_ptr);

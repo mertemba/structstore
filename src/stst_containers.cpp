@@ -8,9 +8,9 @@ using namespace structstore;
 
 const TypeInfo& String::type_info = typing::register_type<String>("structstore::String");
 
-void String::check(const MiniMalloc* mm_alloc) const {
+void String::check(const SharedAlloc* sh_alloc) const {
     CallstackEntry entry{"structstore::String::check()"};
-    if (mm_alloc && !empty()) { stst_assert(mm_alloc->is_owned(data())); }
+    if (sh_alloc && !empty()) { stst_assert(sh_alloc->is_owned(data())); }
 }
 
 String& String::operator=(const std::string& value) {
@@ -38,15 +38,15 @@ YAML::Node List::to_yaml() const {
     return node;
 }
 
-void List::check(const MiniMalloc* mm_alloc) const {
+void List::check(const SharedAlloc* sh_alloc) const {
     CallstackEntry entry{"structstore::List::check()"};
-    if (mm_alloc) {
-        stst_assert(&this->mm_alloc == mm_alloc);
+    if (sh_alloc) {
+        stst_assert(&this->sh_alloc == sh_alloc);
     } else {
         // use our own reference instead
-        mm_alloc = &this->mm_alloc;
+        sh_alloc = &this->sh_alloc;
     }
-    for (const Field& field: data) { field.check(*mm_alloc, *this); }
+    for (const Field& field: data) { field.check(*sh_alloc, *this); }
 }
 
 bool List::operator==(const List& other) const {
@@ -71,15 +71,15 @@ YAML::Node Matrix::to_yaml() const {
     throw std::runtime_error("serialize_yaml_fn not implemented for structstore::Matrix");
 }
 
-void Matrix::check(const MiniMalloc* mm_alloc) const {
+void Matrix::check(const SharedAlloc* sh_alloc) const {
     CallstackEntry entry{"structstore::Matrix::check()"};
-    if (mm_alloc) {
-        stst_assert(&this->mm_alloc == mm_alloc);
+    if (sh_alloc) {
+        stst_assert(&this->sh_alloc == sh_alloc);
     } else {
         // use our own reference instead
-        mm_alloc = &this->mm_alloc;
+        sh_alloc = &this->sh_alloc;
     }
-    if (_data) { stst_assert(mm_alloc->is_owned(_data)); }
+    if (_data) { stst_assert(sh_alloc->is_owned(_data)); }
 }
 
 bool Matrix::operator==(const Matrix& other) const {

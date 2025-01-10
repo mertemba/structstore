@@ -23,7 +23,7 @@ protected:
 
     Struct() : Struct(static_alloc) {}
 
-    explicit Struct(MiniMalloc& mm_alloc) : field_map(mm_alloc) {}
+    explicit Struct(SharedAlloc& sh_alloc) : field_map(sh_alloc) {}
 
     Struct(const Struct&) = delete;
     Struct(Struct&&) = delete;
@@ -48,9 +48,9 @@ public:
 
     inline YAML::Node to_yaml() const { return field_map.to_yaml(); }
 
-    void check(const MiniMalloc* mm_alloc = nullptr) const {
+    void check(const SharedAlloc* sh_alloc = nullptr) const {
         CallstackEntry entry{"structstore::Struct::check()"};
-        field_map.check(mm_alloc, *this);
+        field_map.check(sh_alloc, *this);
     }
 
     inline bool operator==(const Struct& other) const { return field_map == other.field_map; }
