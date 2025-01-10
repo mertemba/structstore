@@ -1,5 +1,6 @@
 import unittest
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import List, Dict
 
 import numpy as np
@@ -47,11 +48,11 @@ class TestBasic0(unittest.TestCase):
         state2.state = state.deepcopy()
         state2.check()
 
-        # check dict types
+        # check converted types
         self.assertEqual(type(state.sub), structstore.StructStore)
-        self.assertEqual(type(state.copy()), dict)
-        self.assertEqual(type(state.copy()["sub"]), structstore.StructStore)
-        self.assertEqual(type(state.deepcopy()["sub"]), dict)
+        self.assertEqual(type(state.copy()), SimpleNamespace)
+        self.assertEqual(type(state.copy().sub), structstore.StructStore)
+        self.assertEqual(type(state.deepcopy().sub), SimpleNamespace)
 
         # check matrix types
         self.assertEqual(type(state.mat), structstore.StructStoreMatrix)
@@ -60,22 +61,28 @@ class TestBasic0(unittest.TestCase):
         self.assertEqual(state.mat2, state.mat)
 
         state_copy: Dict = state.deepcopy()
-        print(state_copy["vec"])
+        print(state_copy.vec)
         print(state.vec.copy())
-        self.assertTrue((state.vec.copy() == state_copy["vec"]).all())
-        self.assertTrue(state.sub.vec.copy()[0] == state_copy["sub"]["vec"][0])
-        self.assertTrue((state.mat.copy() == state_copy["mat"]).all().all())
-        del state_copy["vec"]
-        del state_copy["sub"]
-        del state_copy["mat"]
-        del state_copy["mat2"]
-        self.assertEqual(state_copy, {
-            "num": 5,
-            "value": 3.14,
-            "mystr": "foo",
-            "lst": [1, 2, 3, 5, 8],
-            "tuple": [0, 0],
-        })
+        self.assertTrue((state.vec.copy() == state_copy.vec).all())
+        self.assertTrue(state.sub.vec.copy()[0] == state_copy.sub.vec[0])
+        self.assertTrue((state.mat.copy() == state_copy.mat).all().all())
+        del state_copy.vec
+        del state_copy.sub
+        del state_copy.mat
+        del state_copy.mat2
+        self.assertEqual(
+            state_copy,
+            SimpleNamespace(
+                **{
+                    "num": 5,
+                    "value": 3.14,
+                    "mystr": "foo",
+                    "lst": [1, 2, 3, 5, 8],
+                    "tuple": [0, 0],
+                }
+            ),
+        )
+        # return
         state.lst.append(42)
         state.lst.insert(0, 42)
         self.assertEqual(len(state.lst), 7)
@@ -89,7 +96,7 @@ class TestBasic0(unittest.TestCase):
         self.assertEqual(type(state.lst2), structstore.StructStoreList)
         self.assertEqual(type(state.lst2.copy()), list)
         self.assertEqual(type(state.lst2.copy()[0]), structstore.StructStore)
-        self.assertEqual(type(state.lst2.deepcopy()[0]), dict)
+        self.assertEqual(type(state.lst2.deepcopy()[0]), SimpleNamespace)
         state.lst2.clear()
         self.assertEqual(state.lst2.copy(), [])
         state.lst3 = state.lst2.copy()

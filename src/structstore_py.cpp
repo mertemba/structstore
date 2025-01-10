@@ -15,6 +15,8 @@ namespace nb = nanobind;
 NB_MODULE(MODULE_NAME, m) {
     // API types:
 
+    py::SimpleNamespace = nb::module_::import_("types").attr("SimpleNamespace");
+
     nb::class_<ScopedFieldLock<false>>(m, "ScopedReadLock")
             .def("__enter__", [](ScopedFieldLock<false>&) {})
             .def(

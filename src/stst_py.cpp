@@ -12,6 +12,9 @@ using namespace structstore;
 
 namespace nb = nanobind;
 
+__attribute__((__visibility__("default")))
+nb::object py::SimpleNamespace;
+
 std::unordered_map<uint64_t, const py::PyType>& py::get_py_types() {
     static auto* from_python_fns = new std::unordered_map<uint64_t, const py::PyType>();
     return *from_python_fns;
@@ -29,16 +32,16 @@ const py::PyType& py::get_py_type(uint64_t type_hash) {
 
 __attribute__((__visibility__("default"))) nb::object
 py::field_map_to_python(const FieldMapBase& field_map, py::ToPythonMode mode) {
-    auto dict = nb::dict();
+    auto obj = SimpleNamespace();
     for (shr_string_ptr str: field_map.get_slots()) {
         auto key = nb::str(str->c_str());
         if (mode == py::ToPythonMode::RECURSIVE) {
-            dict[key] = py::to_python(field_map.at(str), py::ToPythonMode::RECURSIVE);
+            nb::setattr(obj, key, py::to_python(field_map.at(str), py::ToPythonMode::RECURSIVE));
         } else { // non-recursive convert
-            dict[key] = py::to_python_cast(field_map.at(str));
+            nb::setattr(obj, key, py::to_python_cast(field_map.at(str)));
         }
     }
-    return dict;
+    return obj;
 }
 
 __attribute__((__visibility__("default"))) void

@@ -42,6 +42,8 @@ public:
     using ToPythonFn = std::function<nb::object(const Field&, ToPythonMode mode)>;
     using ToPythonCastFn = std::function<nb::object(const Field&)>;
 
+    static nb::object SimpleNamespace;
+
 private:
     struct __attribute__((__visibility__("default"))) PyType {
         const FromPythonFn from_python_fn;
@@ -329,8 +331,8 @@ public:
         register_complex_type_funcs<T>(cls);
 
         cls.def("__getstate__", [](T& t) {
-            nb::object dict = field_map_to_python(get_field_map(t), py::ToPythonMode::RECURSIVE);
-            return dict;
+            nb::object obj = field_map_to_python(get_field_map(t), py::ToPythonMode::RECURSIVE);
+            return obj;
         });
 
         cls.def("__dir__", [](T& t) {
