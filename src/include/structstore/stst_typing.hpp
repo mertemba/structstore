@@ -43,6 +43,8 @@ protected:
     void read_unlock_() const;
     void write_lock_() const;
     void write_unlock_() const;
+    void read_or_write_lock_() const;
+    void read_or_write_unlock_() const;
 
 public:
     [[nodiscard]] ScopedFieldLock<false> read_lock() const { return ScopedFieldLock<false>(*this); }

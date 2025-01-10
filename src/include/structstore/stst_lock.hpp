@@ -35,6 +35,9 @@ class SpinMutex {
     void write_lock();
     void write_unlock();
 
+    void read_or_write_lock();
+    void read_or_write_unlock();
+
 public:
     SpinMutex() = default;
 };

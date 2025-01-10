@@ -13,15 +13,23 @@ void FieldTypeBase::read_unlock_() const {
 }
 
 void FieldTypeBase::write_lock_() const {
-    // the read lock here is intentional
-    if (parent_field) { parent_field->read_lock_(); }
+    if (parent_field) { parent_field->read_or_write_lock_(); }
     mutex.write_lock();
 }
 
 void FieldTypeBase::write_unlock_() const {
-    // the read lock here is intentional
     mutex.write_unlock();
-    if (parent_field) { parent_field->read_unlock_(); }
+    if (parent_field) { parent_field->read_or_write_unlock_(); }
+}
+
+void FieldTypeBase::read_or_write_lock_() const {
+    if (parent_field) { parent_field->read_or_write_lock_(); }
+    mutex.read_or_write_lock();
+}
+
+void FieldTypeBase::read_or_write_unlock_() const {
+    mutex.read_or_write_unlock();
+    if (parent_field) { parent_field->read_or_write_unlock_(); }
 }
 
 std::unordered_map<std::type_index, uint64_t>& typing::get_type_hashes() {

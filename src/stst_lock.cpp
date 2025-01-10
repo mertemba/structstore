@@ -78,6 +78,22 @@ void SpinMutex::write_unlock() {
     STST_LOG_DEBUG() << "write unlocked " << this;
 }
 
+void SpinMutex::read_or_write_lock() {
+    if (write_lock_tid == tid) {
+        write_lock();
+    } else {
+        read_lock();
+    }
+}
+
+void SpinMutex::read_or_write_unlock() {
+    if (write_lock_tid == tid) {
+        write_unlock();
+    } else {
+        read_unlock();
+    }
+}
+
 template<>
 ScopedLock<false>::ScopedLock(SpinMutex& mutex) : mutex(&mutex) {
     mutex.read_lock();
