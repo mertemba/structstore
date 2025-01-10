@@ -41,10 +41,10 @@ YAML::Node List::to_yaml() const {
 void List::check(const SharedAlloc* sh_alloc) const {
     CallstackEntry entry{"structstore::List::check()"};
     if (sh_alloc) {
-        stst_assert(&this->sh_alloc == sh_alloc);
+        stst_assert(this->sh_alloc == sh_alloc);
     } else {
         // use our own reference instead
-        sh_alloc = &this->sh_alloc;
+        sh_alloc = this->sh_alloc.get();
     }
     for (const Field& field: data) { field.check(*sh_alloc, *this); }
 }
@@ -74,12 +74,12 @@ YAML::Node Matrix::to_yaml() const {
 void Matrix::check(const SharedAlloc* sh_alloc) const {
     CallstackEntry entry{"structstore::Matrix::check()"};
     if (sh_alloc) {
-        stst_assert(&this->sh_alloc == sh_alloc);
+        stst_assert(this->sh_alloc == sh_alloc);
     } else {
         // use our own reference instead
-        sh_alloc = &this->sh_alloc;
+        sh_alloc = this->sh_alloc.get();
     }
-    if (_data) { stst_assert(sh_alloc->is_owned(_data)); }
+    if (_data) { stst_assert(sh_alloc->is_owned(_data.get())); }
 }
 
 bool Matrix::operator==(const Matrix& other) const {

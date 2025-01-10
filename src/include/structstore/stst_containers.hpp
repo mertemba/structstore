@@ -8,6 +8,8 @@
 
 namespace structstore {
 
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class String : public FieldType<String>, public shr_string {
 public:
     static const TypeInfo& type_info;
@@ -23,8 +25,10 @@ public:
     String& operator=(const std::string& value);
 };
 
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class List : public FieldType<List> {
-    SharedAlloc& sh_alloc;
+    OffsetPtr<SharedAlloc> sh_alloc;
     shr_vector<Field> data;
 
 public:
@@ -62,7 +66,8 @@ public:
         Field& operator*() { return ((List&) list).data.at(index); }
     };
 
-    explicit List(SharedAlloc& sh_alloc) : sh_alloc(sh_alloc), data(StlAllocator<Field>(sh_alloc)) {
+    explicit List(SharedAlloc& sh_alloc)
+        : sh_alloc(&sh_alloc), data(StlAllocator<Field>(sh_alloc)) {
         STST_LOG_DEBUG() << "constructing List at " << this;
     }
 
@@ -86,7 +91,7 @@ public:
 
     FieldAccess<true> push_back() {
         STST_LOG_DEBUG() << "this: " << this << ", cur size: " << data.size();
-        return FieldAccess<true>{data.emplace_back(), sh_alloc, this};
+        return FieldAccess<true>{data.emplace_back(), *sh_alloc, this};
     }
 
     template<typename T>
@@ -98,17 +103,19 @@ public:
         if (index > data.size()) {
             throw std::out_of_range("index out of bounds: " + std::to_string(index));
         }
-        return FieldAccess<true>{*data.emplace(data.begin() + index), sh_alloc, this};
+        return FieldAccess<true>{*data.emplace(data.begin() + index), *sh_alloc, this};
     }
 
     FieldAccess<true> operator[](size_t index) {
         if (index >= data.size()) {
             throw std::out_of_range("index out of bounds: " + std::to_string(index));
         }
-        return FieldAccess<true>{data.at(index), sh_alloc, this};
+        return FieldAccess<true>{data.at(index), *sh_alloc, this};
     }
 
-    FieldAccess<true> at(size_t index) { return FieldAccess<true>{data.at(index), sh_alloc, this}; }
+    FieldAccess<true> at(size_t index) {
+        return FieldAccess<true>{data.at(index), *sh_alloc, this};
+    }
 
     Iterator begin() const { return {(List&) *this, 0, read_lock()}; }
 
@@ -127,7 +134,7 @@ public:
     }
 
     void clear() {
-        for (Field& field: data) { FieldAccess<true>{field, sh_alloc, this}.clear(); }
+        for (Field& field: data) { FieldAccess<true>{field, *sh_alloc, this}.clear(); }
         data.clear();
     }
 
@@ -140,6 +147,8 @@ public:
     bool operator==(const List& other) const;
 };
 
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class Matrix : public FieldType<Matrix> {
 public:
     static constexpr int MAX_DIMS = 8;
@@ -147,16 +156,16 @@ public:
     static const TypeInfo& type_info;
 
 protected:
-    SharedAlloc& sh_alloc;
+    OffsetPtr<SharedAlloc> sh_alloc;
     size_t _ndim;
     size_t _shape[MAX_DIMS] = {};
-    double* _data;
+    OffsetPtr<double> _data;
 
 public:
     Matrix(SharedAlloc& sh_alloc) : Matrix(0, 0, sh_alloc) {}
 
     Matrix(size_t ndim, const size_t* shape, SharedAlloc& sh_alloc)
-        : sh_alloc(sh_alloc), _ndim(ndim) {
+        : sh_alloc(&sh_alloc), _ndim(ndim) {
         if (ndim == 0) {
             _data = nullptr;
         } else {
@@ -165,7 +174,7 @@ public:
     }
 
     ~Matrix() {
-        if (_data != nullptr) { sh_alloc.deallocate(_data); }
+        if (_data) { sh_alloc->deallocate(_data.get()); }
     }
 
     Matrix(Matrix&&) = delete;
@@ -182,7 +191,7 @@ public:
     }
 
     Matrix& operator=(const Matrix& other) {
-        from(other._ndim, other._shape, other._data);
+        from(other._ndim, other._shape, other._data.get());
         return *this;
     }
 
@@ -190,10 +199,10 @@ public:
 
     const size_t* shape() const { return _shape; }
 
-    double* data() { return _data; }
+    double* data() { return _data.get(); }
 
     void from(size_t ndim, const size_t* shape, const double* data) {
-        if (data == _data) {
+        if (data == _data.get()) {
             if (ndim != _ndim) {
                 throw std::runtime_error("setting matrix data to same pointer but different size");
             }
@@ -204,8 +213,8 @@ public:
             }
             return;
         }
-        if (_data != nullptr) {
-            sh_alloc.deallocate(_data);
+        if (_data) {
+            sh_alloc->deallocate(_data.get());
             _data = nullptr;
         }
         _ndim = ndim;
@@ -218,10 +227,8 @@ public:
             size *= shape[i];
         }
         if (size > 0) {
-            _data = (double*) sh_alloc.allocate(size);
-            if (data != nullptr) {
-                std::memcpy(_data, data, size);
-            }
+            _data = (double*) sh_alloc->allocate(size);
+            if (data != nullptr) { std::memcpy(_data.get(), data, size); }
         }
     }
 

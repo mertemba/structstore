@@ -11,6 +11,10 @@ namespace structstore {
 
 class py;
 
+// todo: when returning a FieldAccess, there should be a read lock on the parent StructStore
+
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class StructStore : public FieldType<StructStore> {
     friend class py;
 

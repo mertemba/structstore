@@ -19,6 +19,8 @@ namespace structstore {
 
 class StringStorage;
 
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class SharedAlloc {
     using byte = uint8_t;
     static constexpr size_t ALIGN = 8;
@@ -138,23 +140,27 @@ public:
 
 using shr_string = std::basic_string<char, std::char_traits<char>, StlAllocator<char>>;
 
+using shr_string_ptr = OffsetPtr<const shr_string>;
+
 template<class T>
 using shr_vector = std::vector<T, StlAllocator<T>>;
 
-template<class K, class T>
-using shr_unordered_map = std::unordered_map<K, T, std::hash<K>, std::equal_to<K>,
-                                             StlAllocator<std::pair<const K, T>>>;
+template<class K, class T, class H = std::hash<K>>
+using shr_unordered_map =
+        std::unordered_map<K, T, H, std::equal_to<K>, StlAllocator<std::pair<const K, T>>>;
 
-template<class T>
-using shr_unordered_set = std::unordered_set<T, std::hash<T>, std::equal_to<T>, StlAllocator<T>>;
+template<class T, class H = std::hash<T>>
+using shr_unordered_set = std::unordered_set<T, H, std::equal_to<T>, StlAllocator<T>>;
 
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class StringStorage {
-    SharedAlloc& sh_alloc;
+    OffsetPtr<SharedAlloc> sh_alloc;
     shr_unordered_set<shr_string> data;
     SpinMutex mutex;
 
 public:
-    StringStorage(SharedAlloc& sh_alloc) : sh_alloc{sh_alloc}, data{StlAllocator<int>(sh_alloc)} {}
+    StringStorage(SharedAlloc& sh_alloc) : sh_alloc{&sh_alloc}, data{StlAllocator<int>(sh_alloc)} {}
 
     const shr_string* internalize(const std::string& str);
 

@@ -17,21 +17,23 @@ class FieldView;
 template<bool managed>
 class FieldAccess;
 
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class Field {
 protected:
     friend class FieldView;
     template<bool managed>
     friend class FieldAccess;
 
-    void* data;
+    OffsetPtr<void> data;
     uint64_t type_hash;
 
     void assert_nonempty() const {
-        if (data == nullptr) { throw std::runtime_error("field is not yet initialized!"); }
+        if (!data) { throw std::runtime_error("field is not yet initialized!"); }
     }
 
     void assert_empty() const {
-        if (data != nullptr) {
+        if (data) {
             throw std::runtime_error("field is replaced/deleted while still initialized!");
         }
     }
@@ -49,10 +51,10 @@ protected:
     void clear(SharedAlloc& sh_alloc) {
         if (data) {
             const auto& type_info = typing::get_type(type_hash);
-            STST_LOG_DEBUG() << "deconstructing field " << type_info.name << " at " << data;
-            type_info.destructor_fn(sh_alloc, data);
-            STST_LOG_DEBUG() << "deallocating at " << data;
-            sh_alloc.deallocate(data);
+            STST_LOG_DEBUG() << "deconstructing field " << type_info.name << " at " << data.get();
+            type_info.destructor_fn(sh_alloc, data.get());
+            STST_LOG_DEBUG() << "deallocating at " << data.get();
+            sh_alloc.deallocate(data.get());
         }
         data = nullptr;
         type_hash = 0;
@@ -126,7 +128,7 @@ public:
     bool operator==(const Field& other) const {
         if (!data) { return !other.data; }
         if (type_hash != other.type_hash) { return false; }
-        return typing::get_type(type_hash).cmp_equal_fn(data, other.data);
+        return typing::get_type(type_hash).cmp_equal_fn(data.get(), other.data.get());
     }
 
     inline bool operator!=(const Field& other) const { return !(*this == other); }
@@ -144,7 +146,7 @@ public:
         if (type_hash != typing::get_type_hash<T>()) {
             throw std::runtime_error("field accessed with wrong type");
         }
-        return *(T*) data;
+        return *(T*) data.get();
     }
 
     template<typename T>

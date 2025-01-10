@@ -5,6 +5,8 @@
 
 namespace structstore {
 
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class SpinMutex {
     template<bool write>
     friend class ScopedLock;

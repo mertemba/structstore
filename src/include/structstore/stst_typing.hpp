@@ -22,13 +22,15 @@ class StructStore;
 template<typename T>
 class Struct;
 
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class FieldTypeBase {
 protected:
     template<bool write>
     friend class ScopedFieldLock;
     friend class py;
 
-    const FieldTypeBase* parent_field = nullptr;
+    OffsetPtr<const FieldTypeBase> parent_field = nullptr;
     mutable SpinMutex mutex = {};
 
     FieldTypeBase() {}

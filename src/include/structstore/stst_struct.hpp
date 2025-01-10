@@ -9,6 +9,8 @@ namespace structstore {
 
 class py;
 
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 template<typename T>
 class Struct : public FieldType<T> {
     friend class structstore::py;

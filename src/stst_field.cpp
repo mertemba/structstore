@@ -8,12 +8,12 @@ using namespace structstore;
 
 void Field::to_text(std::ostream& os) const {
     const auto& type_info = typing::get_type(type_hash);
-    type_info.serialize_text_fn(os, data);
+    type_info.serialize_text_fn(os, data.get());
 }
 
 YAML::Node Field::to_yaml() const {
     const auto& type_info = typing::get_type(type_hash);
-    return type_info.serialize_yaml_fn(data);
+    return type_info.serialize_yaml_fn(data.get());
 }
 
 void Field::construct_copy_from(SharedAlloc& sh_alloc, const Field& other,
@@ -22,8 +22,8 @@ void Field::construct_copy_from(SharedAlloc& sh_alloc, const Field& other,
     type_hash = other.type_hash;
     const auto& type_info = typing::get_type(type_hash);
     data = sh_alloc.allocate(type_info.size);
-    type_info.constructor_fn(sh_alloc, data, parent_field);
-    type_info.copy_fn(sh_alloc, data, other.data);
+    type_info.constructor_fn(sh_alloc, data.get(), parent_field);
+    type_info.copy_fn(sh_alloc, data.get(), other.data.get());
 }
 
 void Field::copy_from(SharedAlloc& sh_alloc, const Field& other) {
@@ -32,7 +32,7 @@ void Field::copy_from(SharedAlloc& sh_alloc, const Field& other) {
         throw std::runtime_error("copying field with different type");
     }
     const auto& type_info = typing::get_type(type_hash);
-    type_info.copy_fn(sh_alloc, data, other.data);
+    type_info.copy_fn(sh_alloc, data.get(), other.data.get());
 }
 
 void Field::move_from(Field& other) {
@@ -45,9 +45,9 @@ void Field::check(const SharedAlloc& sh_alloc, const FieldTypeBase& parent_field
     CallstackEntry entry{"structstore::Field::check()"};
     stst_assert(sh_alloc.is_owned(this));
     if (data) {
-        stst_assert(sh_alloc.is_owned(data));
+        stst_assert(sh_alloc.is_owned(data.get()));
         const TypeInfo& type_info = typing::get_type(type_hash);
-        type_info.check_fn(sh_alloc, data, parent_field);
+        type_info.check_fn(sh_alloc, data.get(), parent_field);
     }
 }
 

@@ -27,7 +27,7 @@ SharedAlloc::~SharedAlloc() noexcept(false) {
 }
 
 const shr_string* StringStorage::internalize(const std::string& str) {
-    shr_string str_{str, StlAllocator<>{sh_alloc}};
+    shr_string str_{str, StlAllocator<>{*sh_alloc}};
     {
         ScopedLock<false> lock{mutex};
         auto it = data.find(str_);
@@ -40,7 +40,7 @@ const shr_string* StringStorage::internalize(const std::string& str) {
 
 const shr_string* StringStorage::get(const std::string& str) {
     ScopedLock<false> lock{mutex};
-    shr_string str_{str, StlAllocator<>{sh_alloc}};
+    shr_string str_{str, StlAllocator<>{*sh_alloc}};
     auto it = data.find(str_);
     if (it != data.end()) { return &*it; }
     return nullptr;

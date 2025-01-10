@@ -4,6 +4,14 @@
 
 namespace stst = structstore;
 
+TEST(StructStoreTestAlloc, structSizes) {
+    EXPECT_EQ(sizeof(stst::FieldTypeBase), 16);
+    EXPECT_EQ(sizeof(stst::Field), 16);
+    EXPECT_EQ(sizeof(stst::String), 56);
+    EXPECT_EQ(sizeof(stst::StructStore), 128);
+    EXPECT_EQ(sizeof(stst::SharedAlloc), 32);
+}
+
 TEST(StructStoreTestAlloc, bigAlloc) {
     stst::CallstackEntry entry{"prefix"};
     EXPECT_THROW(

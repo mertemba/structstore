@@ -76,12 +76,13 @@ class StructStoreShared {
 
     StructStoreShared& operator=(const StructStoreShared&) = delete;
 
+    // instances of this class reside in shared memory, thus no raw pointers
+    // or references should be used; use structstore::OffsetPtr<T> instead.
     struct SharedData {
-        SharedData* original_ptr;
         size_t size;
         std::atomic_int32_t usage_count;
         SharedAlloc sh_alloc;
-        StructStore* store;
+        OffsetPtr<StructStore> store;
         std::atomic_bool invalidated;
 
         SharedData(size_t size, size_t bufsize, void* buffer);
@@ -107,8 +108,7 @@ class StructStoreShared {
 
 public:
     explicit StructStoreShared(const std::string& path, size_t bufsize = 4096, bool reinit = false,
-                               bool use_file = false, CleanupMode cleanup = IF_LAST,
-                               void* target_addr = nullptr);
+                               bool use_file = false, CleanupMode cleanup = IF_LAST);
 
     explicit StructStoreShared(int fd, bool init);
 
@@ -147,12 +147,12 @@ public:
 
     StructStore* operator->() {
         assert_valid();
-        return sh_data_ptr->store;
+        return sh_data_ptr->store.get();
     }
 
     StructStore& operator*() {
         assert_valid();
-        return *sh_data_ptr->store;
+        return *sh_data_ptr->store.get();
     }
 
     FieldAccess<true> operator[](const std::string& name) {

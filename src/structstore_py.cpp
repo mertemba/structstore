@@ -108,12 +108,11 @@ NB_MODULE(MODULE_NAME, m) {
     shcls.def(
             "__init__",
             [](StructStoreShared* s, const std::string& path, size_t size, bool reinit,
-               bool use_file, CleanupMode cleanup, uintptr_t target_addr) {
-                new (s) StructStoreShared{path,     size,    reinit,
-                                          use_file, cleanup, (void*) target_addr};
+               bool use_file, CleanupMode cleanup) {
+                new (s) StructStoreShared{path, size, reinit, use_file, cleanup};
             },
             nb::arg("path"), nb::arg("size") = 4096, nb::arg("reinit") = false,
-            nb::arg("use_file") = false, nb::arg("cleanup") = IF_LAST, nb::arg("target_addr") = 0);
+            nb::arg("use_file") = false, nb::arg("cleanup") = IF_LAST);
     shcls.def(
             "__init__",
             [](StructStoreShared* s, int fd, bool init) { new (s) StructStoreShared{fd, init}; },
@@ -131,9 +130,6 @@ NB_MODULE(MODULE_NAME, m) {
                 return res;
             },
             nb::arg("block") = true);
-    shcls.def("addr", [](StructStoreShared& shs) {
-        return uintptr_t(shs.addr());
-    });
     shcls.def("to_bytes", [](StructStoreShared& shs) {
         return nb::bytes((const char*) shs.addr(), shs.size());
     });

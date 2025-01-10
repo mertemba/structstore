@@ -335,7 +335,7 @@ public:
 
         cls.def("__dir__", [](T& t) {
             nb::list slots;
-            for (const shr_string* str : get_field_map(t).get_slots()) {
+            for (shr_string_ptr str: get_field_map(t).get_slots()) {
                 slots.append(nb::str(str->c_str()));
             }
             return slots;

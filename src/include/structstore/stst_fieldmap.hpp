@@ -13,17 +13,20 @@
 
 namespace structstore {
 
-// base class for managed and unmanaged FieldMap
+// base class for managed and unmanaged FieldMap.
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class FieldMapBase {
 protected:
-    SharedAlloc& sh_alloc;
-    shr_unordered_map<const shr_string*, Field> fields;
-    shr_vector<const shr_string*> slots;
+    OffsetPtr<SharedAlloc> sh_alloc;
+    shr_unordered_map<shr_string_ptr, Field, OffsetPtrHasher> fields;
+    shr_vector<shr_string_ptr> slots;
 
     // constructor, assignment, destructor
 
     explicit FieldMapBase(SharedAlloc& sh_alloc)
-        : sh_alloc(sh_alloc), fields(StlAllocator<>(sh_alloc)), slots(StlAllocator<>(sh_alloc)) {
+        : sh_alloc(&sh_alloc), fields(0, OffsetPtrHasher{this}, StlAllocator<>(sh_alloc)),
+          slots(StlAllocator<>(sh_alloc)) {
         STST_LOG_DEBUG() << "constructing FieldMap at " << this << " with alloc at " << &sh_alloc
                          << " (static alloc: " << (&sh_alloc == &static_alloc) << ")";
     }
@@ -47,31 +50,31 @@ public:
 
     inline bool empty() const { return slots.empty(); }
 
-    inline SharedAlloc& get_alloc() { return sh_alloc; }
+    inline SharedAlloc& get_alloc() { return *sh_alloc; }
 
-    inline const SharedAlloc& get_alloc() const { return sh_alloc; }
+    inline const SharedAlloc& get_alloc() const { return *sh_alloc; }
 
-    inline const shr_unordered_map<const shr_string*, Field>& get_fields() const { return fields; }
-
-    inline const shr_vector<const shr_string*>& get_slots() const { return slots; }
+    inline const shr_vector<shr_string_ptr>& get_slots() const { return slots; }
 
     Field* try_get_field(const std::string& name);
 
     const Field* try_get_field(const std::string& name) const;
 
-    inline Field& at(const std::string& name) { return fields.at(sh_alloc.strings().get(name)); }
+    inline Field& at(const std::string& name) { return fields.at(sh_alloc->strings().get(name)); }
 
     inline const Field& at(const std::string& name) const {
-        return fields.at(sh_alloc.strings().get(name));
+        return fields.at(sh_alloc->strings().get(name));
     }
 
-    inline Field& at(const shr_string* name) { return fields.at(name); }
+    inline Field& at(shr_string_ptr name) { return fields.at(name); }
 
-    inline const Field& at(const shr_string* name) const { return fields.at(name); }
+    inline const Field& at(shr_string_ptr name) const { return fields.at(name); }
 };
 
 // managed means the contained fields are allocated and constructed.
 // unmanaged means only pointers are stored.
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 template<bool managed>
 class FieldMap : public FieldMapBase {
 protected:
@@ -123,7 +126,7 @@ public:
     void store_ref(const std::string& name, T& t, const FieldTypeBase& parent_field) {
         static_assert(!managed, "storing ref in managed FieldMap is not supported");
         if constexpr (std::is_base_of_v<Struct<T>, T>) {
-            if (&t.field_map.sh_alloc != &sh_alloc) {
+            if (t.field_map.sh_alloc != sh_alloc) {
                 std::ostringstream str;
                 str << "registering Struct field '" << name << "' with a different allocator "
                     << "than this FieldMap, this is probably not what you want";
@@ -132,8 +135,8 @@ public:
         }
         STST_LOG_DEBUG() << "registering unmanaged data at " << &t << "in FieldMap at " << this
                          << " with alloc at " << &sh_alloc
-                         << " (static alloc: " << (&sh_alloc == &static_alloc) << ")";
-        const shr_string* name_int = sh_alloc.strings().internalize(name);
+                         << " (static alloc: " << (sh_alloc.get() == &static_alloc) << ")";
+        const shr_string* name_int = sh_alloc->strings().internalize(name);
         auto ret = fields.emplace(name_int, Field{&t});
         if (!ret.second) { throw std::runtime_error("field name already exists"); }
         slots.emplace_back(name_int);
@@ -148,8 +151,8 @@ public:
     void clear() {
         static_assert(managed, "removing fields from unmanaged FieldMap is not supported");
         STST_LOG_DEBUG() << "clearing FieldMap at " << this << "with alloc at " << &sh_alloc;
-        if (&sh_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is using the static_alloc)";
-        for (auto& [key, value]: fields) { value.clear(sh_alloc); }
+        if (sh_alloc.get() == &static_alloc) STST_LOG_DEBUG() << "(this is using the static_alloc)";
+        for (auto& [key, value]: fields) { value.clear(*sh_alloc); }
         fields.clear();
         slots.clear();
     }
@@ -157,7 +160,7 @@ public:
     void clear_unmanaged() {
         static_assert(!managed);
         STST_LOG_DEBUG() << "clearing FieldMap at " << this << "with alloc at " << &sh_alloc;
-        if (&sh_alloc == &static_alloc) STST_LOG_DEBUG() << "(this is using the static_alloc)";
+        if (sh_alloc.get() == &static_alloc) STST_LOG_DEBUG() << "(this is using the static_alloc)";
         for (auto& [key, value]: fields) { value.clear_unmanaged(); }
         fields.clear();
         slots.clear();
@@ -165,9 +168,9 @@ public:
 
     void remove(const std::string& name) {
         static_assert(managed, "removing fields from unmanaged FieldMap is not supported");
-        const shr_string* name_ = sh_alloc.strings().get(name);
+        const shr_string* name_ = sh_alloc->strings().get(name);
         Field& field = fields.at(name_);
-        field.clear(sh_alloc);
+        field.clear(*sh_alloc);
         fields.erase(name_);
         auto slot_it = std::find(slots.begin(), slots.end(), name_);
         slots.erase(slot_it);

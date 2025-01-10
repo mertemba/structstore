@@ -115,6 +115,17 @@ public:
     OffsetPtr& operator--() { return *this = get() - 1; }
 };
 
+struct OffsetPtrHasher {
+    const OffsetPtr<const void> base;
+
+    OffsetPtrHasher(const OffsetPtr<const void>& base) : base{base} {}
+
+    template<typename T>
+    std::size_t operator()(const OffsetPtr<const T>& ptr) const {
+        return (std::ptrdiff_t) ptr.get() - (std::ptrdiff_t) base.get();
+    }
+};
+
 } // namespace structstore
 
 #endif

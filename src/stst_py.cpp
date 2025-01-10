@@ -30,7 +30,7 @@ const py::PyType& py::get_py_type(uint64_t type_hash) {
 __attribute__((__visibility__("default"))) nb::object
 py::field_map_to_python(const FieldMapBase& field_map, py::ToPythonMode mode) {
     auto dict = nb::dict();
-    for (const shr_string* str: field_map.get_slots()) {
+    for (shr_string_ptr str: field_map.get_slots()) {
         auto key = nb::str(str->c_str());
         if (mode == py::ToPythonMode::RECURSIVE) {
             dict[key] = py::to_python(field_map.at(str), py::ToPythonMode::RECURSIVE);
@@ -49,7 +49,7 @@ py::field_map_from_python(FieldMap<false>& field_map, const nb::dict& dict,
         Callstack::throw_with_trace<std::runtime_error>(
                 "cannot copy dict with wrong fields into struct");
     }
-    for (const shr_string* str: field_map.get_slots()) {
+    for (shr_string_ptr str: field_map.get_slots()) {
         std::string key_str = str->c_str();
         py::set_field(field_map, key_str, dict[str->c_str()], parent_field);
     }
