@@ -2,8 +2,15 @@
 
 using namespace structstore;
 
+struct ManagedMalloc {
+    void* data;
+    ManagedMalloc(size_t size) : data{std::malloc(size)} {}
+    ~ManagedMalloc() { std::free(data); }
+};
+
 static constexpr size_t static_alloc_size = 1 << 20;
-SharedAlloc structstore::static_alloc(std::malloc(static_alloc_size), static_alloc_size);
+ManagedMalloc static_alloc_data{static_alloc_size};
+SharedAlloc structstore::static_alloc{static_alloc_data.data, static_alloc_size};
 
 SharedAlloc::SharedAlloc(void* buffer, size_t size)
     : mm{(mini_malloc*) buffer}, blocksize{size}, string_storage{nullptr} {
