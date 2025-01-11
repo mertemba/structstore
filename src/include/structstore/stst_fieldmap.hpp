@@ -141,7 +141,7 @@ public:
         if (!ret.second) { throw std::runtime_error("field name already exists"); }
         slots.emplace_back(name_int);
         STST_LOG_DEBUG() << "field " << name << " at " << &t;
-        if constexpr (std::is_class_v<T>) {
+        if constexpr (std::is_class_v<T> && !std::is_base_of_v<OffsetPtrBase, T>) {
             t.parent_field = &parent_field;
         }
     }

@@ -136,7 +136,7 @@ public:
         static_assert(!std::is_pointer_v<T>);
         static_assert(std::is_class_v<T>);
         auto from_python_fn = [](FieldAccess<true> access, const nb::handle& value) {
-            if (access.get_type_hash() == typing::get_type_hash<T*>() && nb::isinstance<T>(value)) {
+            if (access.get_type_hash() == typing::get_type_hash<OffsetPtr<T>>() && nb::isinstance<T>(value)) {
                 STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name
                                  << " succeeded";
                 T& t = nb::cast<T&>(value, false);
@@ -144,27 +144,27 @@ public:
                     Callstack::throw_with_trace<std::runtime_error>(
                             "cannot assign pointer to different memory region");
                 }
-                access.get<T*>() = &t;
+                access.get<OffsetPtr<T>>() = &t;
                 return true;
             }
             STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name << " failed";
             return false;
         };
         py::ToPythonFn to_python_fn = [](const Field& field, py::ToPythonMode mode) {
-            T* t_ptr = field.get<T*>();
+            T* t_ptr = field.get<OffsetPtr<T>>().get();
             if (t_ptr == nullptr) {
                 return nb::none();
             }
             return field_map_to_python(t_ptr->field_map, mode);
         };
         py::ToPythonCastFn to_python_cast_fn = [](const Field& field) {
-            T* t_ptr = field.get<T*>();
+            T* t_ptr = field.get<OffsetPtr<T>>().get();
             if (t_ptr == nullptr) {
                 return nb::none();
             }
             return nb::cast(*t_ptr, nb::rv_policy::reference);
         };
-        register_type<T*>(from_python_fn, to_python_fn, to_python_cast_fn);
+        register_type<OffsetPtr<T>>(from_python_fn, to_python_fn, to_python_cast_fn);
     }
 
     template<typename T>
@@ -218,31 +218,31 @@ public:
         static_assert(!std::is_pointer_v<T>);
         static_assert(!std::is_class_v<T>);
         auto from_python_fn = [](FieldAccess<true> access, const nb::handle& value) {
-            if (access.get_type_hash() == typing::get_type_hash<T*>() && nb::isinstance<T>(value)) {
+            if (access.get_type_hash() == typing::get_type_hash<OffsetPtr<T>>() && nb::isinstance<T>(value)) {
                 STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name
                                  << " succeeded";
                 T t = nb::cast<T>(value, false);
-                *access.get<T*>() = t;
+                *access.get<OffsetPtr<T>>() = t;
                 return true;
             }
             STST_LOG_DEBUG() << "converting from type " << typing::get_type<T>().name << " failed";
             return false;
         };
         py::ToPythonFn to_python_fn = [](const Field& field, py::ToPythonMode) {
-            T* t_ptr = field.get<T*>();
+            T* t_ptr = field.get<OffsetPtr<T>>().get();
             if (t_ptr == nullptr) {
                 return nb::none();
             }
             return nb::cast(*t_ptr);
         };
         py::ToPythonCastFn to_python_cast_fn = [](const Field& field) {
-            T* t_ptr = field.get<T*>();
+            T* t_ptr = field.get<OffsetPtr<T>>().get();
             if (t_ptr == nullptr) {
                 return nb::none();
             }
             return nb::cast(*t_ptr);
         };
-        register_type<T*>(from_python_fn, to_python_fn, to_python_cast_fn);
+        register_type<OffsetPtr<T>>(from_python_fn, to_python_fn, to_python_cast_fn);
     }
 
     template<typename T, typename T_py>

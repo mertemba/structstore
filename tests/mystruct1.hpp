@@ -11,7 +11,7 @@ struct Track : public stst::Struct<Track> {
 
     Frame frame1;
     Frame frame2;
-    Frame* frame_ptr = &frame1;
+    stst::OffsetPtr<Frame> frame_ptr = &frame1;
 
     Track() : Track(stst::static_alloc) {}
 

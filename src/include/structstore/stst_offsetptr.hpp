@@ -8,8 +8,10 @@
 
 namespace structstore {
 
+class OffsetPtrBase {};
+
 template<typename T>
-class OffsetPtr {
+class OffsetPtr : public OffsetPtrBase {
     static constexpr std::ptrdiff_t empty_val = 1;
     std::ptrdiff_t offset = empty_val;
 
@@ -100,7 +102,11 @@ public:
         return get() == other.get();
     }
 
+    bool operator==(std::nullptr_t) const { return !*this; }
+
     bool operator!=(const OffsetPtr<T>& other) const { return get() != other.get(); }
+
+    bool operator!=(std::nullptr_t) const { return !!*this; }
 
     // arithmetic operators
 

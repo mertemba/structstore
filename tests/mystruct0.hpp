@@ -10,7 +10,7 @@ struct Frame : public stst::Struct<Frame> {
 
     double t = 0.0;
     bool flag = false;
-    double* t_ptr = &t;
+    stst::OffsetPtr<double> t_ptr = &t;
 
     Frame() : Frame(stst::static_alloc) {}
 
