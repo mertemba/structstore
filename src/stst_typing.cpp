@@ -3,13 +3,13 @@
 using namespace structstore;
 
 void FieldTypeBase::read_lock_() const {
-    if (parent_field) { parent_field->read_lock_(); }
+    if (parent_field) { parent_field->read_or_write_lock_(); }
     mutex.read_lock();
 }
 
 void FieldTypeBase::read_unlock_() const {
     mutex.read_unlock();
-    if (parent_field) { parent_field->read_unlock_(); }
+    if (parent_field) { parent_field->read_or_write_unlock_(); }
 }
 
 void FieldTypeBase::write_lock_() const {

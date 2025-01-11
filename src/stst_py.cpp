@@ -12,7 +12,6 @@ using namespace structstore;
 
 namespace nb = nanobind;
 
-__attribute__((__visibility__("default")))
 nb::object py::SimpleNamespace;
 
 std::unordered_map<uint64_t, const py::PyType>& py::get_py_types() {

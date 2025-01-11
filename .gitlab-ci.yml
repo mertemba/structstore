@@ -109,6 +109,7 @@ test_archlinux_cpp-aarch64:
 test_archlinux_py-amd64:
   extends: [.test_archlinux_py, .amd64]
   needs: [build_archlinux-amd64]
+  allow_failure: true  # lapack 3.12.1-1 causes an undefined symbol error
 test_archlinux_py-aarch64:
   extends: [.test_archlinux_py, .aarch64]
   needs: [build_archlinux-aarch64]

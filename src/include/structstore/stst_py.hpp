@@ -42,6 +42,7 @@ public:
     using ToPythonFn = std::function<nb::object(const Field&, ToPythonMode mode)>;
     using ToPythonCastFn = std::function<nb::object(const Field&)>;
 
+    __attribute__((__visibility__("default")))
     static nb::object SimpleNamespace;
 
 private:
@@ -342,6 +343,8 @@ public:
             }
             return slots;
         });
+
+        cls.def("__len__", [](T& t) { return get_field_map(t).get_slots().size(); });
 
         if constexpr (typing::is_field_type<T>) {
             cls.def("__setstate__", [](T& t, nb::handle value) {
