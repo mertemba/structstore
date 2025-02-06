@@ -2,5 +2,7 @@ include(CMakeFindDependencyMacro)
 find_dependency(yaml-cpp REQUIRED)
 
 get_filename_component(STRUCTSTORE_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+set(STRUCTSTORE_CMAKE_TO_LIB_DIR @STRUCTSTORE_CMAKE_TO_LIB_DIR@)
+set(STRUCTSTORE_LIB_DIR "${STRUCTSTORE_CMAKE_DIR}/${STRUCTSTORE_CMAKE_TO_LIB_DIR}")
 
 include("${STRUCTSTORE_CMAKE_DIR}/StructStoreTargets.cmake")

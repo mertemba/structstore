@@ -49,7 +49,8 @@ package_structstore() {
     DESTDIR="$pkgdir" cmake --install build
 
     # keep only non-Python files
-    find "$pkgdir" -type f | sed "s@$pkgdir@@" | grep -i py \
+    find "$pkgdir" -type f | sed "s@$pkgdir@@" \
+        | grep -i -e py -e nanobind -e binding \
         | while IFS='' read f; do rm "$pkgdir/$f"; done
     find "$pkgdir" -type d -empty -delete
 }
@@ -63,7 +64,8 @@ package_structstore_py() {
     DESTDIR="$pkgdir" cmake --install build
 
     # keep only Python files
-    find "$pkgdir" -type f | sed "s@$pkgdir@@" | grep -i -v py \
+    find "$pkgdir" -type f | sed "s@$pkgdir@@" \
+        | grep -i -v -e py -e nanobind -e binding \
         | while IFS='' read f; do rm "$pkgdir/$f"; done
     find "$pkgdir" -type d -empty -delete
 }

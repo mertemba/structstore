@@ -1,9 +1,10 @@
 variables:
+  GIT_SUBMODULE_STRATEGY: recursive
   pacman_deps: cmake ninja gcc yaml-cpp
   pacman_deps_makepkg: rsync fakeroot git namcap
   pacman_deps_py: python python-pip
   pacman_deps_test: gtest gcovr
-  pacman_deps_pytest: python-pytest python-numpy nanobind
+  pacman_deps_pytest: python-pytest python-numpy
   pacman_deps_clang: clang
 
 stages:
@@ -16,6 +17,9 @@ stages:
 .aarch64:
   image: lopsided/archlinux-arm64v8:latest
   tags: [aarch64]
+.build_tests_only:
+  before_script:
+    - rm -rf cmake ext src
 
 test_devel_coverage-amd64:
   extends: [.test_devel_coverage, .amd64]
@@ -99,6 +103,7 @@ test_archlinux_cpp-aarch64:
   needs: [build_archlinux-aarch64]
 .test_archlinux_cpp:
   stage: test
+  extends: [.build_tests_only]
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_test}
     - pacman -U --noconfirm ./structstore-*.pkg.tar.zst
@@ -109,12 +114,12 @@ test_archlinux_cpp-aarch64:
 test_archlinux_py-amd64:
   extends: [.test_archlinux_py, .amd64]
   needs: [build_archlinux-amd64]
-  allow_failure: true  # lapack 3.12.1-1 causes an undefined symbol error
 test_archlinux_py-aarch64:
   extends: [.test_archlinux_py, .aarch64]
   needs: [build_archlinux-aarch64]
 .test_archlinux_py:
   stage: test
+  extends: [.build_tests_only]
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test} ${pacman_deps_pytest}
     - pacman -U --noconfirm ./structstore{,_py}-*.pkg.tar.zst
@@ -147,6 +152,7 @@ test_py_tarball-aarch64:
   needs: [build_pyproj-aarch64]
 .test_py_tarball:
   stage: test
+  extends: [.build_tests_only]
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
     - chmod a+rX -R .
@@ -161,6 +167,7 @@ test_py_wheel-aarch64:
   needs: [build_pyproj-aarch64]
 .test_py_wheel:
   stage: test
+  extends: [.build_tests_only]
   script:
     - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
     - chmod a+rX -R .

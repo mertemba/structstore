@@ -1,3 +1,10 @@
+FetchContent_Declare(nanobind
+    URL ${STRUCTSTORE_LIB_DIR}/ext/nanobind
+    SYSTEM)
+FetchContent_MakeAvailable(nanobind)
+
+include(${STRUCTSTORE_CMAKE_DIR}/NanobindStubgen.cmake)
+
 function(add_structstore_binding binding_target binding_srcs)
     nanobind_add_module(${binding_target} ${binding_srcs} NB_STATIC)
     target_link_libraries(${binding_target} PUBLIC structstore_py_lib)
