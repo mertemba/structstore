@@ -13,16 +13,12 @@ struct Track : public stst::Struct<Track> {
     Frame frame2;
     stst::OffsetPtr<Frame> frame_ptr = &frame1;
 
-    Track() : Track(stst::static_alloc) {}
-
     explicit Track(stst::SharedAlloc& sh_alloc)
         : Struct(sh_alloc), frame1{sh_alloc}, frame2{sh_alloc} {
         store_ref("frame1", frame1);
         store_ref("frame2", frame2);
         store_ref("frame_ptr", frame_ptr);
     }
-
-    Track(const Track& other) : Track() { *this = other; }
 
     Track& operator=(const Track& other) {
         copy_from(other);

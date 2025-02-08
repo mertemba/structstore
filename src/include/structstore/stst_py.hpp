@@ -52,9 +52,9 @@ private:
         const ToPythonCastFn to_python_cast_fn;
     };
 
-    static std::unordered_map<uint64_t, const PyType>& get_py_types();
+    static std::unordered_map<type_hash_t, const PyType>& get_py_types();
 
-    static const PyType& get_py_type(uint64_t type_hash);
+    static const PyType& get_py_type(type_hash_t type_hash);
 
     static StructStore& get_store(StructStore& store) { return store; }
     static StructStore& get_store(StructStoreShared& store) { return *store; }
@@ -112,7 +112,7 @@ public:
     static void register_type(FromPythonFn from_python_fn, ToPythonFn to_python_fn,
                               ToPythonCastFn to_python_cast_fn = default_to_python_cast_fn<T>) {
         PyType py_type{from_python_fn, to_python_fn, to_python_cast_fn};
-        const uint64_t type_hash = typing::get_type_hash<T>();
+        const type_hash_t type_hash = typing::get_type_hash<T>();
         STST_LOG_DEBUG() << "registering Python type '" << typing::get_type<T>().name
                          << "' with hash '" << type_hash << "'";
         auto ret = get_py_types().insert({type_hash, py_type});
@@ -201,15 +201,15 @@ public:
         register_field_map_funcs(cls);
     }
 
-    static const FromPythonFn& get_from_python_fn(uint64_t type_hash) {
+    static const FromPythonFn& get_from_python_fn(type_hash_t type_hash) {
         return get_py_type(type_hash).from_python_fn;
     }
 
-    static const ToPythonFn& get_to_python_fn(uint64_t type_hash) {
+    static const ToPythonFn& get_to_python_fn(type_hash_t type_hash) {
         return get_py_type(type_hash).to_python_fn;
     }
 
-    static const ToPythonCastFn& get_to_python_cast_fn(uint64_t type_hash) {
+    static const ToPythonCastFn& get_to_python_cast_fn(type_hash_t type_hash) {
         return get_py_type(type_hash).to_python_cast_fn;
     }
 

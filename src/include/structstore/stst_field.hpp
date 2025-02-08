@@ -26,7 +26,7 @@ protected:
     friend class FieldAccess;
 
     OffsetPtr<void> data;
-    uint64_t type_hash;
+    type_hash_t type_hash;
 
     void assert_nonempty() const {
         if (!data) { throw std::runtime_error("field is not yet initialized!"); }
@@ -53,7 +53,6 @@ protected:
             const auto& type_info = typing::get_type(type_hash);
             STST_LOG_DEBUG() << "deconstructing field " << type_info.name << " at " << data.get();
             type_info.destructor_fn(sh_alloc, data.get());
-            STST_LOG_DEBUG() << "deallocating at " << data.get();
             sh_alloc.deallocate(data.get());
         }
         data = nullptr;
@@ -82,6 +81,7 @@ protected:
             STST_LOG_DEBUG() << "allocating at " << ptr;
             const auto& type_info = typing::get_type<T>();
             STST_LOG_DEBUG() << "constructing field " << type_info.name << " at " << ptr;
+            STST_LOG_DEBUG() << "parent field at " << parent_field;
             type_info.constructor_fn(sh_alloc, ptr, parent_field);
             replace_data<T>(ptr, sh_alloc);
         }
@@ -91,7 +91,7 @@ protected:
 public:
     // constructor, assignment, destructor
 
-    Field(void* data, uint64_t type_hash) : data(data), type_hash(type_hash) {}
+    Field(void* data, type_hash_t type_hash) : data(data), type_hash(type_hash) {}
 
     Field() : Field{nullptr, 0} {}
 
@@ -116,6 +116,13 @@ public:
         }
     }
 
+    template<typename T>
+    void set_data(T* data) {
+        assert_empty();
+        this->data = data;
+        this->type_hash = typing::get_type_hash<T>();
+    }
+
     // FieldTypeBase utility functions
 
     void to_text(std::ostream& os) const;
@@ -136,7 +143,7 @@ public:
 
     [[nodiscard]] bool empty() const { return !data; }
 
-    [[nodiscard]] uint64_t get_type_hash() const { return type_hash; }
+    [[nodiscard]] type_hash_t get_type_hash() const { return type_hash; }
 
     template<typename T>
     T& get() const {
@@ -251,7 +258,7 @@ public:
 
     SharedAlloc& get_alloc() { return sh_alloc; }
 
-    [[nodiscard]] uint64_t get_type_hash() const { return field.get_type_hash(); }
+    [[nodiscard]] type_hash_t get_type_hash() const { return field.get_type_hash(); }
 
     void clear() { field.clear(sh_alloc); }
 };

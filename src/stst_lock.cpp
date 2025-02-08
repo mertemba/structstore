@@ -39,7 +39,7 @@ void SpinMutex::read_lock() {
     if (write_lock_tid == tid) {
         throw std::runtime_error("trying to acquire read lock while current thread has write lock");
     }
-    int32_t v;
+    int16_t v;
     TIMEOUT_CHECK_INIT
     do {
         while ((v = level.load(std::memory_order_relaxed)) < 0) { TIMEOUT_CHECK("read lock"); }
@@ -49,14 +49,14 @@ void SpinMutex::read_lock() {
 
 void SpinMutex::read_unlock() {
     STST_LOG_DEBUG() << "read unlocking " << this;
-    int32_t v = level.load(std::memory_order_relaxed);
+    int16_t v = level.load(std::memory_order_relaxed);
     while (!level.compare_exchange_weak(v, v - 1, std::memory_order_acquire));
     STST_LOG_DEBUG() << "read unlocked at " << this << " at level " << v - 1;
 }
 
 void SpinMutex::write_lock() {
     STST_LOG_DEBUG() << "write locking " << this;
-    int32_t v;
+    int16_t v;
     if (write_lock_tid == tid) {
         v = level.load(std::memory_order_relaxed);
         level.store(v - 1, std::memory_order_relaxed);
@@ -72,7 +72,7 @@ void SpinMutex::write_lock() {
 }
 
 void SpinMutex::write_unlock() {
-    int32_t v = level.load(std::memory_order_relaxed);
+    int16_t v = level.load(std::memory_order_relaxed);
     level.store(v + 1, std::memory_order_release);
     if (v + 1 == 0) { write_lock_tid = 0; }
     STST_LOG_DEBUG() << "write unlocked " << this;

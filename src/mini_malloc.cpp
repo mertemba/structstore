@@ -235,10 +235,7 @@ void* structstore::mm_allocate(mini_malloc* mm, size_t size) {
     int32_t left_size = node->size - size - ALLOC_NODE_SIZE;
     assert(left_size >= -ALLOC_NODE_SIZE);
     if (left_size >= ALIGN) {
-        if (left_size % ALIGN) {
-            left_size += ALIGN - size % ALIGN;
-            assert(left_size % ALIGN == 0);
-        }
+        assert(left_size % ALIGN == 0);
         size_index_type left_size_index = get_size_index_lower(left_size);
         memnode* new_node = (memnode*) (((byte*) node) + size + ALLOC_NODE_SIZE);
         new_node->size = left_size;

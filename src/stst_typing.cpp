@@ -32,17 +32,17 @@ void FieldTypeBase::read_or_write_unlock_() const {
     if (parent_field) { parent_field->read_or_write_unlock_(); }
 }
 
-std::unordered_map<std::type_index, uint64_t>& typing::get_type_hashes() {
-    static auto* types = new std::unordered_map<std::type_index, uint64_t>();
+std::unordered_map<std::type_index, type_hash_t>& typing::get_type_hashes() {
+    static auto* types = new std::unordered_map<std::type_index, type_hash_t>();
     return *types;
 }
 
-std::unordered_map<uint64_t, const TypeInfo>& typing::get_type_infos() {
-    static auto* type_infos = new std::unordered_map<uint64_t, const TypeInfo>();
+std::unordered_map<type_hash_t, const TypeInfo>& typing::get_type_infos() {
+    static auto* type_infos = new std::unordered_map<type_hash_t, const TypeInfo>();
     return *type_infos;
 }
 
-const TypeInfo& typing::get_type(uint64_t type_hash) {
+const TypeInfo& typing::get_type(type_hash_t type_hash) {
     try {
         return get_type_infos().at(type_hash);
     } catch (const std::out_of_range&) {

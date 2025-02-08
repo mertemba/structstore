@@ -201,7 +201,7 @@ if(${BUILD_WITH_PYTHON})
             DESTINATION ${STRUCTSTORE_INSTALL_LIBDIR_PY})
 
     if(NOT ${BUILD_WITH_SANITIZER})
-        nanobind_stubgen_install(structstore_py ${STRUCTSTORE_INSTALL_LIBDIR_PY})
+        # nanobind_stubgen_install(structstore_py ${STRUCTSTORE_INSTALL_LIBDIR_PY})
     endif()
 endif()
 

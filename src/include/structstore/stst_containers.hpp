@@ -28,7 +28,7 @@ public:
 // instances of this class reside in shared memory, thus no raw pointers
 // or references should be used; use structstore::OffsetPtr<T> instead.
 class List : public FieldType<List> {
-    OffsetPtr<SharedAlloc> sh_alloc;
+    OffsetPtr<SharedAlloc, int64_t> sh_alloc;
     shr_vector<Field> data;
 
 public:

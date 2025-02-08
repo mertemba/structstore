@@ -16,7 +16,10 @@ class py;
 // instances of this class reside in shared memory, thus no raw pointers
 // or references should be used; use structstore::OffsetPtr<T> instead.
 class StructStore : public FieldType<StructStore> {
-    friend class py;
+    friend class ::structstore::typing;
+    friend class ::structstore::SharedAlloc;
+    friend class ::structstore::StructStoreShared;
+    friend class ::structstore::py;
 
 public:
     static const TypeInfo& type_info;
@@ -24,12 +27,12 @@ public:
 protected:
     FieldMap<true> field_map;
 
-public:
-    // constructor, assignment, destructor
-
     explicit StructStore(SharedAlloc& sh_alloc) : field_map(sh_alloc) {}
 
     StructStore(const StructStore& other) : StructStore{static_alloc} { *this = other; }
+
+public:
+    // constructor, assignment, destructor
 
     StructStore& operator=(const StructStore& other) {
         field_map.copy_from(other.field_map, this);

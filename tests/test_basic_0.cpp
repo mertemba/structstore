@@ -26,7 +26,8 @@ struct Settings {
 };
 
 TEST(StructStoreTestBasic, refStructInLocalStore) {
-    stst::StructStore store(stst::static_alloc);
+    auto store_ptr = stst::create<stst::StructStore>();
+    stst::StructStore& store = *store_ptr;
     store["num"] = 5;
     std::ostringstream str;
     str << store;
@@ -45,7 +46,8 @@ TEST(StructStoreTestBasic, refStructInLocalStore) {
         ++i;
     }
     EXPECT_EQ(list.size(), 2);
-    list.push_back(stst::StructStore(stst::static_alloc));
+    auto store_ptr2 = stst::create<stst::StructStore>();
+    list.push_back(*store_ptr2);
     list.check();
     EXPECT_EQ(list.size(), 3);
     for (stst::Field& field: list) {
@@ -89,9 +91,11 @@ TEST(StructStoreTestBasic, sharedStore) {
 }
 
 TEST(StructStoreTestBasic, cmpEqual) {
-    stst::StructStore store1(stst::static_alloc);
+    auto store_ptr1 = stst::create<stst::StructStore>();
+    stst::StructStore& store1 = *store_ptr1;
     Settings settings1{store1};
-    stst::StructStore store2(stst::static_alloc);
+    auto store_ptr2 = stst::create<stst::StructStore>();
+    stst::StructStore& store2 = *store_ptr2;
     Settings settings2{store2};
     EXPECT_EQ(store1, store2);
     settings2.subsettings.substr += '.';
@@ -115,11 +119,14 @@ TEST(StructStoreTestBasic, cmpEqualShared) {
 }
 
 TEST(StructStoreTestBasic, copyStore) {
-    stst::StructStore store(stst::static_alloc);
+    auto store_ptr = stst::create<stst::StructStore>();
+    stst::StructStore& store = *store_ptr;
     int& num = store["num"];
     num = 5;
     store["str"].get_str() = "foo";
-    stst::StructStore store2 = store;
+    auto store_ptr2 = stst::create<stst::StructStore>();
+    stst::StructStore& store2 = *store_ptr2;
+    store2 = store;
     EXPECT_EQ(store2["num"].get<int>(), 5);
     store.check();
     store2.check();

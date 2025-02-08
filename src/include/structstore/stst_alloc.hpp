@@ -6,6 +6,7 @@
 #include "structstore/stst_callstack.hpp"
 #include "structstore/stst_lock.hpp"
 #include "structstore/stst_offsetptr.hpp"
+#include "structstore/stst_utils.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -15,6 +16,7 @@
 #include <memory>
 #include <sstream>
 #include <stdexcept>
+#include <type_traits>
 
 namespace structstore {
 
@@ -29,9 +31,8 @@ class SharedAlloc {
     // member variables
     OffsetPtr<mini_malloc> mm;
     SpinMutex mutex;
-    const size_t blocksize;
+    const uint32_t blocksize;
     OffsetPtr<StringStorage> string_storage;
-    std::function<void(const void*)> deleter = [this](const void* ptr) { deallocate(ptr); };
 
 public:
     SharedAlloc(void* buffer, size_t size);
@@ -62,11 +63,13 @@ public:
             str << "insufficient space in sh_alloc region, requested: " << field_size;
             Callstack::throw_with_trace<std::runtime_error>(str.str());
         }
-        assert((uint64_t) ptr % ALIGN == 0);
+        assert((size_t) ptr % ALIGN == 0);
+        STST_LOG_DEBUG() << "allocating " << typeid(T).name() << " at " << ptr;
         return (T*) ptr;
     }
 
     void deallocate(const void* ptr) {
+        STST_LOG_DEBUG() << "deallocating at " << ptr;
         ScopedLock<true> lock{mutex};
         mm_free(mm.get(), ptr);
     }
@@ -74,7 +77,13 @@ public:
     template<typename T, typename... Args>
     std::shared_ptr<T> allocate_smart(Args&&... args) {
         T* ptr = allocate<T>();
+        STST_LOG_DEBUG() << "shared_ptr alloc at " << ptr;
         new (ptr) T(args...);
+        std::function<void(const void*)> deleter = [this](const void* ptr) {
+            STST_LOG_DEBUG() << "shared_ptr dealloc at " << ptr;
+            if constexpr (std::is_destructible_v<T>) { ((T*) ptr)->~T(); }
+            deallocate(ptr);
+        };
         return {ptr, deleter};
     }
 
@@ -99,7 +108,12 @@ public:
     inline const StringStorage& strings() const { return *string_storage.get(); }
 };
 
-extern SharedAlloc static_alloc;
+extern SharedAlloc& static_alloc;
+
+template<typename T>
+std::shared_ptr<T> create() {
+    return static_alloc.allocate_smart<T>(static_alloc);
+}
 
 template<typename T = char>
 class StlAllocator {
@@ -110,7 +124,7 @@ class StlAllocator {
 
 public:
     using value_type = T;
-    using pointer = OffsetPtr<T>;
+    using pointer = OffsetPtr<T, int64_t>;
 
     explicit StlAllocator(SharedAlloc& a) : sh_alloc(a) {}
 
@@ -120,8 +134,8 @@ public:
     T* allocate(std::size_t n) { return static_cast<T*>(sh_alloc.allocate(n * sizeof(T))); }
 
     void deallocate(T* p, std::size_t) { sh_alloc.deallocate(p); }
-
-    void deallocate(const OffsetPtr<T>& p, std::size_t) { sh_alloc.deallocate(p.get()); }
+    void deallocate(const OffsetPtr<T, int32_t>& p, std::size_t) { sh_alloc.deallocate(p.get()); }
+    void deallocate(const OffsetPtr<T, int64_t>& p, std::size_t) { sh_alloc.deallocate(p.get()); }
 
     void construct(T* p) {
         if constexpr (std::is_constructible_v<T, SharedAlloc&>) {

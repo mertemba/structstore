@@ -46,7 +46,8 @@ void from_store(stst::StructStore& store, Settings& settings) {
 TEST(StructStoreTestBasic, structInStaticStore) {
     Settings settings;
 
-    stst::StructStore store(stst::static_alloc);
+    auto store_ptr = stst::create<stst::StructStore>();
+    stst::StructStore& store = *store_ptr;
     to_store(store, settings);
     std::ostringstream str;
     str << store;

@@ -139,8 +139,9 @@ public:
                          << " with alloc at " << &sh_alloc
                          << " (static alloc: " << (sh_alloc.get() == &static_alloc) << ")";
         shr_string_idx name_idx = sh_alloc->strings().internalize(name, *sh_alloc);
-        auto ret = fields.emplace(name_idx, Field{&t});
-        if (!ret.second) { throw std::runtime_error("field name already exists"); }
+        auto [it, inserted] = fields.emplace(name_idx, Field{});
+        if (!inserted) { throw std::runtime_error("field name already exists"); }
+        it->second.set_data(&t);
         slots.emplace_back(name_idx);
         STST_LOG_DEBUG() << "field " << name << " at " << &t;
         if constexpr (std::is_class_v<T> && !std::is_base_of_v<OffsetPtrBase<>, T>) {

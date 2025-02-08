@@ -27,6 +27,6 @@ function(add_structstore_binding binding_target binding_srcs)
     target_include_directories(${binding_target} SYSTEM PRIVATE ${NB_INC_DIRS})
 
     if(NOT ${BUILD_WITH_SANITIZER})
-        nanobind_stubgen(${binding_target})
+        # nanobind_stubgen(${binding_target})
     endif()
 endfunction()

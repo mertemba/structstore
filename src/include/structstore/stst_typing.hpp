@@ -17,6 +17,8 @@
 
 namespace structstore {
 
+using type_hash_t = uint32_t;
+
 class StructStore;
 
 template<typename T>
@@ -30,8 +32,8 @@ protected:
     friend class ScopedFieldLock;
     friend class py;
 
-    OffsetPtr<const FieldTypeBase> parent_field = nullptr;
     mutable SpinMutex mutex = {};
+    OffsetPtr<const FieldTypeBase> parent_field = nullptr;
 
     FieldTypeBase() {}
     FieldTypeBase(const FieldTypeBase&) {}
@@ -103,7 +105,7 @@ public:
     using CopyFn = std::function<void(SharedAlloc&, void*, const void*)>;
 
     struct TypeInfo {
-        uint64_t type_hash;
+        type_hash_t type_hash;
         std::string name;
         size_t size;
         ConstructorFn constructor_fn;
@@ -124,7 +126,7 @@ private:
         ti.type_hash = -1;
         ti.name = name;
         ti.size = sizeof(T);
-        if constexpr (std::is_constructible_v<T, SharedAlloc&>) {
+        if constexpr (std::is_constructible_v<T, SharedAlloc&> || std::is_same_v<T, StructStore>) {
             ti.constructor_fn = [](SharedAlloc& sh_alloc, void* t,
                                    const FieldTypeBase* parent_field) {
                 new (t) T(sh_alloc);
@@ -215,13 +217,13 @@ private:
         return t;
     }
 
-    static std::unordered_map<std::type_index, uint64_t>& get_type_hashes();
+    static std::unordered_map<std::type_index, type_hash_t>& get_type_hashes();
 
-    static std::unordered_map<uint64_t, const TypeInfo>& get_type_infos();
+    static std::unordered_map<type_hash_t, const TypeInfo>& get_type_infos();
 
     template<typename T>
     static const TypeInfo& register_type_internal(const std::string& name) {
-        uint64_t type_hash = const_hash(name.c_str());
+        type_hash_t type_hash = const_hash(name.c_str());
         if constexpr (std::is_void_v<T>) {
             type_hash = 0;
         } else {
@@ -269,7 +271,7 @@ private:
     }
 
 public:
-    static std::runtime_error already_registered_type_error(uint64_t type_hash) {
+    static std::runtime_error already_registered_type_error(type_hash_t type_hash) {
         std::ostringstream str;
         str << "type already registered: " << get_type(type_hash).name;
         return std::runtime_error(str.str());
@@ -282,7 +284,7 @@ public:
     }
 
     template<typename T>
-    static uint64_t get_type_hash() {
+    static type_hash_t get_type_hash() {
         static_assert(typing::is_field_type<T>);
         if constexpr (std::is_class_v<T> && !std::is_base_of_v<OffsetPtrBase<>, T>) {
             static_assert(std::is_base_of_v<FieldType<T>, T>);
@@ -299,7 +301,7 @@ public:
         }
     }
 
-    static const TypeInfo& get_type(uint64_t type_hash);
+    static const TypeInfo& get_type(type_hash_t type_hash);
 
     template<typename T>
     inline static const TypeInfo& get_type() {

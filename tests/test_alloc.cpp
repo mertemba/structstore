@@ -5,11 +5,12 @@
 namespace stst = structstore;
 
 TEST(StructStoreTestAlloc, structSizes) {
-    EXPECT_EQ(sizeof(stst::FieldTypeBase), 16);
-    EXPECT_EQ(sizeof(stst::Field), 16);
+    EXPECT_EQ(sizeof(stst::SpinMutex), 8);
+    EXPECT_EQ(sizeof(stst::FieldTypeBase), 12);
+    EXPECT_EQ(sizeof(stst::Field), 8);
     EXPECT_EQ(sizeof(stst::String), 56);
     EXPECT_EQ(sizeof(stst::StructStore), 136);
-    EXPECT_EQ(sizeof(stst::SharedAlloc), 64);
+    EXPECT_EQ(sizeof(stst::SharedAlloc), 20);
 }
 
 TEST(StructStoreTestAlloc, bigAlloc) {

@@ -14,12 +14,12 @@ namespace nb = nanobind;
 
 nb::object py::SimpleNamespace;
 
-std::unordered_map<uint64_t, const py::PyType>& py::get_py_types() {
-    static auto* from_python_fns = new std::unordered_map<uint64_t, const py::PyType>();
+std::unordered_map<type_hash_t, const py::PyType>& py::get_py_types() {
+    static auto* from_python_fns = new std::unordered_map<type_hash_t, const py::PyType>();
     return *from_python_fns;
 }
 
-const py::PyType& py::get_py_type(uint64_t type_hash) {
+const py::PyType& py::get_py_type(type_hash_t type_hash) {
     try {
         return py::get_py_types().at(type_hash);
     } catch (const std::out_of_range&) {

@@ -51,9 +51,6 @@ NB_MODULE(MODULE_NAME, m) {
 
     // structstore::StructStore
     nb::class_<StructStore> cls = nb::class_<StructStore>{m, "StructStore"};
-    cls.def("__init__", [](StructStore* store) {
-        new (store) StructStore(static_alloc);
-    });
     py::ToPythonFn structstore_to_python_fn = [](const Field& field, py::ToPythonMode mode) -> nb::object {
         auto& store = field.get<StructStore>();
         return py::structstore_to_python(store, mode);

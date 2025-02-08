@@ -16,10 +16,10 @@ class SpinMutex {
     // randomly assigned pseudo thread id
     static thread_local uint32_t tid;
 
-    // >0 is read-locked, 0 is unlocked, <0 is write-locked
-    std::atomic_int32_t level{0};
     // thread id currently holding the write lock, or zero
     uint32_t write_lock_tid{0};
+    // >0 is read-locked, 0 is unlocked, <0 is write-locked
+    std::atomic_int16_t level{0};
 
     SpinMutex(SpinMutex&&) = delete;
 
