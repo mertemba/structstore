@@ -78,8 +78,7 @@ protected:
     template<typename T>
     T& get_or_construct(SharedAlloc& sh_alloc, const FieldTypeBase* parent_field) {
         if (empty()) {
-            StlAllocator<T> tmp_alloc{sh_alloc};
-            void* ptr = tmp_alloc.allocate(1);
+            T* ptr = sh_alloc.allocate<T>();
             STST_LOG_DEBUG() << "allocating at " << ptr;
             const auto& type_info = typing::get_type<T>();
             STST_LOG_DEBUG() << "constructing field " << type_info.name << " at " << ptr;

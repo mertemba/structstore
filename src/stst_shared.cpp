@@ -9,7 +9,7 @@ using namespace structstore;
 
 StructStoreShared::SharedData::SharedData(size_t size, size_t bufsize, void* buffer)
     : size{size}, usage_count{1}, sh_alloc{buffer, bufsize}, invalidated{false} {
-    store = StlAllocator<StructStore>(sh_alloc).allocate(1);
+    store = sh_alloc.allocate<StructStore>();
     new (store.get()) StructStore(sh_alloc);
 }
 

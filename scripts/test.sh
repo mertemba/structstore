@@ -18,7 +18,7 @@ if [ ! -z "$BUILD_WITH_VENV" ]; then
     fi
 fi
 
-cmake "$srcdir/tests" -GNinja -DCMAKE_BUILD_TYPE=Debug $cmake_options
+cmake "$srcdir/tests" -GNinja $cmake_options
 ninja
 ctest --output-on-failure
 if [ ! -z "$BUILD_WITH_PYTHON" ]; then

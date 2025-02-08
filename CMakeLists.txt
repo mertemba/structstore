@@ -212,6 +212,10 @@ foreach(TARGET ${STRUCTSTORE_LIB_TARGETS} ${STRUCTSTORE_PY_TARGETS})
             PUBLIC
             "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/include>"
             "$<INSTALL_INTERFACE:${STRUCTSTORE_INSTALL_INCLUDEDIR}>")
+    target_include_directories(${TARGET}
+            SYSTEM PUBLIC
+            "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/ext/ankerl_unordered_dense/include>"
+            "$<INSTALL_INTERFACE:${STRUCTSTORE_INSTALL_LIBDIR}/ext/ankerl_unordered_dense/include>")
 endforeach()
 
 # inspired by https://stackoverflow.com/a/49857699

@@ -19,13 +19,13 @@ namespace structstore {
 class FieldMapBase {
 protected:
     OffsetPtr<SharedAlloc> sh_alloc;
-    shr_unordered_map<shr_string_ptr, Field, OffsetPtrHasher> fields;
-    shr_vector<shr_string_ptr> slots;
+    shr_unordered_map<shr_string_idx, Field> fields;
+    shr_vector<shr_string_idx> slots;
 
     // constructor, assignment, destructor
 
     explicit FieldMapBase(SharedAlloc& sh_alloc)
-        : sh_alloc(&sh_alloc), fields(0, OffsetPtrHasher{this}, StlAllocator<>(sh_alloc)),
+        : sh_alloc(&sh_alloc), fields(0, StlAllocator<>(sh_alloc)),
           slots(StlAllocator<>(sh_alloc)) {
         STST_LOG_DEBUG() << "constructing FieldMap at " << this << " with alloc at " << &sh_alloc
                          << " (static alloc: " << (&sh_alloc == &static_alloc) << ")";
@@ -54,21 +54,23 @@ public:
 
     inline const SharedAlloc& get_alloc() const { return *sh_alloc; }
 
-    inline const shr_vector<shr_string_ptr>& get_slots() const { return slots; }
+    inline const shr_vector<shr_string_idx>& get_slots() const { return slots; }
 
     Field* try_get_field(const std::string& name);
 
     const Field* try_get_field(const std::string& name) const;
 
-    inline Field& at(const std::string& name) { return fields.at(sh_alloc->strings().get(name)); }
-
-    inline const Field& at(const std::string& name) const {
-        return fields.at(sh_alloc->strings().get(name));
+    inline Field& at(const std::string& name) {
+        return fields.at(sh_alloc->strings().get_idx(name, *sh_alloc));
     }
 
-    inline Field& at(shr_string_ptr name) { return fields.at(name); }
+    inline const Field& at(const std::string& name) const {
+        return fields.at(sh_alloc->strings().get_idx(name, *sh_alloc));
+    }
 
-    inline const Field& at(shr_string_ptr name) const { return fields.at(name); }
+    inline Field& at(shr_string_idx name_idx) { return fields.at(name_idx); }
+
+    inline const Field& at(shr_string_idx name_idx) const { return fields.at(name_idx); }
 };
 
 // managed means the contained fields are allocated and constructed.
@@ -136,12 +138,12 @@ public:
         STST_LOG_DEBUG() << "registering unmanaged data at " << &t << "in FieldMap at " << this
                          << " with alloc at " << &sh_alloc
                          << " (static alloc: " << (sh_alloc.get() == &static_alloc) << ")";
-        const shr_string* name_int = sh_alloc->strings().internalize(name);
-        auto ret = fields.emplace(name_int, Field{&t});
+        shr_string_idx name_idx = sh_alloc->strings().internalize(name, *sh_alloc);
+        auto ret = fields.emplace(name_idx, Field{&t});
         if (!ret.second) { throw std::runtime_error("field name already exists"); }
-        slots.emplace_back(name_int);
+        slots.emplace_back(name_idx);
         STST_LOG_DEBUG() << "field " << name << " at " << &t;
-        if constexpr (std::is_class_v<T> && !std::is_base_of_v<OffsetPtrBase, T>) {
+        if constexpr (std::is_class_v<T> && !std::is_base_of_v<OffsetPtrBase<>, T>) {
             t.parent_field = &parent_field;
         }
     }
@@ -168,11 +170,11 @@ public:
 
     void remove(const std::string& name) {
         static_assert(managed, "removing fields from unmanaged FieldMap is not supported");
-        const shr_string* name_ = sh_alloc->strings().get(name);
-        Field& field = fields.at(name_);
+        shr_string_idx name_idx = sh_alloc->strings().get_idx(name, *sh_alloc);
+        Field& field = fields.at(name_idx);
         field.clear(*sh_alloc);
-        fields.erase(name_);
-        auto slot_it = std::find(slots.begin(), slots.end(), name_);
+        fields.erase(name_idx);
+        auto slot_it = std::find(slots.begin(), slots.end(), name_idx);
         slots.erase(slot_it);
     }
 };

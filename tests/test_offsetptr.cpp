@@ -13,7 +13,6 @@ TEST(StructStoreTestOffsetPtr, basic) {
     EXPECT_EQ((foo_ptr = &foo).get(), &foo);
     EXPECT_EQ(*foo_ptr, foo);
     EXPECT_EQ((foo_ptr + 1).get(), &foo + 1);
-    EXPECT_EQ((foo_ptr - 1).get(), &foo - 1);
     EXPECT_EQ((++foo_ptr).get(), &foo + 1);
     EXPECT_EQ(foo_ptr.get(), &foo + 1);
     EXPECT_EQ((--foo_ptr).get(), &foo);

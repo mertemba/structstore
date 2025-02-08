@@ -1,6 +1,7 @@
 #ifndef STST_ALLOC_HPP
 #define STST_ALLOC_HPP
 
+#include "ankerl/unordered_dense.h"
 #include "structstore/mini_malloc.hpp"
 #include "structstore/stst_callstack.hpp"
 #include "structstore/stst_lock.hpp"
@@ -11,9 +12,9 @@
 #include <cstddef>
 #include <cstring>
 #include <functional>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
-#include <unordered_set>
 
 namespace structstore {
 
@@ -30,6 +31,7 @@ class SharedAlloc {
     SpinMutex mutex;
     const size_t blocksize;
     OffsetPtr<StringStorage> string_storage;
+    std::function<void(const void*)> deleter = [this](const void* ptr) { deallocate(ptr); };
 
 public:
     SharedAlloc(void* buffer, size_t size);
@@ -64,9 +66,16 @@ public:
         return (T*) ptr;
     }
 
-    void deallocate(void* ptr) {
+    void deallocate(const void* ptr) {
         ScopedLock<true> lock{mutex};
         mm_free(mm.get(), ptr);
+    }
+
+    template<typename T, typename... Args>
+    std::shared_ptr<T> allocate_smart(Args&&... args) {
+        T* ptr = allocate<T>();
+        new (ptr) T(args...);
+        return {ptr, deleter};
     }
 
     bool is_owned(const void* ptr) const {
@@ -86,6 +95,8 @@ public:
     }
 
     inline StringStorage& strings() { return *string_storage.get(); }
+
+    inline const StringStorage& strings() const { return *string_storage.get(); }
 };
 
 extern SharedAlloc static_alloc;
@@ -112,17 +123,22 @@ public:
 
     void deallocate(const OffsetPtr<T>& p, std::size_t) { sh_alloc.deallocate(p.get()); }
 
-    // defined in stst_typing.hpp
-    inline void construct(T* p);
+    void construct(T* p) {
+        if constexpr (std::is_constructible_v<T, SharedAlloc&>) {
+            new (p) T(sh_alloc);
+        } else if constexpr (std::is_constructible_v<T, const StlAllocator<T>&>) {
+            new (p) T(StlAllocator<T>{sh_alloc});
+        } else {
+            new (p) T();
+        }
+    }
 
     void construct(T* p, T&& other) {
-        construct(p);
-        *p = std::move(other);
+        new (p) T(std::move(other));
     }
 
     void construct(T* p, const T& other) {
-        construct(p);
-        *p = other;
+        new (p) T(other);
     }
 
     template<typename U>
@@ -140,31 +156,33 @@ public:
 
 using shr_string = std::basic_string<char, std::char_traits<char>, StlAllocator<char>>;
 
-using shr_string_ptr = OffsetPtr<const shr_string>;
+using shr_string_idx = uint16_t;
 
 template<class T>
 using shr_vector = std::vector<T, StlAllocator<T>>;
 
-template<class K, class T, class H = std::hash<K>>
-using shr_unordered_map =
-        std::unordered_map<K, T, H, std::equal_to<K>, StlAllocator<std::pair<const K, T>>>;
+template<class K, class T, class H = ankerl::unordered_dense::hash<K>>
+using shr_unordered_map = ankerl::unordered_dense::map<K, T, H, std::equal_to<K>,
+                                                       StlAllocator<std::pair<const K, T>>>;
 
-template<class T, class H = std::hash<T>>
-using shr_unordered_set = std::unordered_set<T, H, std::equal_to<T>, StlAllocator<T>>;
+template<class K, class H = ankerl::unordered_dense::hash<K>>
+using shr_unordered_set = ankerl::unordered_dense::set<K, H, std::equal_to<K>, StlAllocator<K>>;
 
 // instances of this class reside in shared memory, thus no raw pointers
 // or references should be used; use structstore::OffsetPtr<T> instead.
 class StringStorage {
-    OffsetPtr<SharedAlloc> sh_alloc;
-    shr_unordered_set<shr_string> data;
-    SpinMutex mutex;
+    shr_unordered_map<shr_string, shr_string_idx> map;
+    shr_vector<shr_string> data;
+    mutable SpinMutex mutex;
 
 public:
-    StringStorage(SharedAlloc& sh_alloc) : sh_alloc{&sh_alloc}, data{StlAllocator<int>(sh_alloc)} {}
+    StringStorage(SharedAlloc& sh_alloc);
 
-    const shr_string* internalize(const std::string& str);
+    shr_string_idx internalize(const std::string& str, SharedAlloc& sh_alloc);
 
-    const shr_string* get(const std::string& str);
+    shr_string_idx get_idx(const std::string& str, SharedAlloc& sh_alloc) const;
+
+    const shr_string* get(shr_string_idx idx) const;
 };
 
 } // namespace structstore

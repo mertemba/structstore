@@ -8,10 +8,11 @@
 
 namespace structstore {
 
+template<int i = 0>
 class OffsetPtrBase {};
 
 template<typename T>
-class OffsetPtr : public OffsetPtrBase {
+class OffsetPtr : public OffsetPtrBase<> {
     static constexpr std::ptrdiff_t empty_val = 1;
     std::ptrdiff_t offset = empty_val;
 
@@ -23,7 +24,7 @@ class OffsetPtr : public OffsetPtrBase {
 
 public:
     // using element_type = T;
-    using pointer = T*;
+    using pointer = OffsetPtr<T>;
     // using const_pointer = const T*;
     using difference_type = std::ptrdiff_t;
     using value_type = T;

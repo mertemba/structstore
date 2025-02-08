@@ -86,7 +86,7 @@ public:
     template<typename T>
     constexpr static bool is_field_type =
             !std::is_pointer_v<T> && (std::is_base_of_v<FieldType<T>, T> ||
-                                      std::is_base_of_v<OffsetPtrBase, T> || !std::is_class_v<T>);
+                                      std::is_base_of_v<OffsetPtrBase<>, T> || !std::is_class_v<T>);
 
     using ConstructorFn = std::function<void(SharedAlloc&, void*, const FieldTypeBase*)>;
 
@@ -174,7 +174,7 @@ private:
     template<typename T>
     static TypeInfo create_ptr_type_info(const std::string name) {
         static_assert(!std::is_pointer_v<T>);
-        static_assert(std::is_base_of_v<OffsetPtrBase, T>);
+        static_assert(std::is_base_of_v<OffsetPtrBase<>, T>);
         TypeInfo ti;
         ti.type_hash = -1;
         ti.name = name;
@@ -231,7 +231,7 @@ private:
                 throw std::runtime_error(str.str());
             }
         }
-        if constexpr (std::is_class_v<T> && !std::is_base_of_v<OffsetPtrBase, T>) {
+        if constexpr (std::is_class_v<T> && !std::is_base_of_v<OffsetPtrBase<>, T>) {
             static_assert(std::is_base_of_v<FieldType<T>, T>);
             FieldType<T>::check_interface();
         }
@@ -243,7 +243,7 @@ private:
         TypeInfo type_info;
         if constexpr (std::is_void_v<T>) {
             type_info = create_void_type_info("void");
-        } else if constexpr (std::is_base_of_v<OffsetPtrBase, T>) {
+        } else if constexpr (std::is_base_of_v<OffsetPtrBase<>, T>) {
             type_info = create_ptr_type_info<T>(name);
         } else {
             type_info = create_type_info<T>(name);
@@ -259,7 +259,7 @@ private:
                 throw std::runtime_error(str.str());
             }
         }
-        if constexpr (!std::is_base_of_v<OffsetPtrBase, T> && !std::is_void_v<T>) {
+        if constexpr (!std::is_base_of_v<OffsetPtrBase<>, T> && !std::is_void_v<T>) {
             // register corresponding pointer type
             register_type_internal<OffsetPtr<T>>(name + "_ptr");
         }
@@ -284,7 +284,7 @@ public:
     template<typename T>
     static uint64_t get_type_hash() {
         static_assert(typing::is_field_type<T>);
-        if constexpr (std::is_class_v<T> && !std::is_base_of_v<OffsetPtrBase, T>) {
+        if constexpr (std::is_class_v<T> && !std::is_base_of_v<OffsetPtrBase<>, T>) {
             static_assert(std::is_base_of_v<FieldType<T>, T>);
             return T::type_info.type_hash;
         } else if constexpr (std::is_void_v<T>) {
@@ -312,15 +312,6 @@ public:
 using TypeInfo = typing::TypeInfo;
 template<typename T>
 using FieldType = typing::FieldType<T>;
-
-template<typename T>
-inline void StlAllocator<T>::construct(T* p) {
-    if constexpr (std::is_base_of_v<FieldType<T>, T>) {
-        T::type_info.constructor_fn(sh_alloc, p);
-    } else {
-        new (p) T;
-    }
-}
 
 } // namespace structstore
 

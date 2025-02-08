@@ -338,8 +338,9 @@ public:
 
         cls.def("__dir__", [](T& t) {
             nb::list slots;
-            for (shr_string_ptr str: get_field_map(t).get_slots()) {
-                slots.append(nb::str(str->c_str()));
+            const auto& field_map = get_field_map(t);
+            for (shr_string_idx str_idx: field_map.get_slots()) {
+                slots.append(nb::str(field_map.get_alloc().strings().get(str_idx)->c_str()));
             }
             return slots;
         });

@@ -62,6 +62,21 @@ test_devel_sanitize-aarch64:
     - su nobody -s /bin/bash -c "cmake --build build"
     - su nobody -s /bin/bash -c "./scripts/devel_test.sh"
 
+test_devel_release-amd64:
+  extends: [.test_devel_release, .amd64]
+test_devel_release-aarch64:
+  extends: [.test_devel_release, .aarch64]
+.test_devel_release:
+  stage: test
+  needs: []
+  script:
+    - pacman -Syu --noconfirm --needed ${pacman_deps} ${pacman_deps_py} ${pacman_deps_test}
+    - chmod a+rX -R .
+    - usermod -e -1 nobody
+    - su nobody -s /bin/bash -c "BUILD_RELEASE=ON ./scripts/devel_setup.sh"
+    - su nobody -s /bin/bash -c "cmake --build build"
+    - su nobody -s /bin/bash -c "./scripts/devel_test.sh"
+
 test_devel_clang-amd64:
   extends: [.test_devel_clang, .amd64]
 test_devel_clang-aarch64:

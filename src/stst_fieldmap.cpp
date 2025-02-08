@@ -7,7 +7,9 @@ using namespace structstore;
 bool FieldMapBase::equal_slots(const FieldMapBase& other) const {
     if (slots.size() != other.slots.size()) return false;
     for (auto it1 = slots.begin(), it2 = other.slots.begin(); it1 != slots.end(); ++it1, ++it2) {
-        if (**it1 != **it2) { return false; }
+        if (*sh_alloc->strings().get(*it1) != *other.sh_alloc->strings().get(*it2)) {
+            return false;
+        }
     }
     return true;
 }
@@ -15,22 +17,24 @@ bool FieldMapBase::equal_slots(const FieldMapBase& other) const {
 bool FieldMapBase::operator==(const FieldMapBase& other) const {
     if (slots.size() != other.slots.size()) return false;
     for (auto it1 = slots.begin(), it2 = other.slots.begin(); it1 != slots.end(); ++it1, ++it2) {
-        if (**it1 != **it2) { return false; }
+        if (*sh_alloc->strings().get(*it1) != *other.sh_alloc->strings().get(*it2)) {
+            return false;
+        }
         if (fields.at(*it1) != other.fields.at(*it2)) { return false; }
     }
     return true;
 }
 
 Field* FieldMapBase::try_get_field(const std::string& name) {
-    const shr_string* name_ = sh_alloc->strings().get(name);
-    auto it = fields.find(name_);
+    shr_string_idx name_idx = sh_alloc->strings().get_idx(name, *sh_alloc);
+    auto it = fields.find(name_idx);
     if (it == fields.end()) { return nullptr; }
     return &it->second;
 }
 
 const Field* FieldMapBase::try_get_field(const std::string& name) const {
-    const shr_string* name_ = sh_alloc->strings().get(name);
-    auto it = fields.find(name_);
+    shr_string_idx name_idx = sh_alloc->strings().get_idx(name, *sh_alloc);
+    auto it = fields.find(name_idx);
     if (it == fields.end()) { return nullptr; }
     return &it->second;
 }
@@ -38,10 +42,11 @@ const Field* FieldMapBase::try_get_field(const std::string& name) const {
 void FieldMapBase::to_text(std::ostream& os) const {
     STST_LOG_DEBUG() << "serializing StructStore at " << this;
     os << "{";
-    for (shr_string_ptr name: slots) {
-        STST_LOG_DEBUG() << "field " << *name << " is at " << &fields.at(name);
+    for (shr_string_idx name_idx: slots) {
+        const shr_string* name = sh_alloc->strings().get(name_idx);
+        STST_LOG_DEBUG() << "field " << *name << " is at " << &fields.at(name_idx);
         os << '"' << *name << "\":";
-        fields.at(name).to_text(os);
+        fields.at(name_idx).to_text(os);
         os << ",";
     }
     os << "}";
@@ -49,7 +54,10 @@ void FieldMapBase::to_text(std::ostream& os) const {
 
 YAML::Node FieldMapBase::to_yaml() const {
     YAML::Node root(YAML::NodeType::Map);
-    for (shr_string_ptr name: slots) { root[name->c_str()] = fields.at(name).to_yaml(); }
+    for (shr_string_idx name_idx: slots) {
+        const shr_string* name = sh_alloc->strings().get(name_idx);
+        root[name->c_str()] = fields.at(name_idx).to_yaml();
+    }
     return root;
 }
 
@@ -66,9 +74,11 @@ void FieldMapBase::check(const SharedAlloc* sh_alloc, const FieldTypeBase& paren
     if (slots.size() != fields.size()) {
         throw std::runtime_error("in FieldMap: slots and fields with different size");
     }
-    for (shr_string_ptr str: slots) { stst_assert(sh_alloc->is_owned(str.get())); }
-    for (const auto& [key, value]: fields) {
-        stst_assert(sh_alloc->is_owned(key.get()));
+    for (shr_string_idx idx: slots) {
+        stst_assert(sh_alloc->is_owned(sh_alloc->strings().get(idx)));
+    }
+    for (const auto& [idx, value]: fields) {
+        stst_assert(sh_alloc->is_owned(sh_alloc->strings().get(idx)));
         value.check(*sh_alloc, parent_field);
     }
 }
@@ -92,21 +102,20 @@ void FieldMap<true>::copy_from_managed(const FieldMap<true>& other,
     // managed copy: clear and insert the other contents
     STST_LOG_DEBUG() << "copying FieldMap from " << &other << " into " << this;
     clear();
-    for (shr_string_ptr str: other.get_slots()) {
-        const shr_string* name_int = sh_alloc->strings().internalize(std::string(*str));
-        slots.emplace_back(name_int);
-        Field& field = fields.emplace(name_int, Field{}).first->second;
-        field.construct_copy_from(*sh_alloc, other.fields.at(str), parent_field);
+    for (shr_string_idx name_idx_other: other.get_slots()) {
+        const shr_string* name_other = other.sh_alloc->strings().get(name_idx_other);
+        shr_string_idx name_idx =
+                sh_alloc->strings().internalize(std::string(*name_other), *sh_alloc);
+        slots.emplace_back(name_idx);
+        Field& field = fields.emplace(name_idx, Field{}).first->second;
+        field.construct_copy_from(*sh_alloc, other.fields.at(name_idx_other), parent_field);
     }
 }
 
 template<>
 Field& FieldMap<true>::get_or_insert(const std::string& name) {
-    auto it = fields.find(sh_alloc->strings().get(name));
-    if (it == fields.end()) {
-        const shr_string* name_int = sh_alloc->strings().internalize(name);
-        it = fields.emplace(name_int, Field{}).first;
-        slots.emplace_back(name_int);
-    }
+    shr_string_idx name_idx = sh_alloc->strings().internalize(name, *sh_alloc);
+    auto [it, inserted] = fields.emplace(name_idx, Field{});
+    if (inserted) { slots.emplace_back(name_idx); }
     return it->second;
 }

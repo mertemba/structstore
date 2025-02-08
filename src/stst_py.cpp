@@ -32,12 +32,12 @@ const py::PyType& py::get_py_type(uint64_t type_hash) {
 __attribute__((__visibility__("default"))) nb::object
 py::field_map_to_python(const FieldMapBase& field_map, py::ToPythonMode mode) {
     auto obj = SimpleNamespace();
-    for (shr_string_ptr str: field_map.get_slots()) {
-        auto key = nb::str(str->c_str());
+    for (shr_string_idx str_idx: field_map.get_slots()) {
+        auto key = nb::str(field_map.get_alloc().strings().get(str_idx)->c_str());
         if (mode == py::ToPythonMode::RECURSIVE) {
-            nb::setattr(obj, key, py::to_python(field_map.at(str), py::ToPythonMode::RECURSIVE));
+            nb::setattr(obj, key, py::to_python(field_map.at(str_idx), py::ToPythonMode::RECURSIVE));
         } else { // non-recursive convert
-            nb::setattr(obj, key, py::to_python_cast(field_map.at(str)));
+            nb::setattr(obj, key, py::to_python_cast(field_map.at(str_idx)));
         }
     }
     return obj;
@@ -51,9 +51,9 @@ py::field_map_from_python(FieldMap<false>& field_map, const nb::dict& dict,
         Callstack::throw_with_trace<std::runtime_error>(
                 "cannot copy dict with wrong fields into struct");
     }
-    for (shr_string_ptr str: field_map.get_slots()) {
-        std::string key_str = str->c_str();
-        py::set_field(field_map, key_str, dict[str->c_str()], parent_field);
+    for (shr_string_idx str_idx: field_map.get_slots()) {
+        std::string key_str = field_map.get_alloc().strings().get(str_idx)->c_str();
+        py::set_field(field_map, key_str, dict[key_str.c_str()], parent_field);
     }
 }
 

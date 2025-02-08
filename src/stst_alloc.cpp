@@ -26,22 +26,30 @@ SharedAlloc::~SharedAlloc() noexcept(false) {
     mm_assert_all_freed(mm.get());
 }
 
-const shr_string* StringStorage::internalize(const std::string& str) {
-    shr_string str_{str, StlAllocator<>{*sh_alloc}};
-    {
-        ScopedLock<false> lock{mutex};
-        auto it = data.find(str_);
-        if (it != data.end()) { return &*it; }
-    }
-    ScopedLock<true> lock{mutex};
-    const shr_string& found_str = *data.insert(str_).first;
-    return &found_str;
+StringStorage::StringStorage(SharedAlloc& sh_alloc)
+    : map{StlAllocator<int>(sh_alloc)}, data{StlAllocator<int>(sh_alloc)} {
+    // element 0 is none
+    data.emplace_back();
 }
 
-const shr_string* StringStorage::get(const std::string& str) {
-    ScopedLock<false> lock{mutex};
-    shr_string str_{str, StlAllocator<>{*sh_alloc}};
-    auto it = data.find(str_);
-    if (it != data.end()) { return &*it; }
-    return nullptr;
+shr_string_idx StringStorage::internalize(const std::string& str, SharedAlloc& sh_alloc) {
+    if (shr_string_idx found_idx = get_idx(str, sh_alloc)) { return found_idx; }
+    shr_string str_{str, StlAllocator{sh_alloc}};
+    ScopedLock<true> lock{mutex};
+    auto [it, inserted] = map.emplace(str_, 0);
+    if (inserted) {
+        it->second = data.size();
+        data.emplace_back(str_);
+    }
+    return it->second;
 }
+
+shr_string_idx StringStorage::get_idx(const std::string& str, SharedAlloc& sh_alloc) const {
+    shr_string str_{str, StlAllocator{sh_alloc}};
+    ScopedLock<false> lock{mutex};
+    auto it = map.find(str_);
+    if (it != map.end()) { return it->second; }
+    return 0;
+}
+
+const shr_string* StringStorage::get(shr_string_idx idx) const { return &data[idx]; }
