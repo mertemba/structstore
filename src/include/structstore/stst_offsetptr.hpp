@@ -15,6 +15,8 @@ class OffsetPtrBase {};
 template<typename T, typename diff_type = int32_t>
 class OffsetPtr : public OffsetPtrBase<diff_type> {
 public:
+    static_assert(std::is_signed_v<diff_type>);
+
     // using element_type = T;
     using pointer = OffsetPtr<T, int64_t>;
     // using const_pointer = const T*;

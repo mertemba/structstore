@@ -18,6 +18,7 @@ class py;
 class StructStore : public FieldType<StructStore> {
     friend class ::structstore::typing;
     friend class ::structstore::SharedAlloc;
+    friend class ::structstore::StlAllocator<StructStore>;
     friend class ::structstore::StructStoreShared;
     friend class ::structstore::py;
 
@@ -74,7 +75,7 @@ public:
         return (*this)[name];
     }
 
-    inline StructStore& substore(const std::string& name) { return get<StructStore>(name); }
+    StructStore& substore(const std::string& name) { return get<StructStore>(name); }
 
     // remove operations
 

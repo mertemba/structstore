@@ -4,7 +4,7 @@
 #include "structstore/stst_alloc.hpp"
 #include "structstore/stst_field.hpp"
 #include "structstore/stst_fieldmap.hpp"
-#include "structstore/stst_shared.hpp"
+#include "structstore/stst_structstore.hpp"
 #include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
 
@@ -55,16 +55,6 @@ private:
     static std::unordered_map<type_hash_t, const PyType>& get_py_types();
 
     static const PyType& get_py_type(type_hash_t type_hash);
-
-    static StructStore& get_store(StructStore& store) { return store; }
-    static StructStore& get_store(StructStoreShared& store) { return *store; }
-
-    static FieldMap<true>& get_field_map(StructStore& store) { return store.field_map; }
-    static FieldMap<true>& get_field_map(StructStoreShared& store) { return store->field_map; }
-    template<typename T>
-    static FieldMap<false>& get_field_map(Struct<T>& s) {
-        return s.field_map;
-    }
 
     static nb::object get_field(const FieldMapBase& field_map, const std::string& name);
 
@@ -279,26 +269,8 @@ public:
             }
             return false;
         });
-        cls.def(
-                "read_lock",
-                [](T& t) {
-                    if constexpr (std::is_same_v<T, StructStoreShared>) {
-                        return t->read_lock();
-                    } else {
-                        return t.read_lock();
-                    }
-                },
-                nb::rv_policy::move);
-        cls.def(
-                "write_lock",
-                [](T& t) {
-                    if constexpr (std::is_same_v<T, StructStoreShared>) {
-                        return t->write_lock();
-                    } else {
-                        return t.write_lock();
-                    }
-                },
-                nb::rv_policy::move);
+        cls.def("read_lock", [](T& t) { return unwrap(t).read_lock(); }, nb::rv_policy::move);
+        cls.def("write_lock", [](T& t) { return unwrap(t).write_lock(); }, nb::rv_policy::move);
     }
 
     template<typename T>
@@ -332,20 +304,20 @@ public:
         register_complex_type_funcs<T>(cls);
 
         cls.def("__getstate__", [](T& t) {
-            nb::object obj = field_map_to_python(get_field_map(t), py::ToPythonMode::RECURSIVE);
+            nb::object obj = field_map_to_python(unwrap(t).field_map, py::ToPythonMode::RECURSIVE);
             return obj;
         });
 
         cls.def("__dir__", [](T& t) {
             nb::list slots;
-            const auto& field_map = get_field_map(t);
+            const auto& field_map = unwrap(t).field_map;
             for (shr_string_idx str_idx: field_map.get_slots()) {
                 slots.append(nb::str(field_map.get_alloc().strings().get(str_idx)->c_str()));
             }
             return slots;
         });
 
-        cls.def("__len__", [](T& t) { return get_field_map(t).get_slots().size(); });
+        cls.def("__len__", [](T& t) { return unwrap(t).field_map.get_slots().size(); });
 
         if constexpr (typing::is_field_type<T>) {
             cls.def("__setstate__", [](T& t, nb::handle value) {
@@ -361,19 +333,15 @@ public:
 
         cls.def(
                 "__getattr__",
-                [](T& t, const std::string& name) { return get_field(get_field_map(t), name); },
+                [](T& t, const std::string& name) { return get_field(unwrap(t).field_map, name); },
                 nb::arg("name"));
 
         cls.def(
                 "__setattr__",
                 [](T& t, const std::string& name, const nb::handle& value) {
-                    if constexpr (std::is_same_v<T, StructStoreShared>) {
-                        auto lock = t->write_lock();
-                        return set_field(get_field_map(t), name, value, *t);
-                    } else {
-                        auto lock = t.write_lock();
-                        return set_field(get_field_map(t), name, value, t);
-                    }
+                    auto& val = unwrap(t);
+                    auto lock = val.write_lock();
+                    return set_field(val.field_map, name, value, val);
                 },
                 nb::arg("name"), nb::arg("value").none());
 
@@ -382,37 +350,27 @@ public:
                 [](T& t, const std::string& name) {
                     // todo: when returning a field, there should be a read lock on the parent StructStore
                     // => attach a read lock to the return value?
-                    return get_field(get_field_map(t), name);
+                    return get_field(unwrap(t).field_map, name);
                 },
                 nb::arg("name"));
 
         cls.def(
                 "__setitem__",
                 [](T& t, const std::string& name, const nb::handle& value) {
-                    if constexpr (std::is_same_v<T, StructStoreShared>) {
-                        auto lock = t->write_lock();
-                        return set_field(get_field_map(t), name, value, *t);
-                    } else {
-                        auto lock = t.write_lock();
-                        return set_field(get_field_map(t), name, value, t);
-                    }
+                    auto& val = unwrap(t);
+                    auto lock = val.write_lock();
+                    return set_field(val.field_map, name, value, val);
                 },
                 nb::arg("name"), nb::arg("value").none());
 
-        cls.def("empty", [](T& t) { return get_field_map(t).empty(); });
+        cls.def("empty", [](T& t) { return unwrap(t).field_map.empty(); });
     }
 
     template<typename T>
     static void register_structstore_funcs(nb::class_<T>& cls) {
         register_field_map_funcs<T>(cls);
 
-        cls.def("clear", [](T& t) {
-            if constexpr (std::is_same_v<T, StructStoreShared>) {
-                t->clear();
-            } else {
-                t.clear();
-            }
-        });
+        cls.def("clear", [](T& t) { unwrap(t).clear(); });
 
         cls.def("check", [](T& t) {
             STST_LOG_DEBUG() << "checking from python ...";
@@ -421,12 +379,12 @@ public:
 
         cls.def(
                 "__delattr__",
-                [](T& t, const std::string& name) { return get_field_map(t).remove(name.c_str()); },
+                [](T& t, const std::string& name) { return unwrap(t).field_map.remove(name.c_str()); },
                 nb::arg("name"));
 
         cls.def(
                 "__delitem__",
-                [](T& t, const std::string& name) { return get_field_map(t).remove(name.c_str()); },
+                [](T& t, const std::string& name) { return unwrap(t).field_map.remove(name.c_str()); },
                 nb::arg("name"));
     }
 

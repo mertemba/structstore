@@ -1,6 +1,8 @@
 #include "structstore/stst_containers.hpp"
 #include "structstore/stst_field.hpp"
 #include "structstore/stst_py.hpp"
+#include "structstore/stst_shared.hpp"
+#include "structstore/stst_structstore.hpp"
 #include "structstore/stst_utils.hpp"
 
 #include <nanobind/nanobind.h>

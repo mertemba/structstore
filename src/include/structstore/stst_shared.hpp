@@ -190,6 +190,12 @@ public:
     void check() const;
 };
 
+template<>
+struct Unwrapper<StructStoreShared> {
+    StructStore& val;
+    Unwrapper(StructStoreShared& t) : val{*t} {}
+};
+
 }  // namespace structstore
 
 #endif

@@ -54,6 +54,9 @@ public:
     [[nodiscard]] ScopedFieldLock<true> write_lock() const { return ScopedFieldLock<true>(*this); }
 };
 
+template<typename T>
+class FieldRef;
+
 class typing {
 public:
     template<typename T>
@@ -77,6 +80,8 @@ public:
         }
 
     public:
+        static FieldRef<T> create() { return FieldRef<T>::create(); }
+
         friend std::ostream& operator<<(std::ostream& os, const FieldType<T>& t) {
             ((const T&) t).to_text(os);
             return os;

@@ -5,6 +5,7 @@
 #include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
 
+#include <type_traits>
 #include <yaml-cpp/yaml.h>
 
 namespace structstore {
@@ -196,6 +197,8 @@ FieldView::FieldView(structstore::StructStoreShared& data);
 
 class String;
 
+class List;
+
 template<bool managed>
 class FieldAccess {
     Field& field;
@@ -231,6 +234,8 @@ public:
 
     FieldAccess<true> operator[](const std::string& name) { return get<StructStore>()[name]; }
 
+    FieldAccess<true> operator[](size_t idx) { return get<List>()[idx]; }
+
     operator FieldAccess<false>() { return FieldAccess<false>{field, sh_alloc, parent_field}; }
 
     FieldAccess<true> to_managed_access() {
@@ -262,6 +267,72 @@ public:
 
     void clear() { field.clear(sh_alloc); }
 };
+
+// this class resides in local stack or heap memory;
+// it manages a reference to a field within a SharedAlloc
+template<typename T>
+class FieldRef {
+    static_assert(std::is_base_of_v<FieldTypeBase, T>);
+    T& data;
+    SharedAlloc* sh_alloc;
+
+public:
+    // construct in static memory arena
+    static FieldRef create() {
+        T* t = static_alloc.allocate<T>();
+        StlAllocator<T>(static_alloc).construct(t);
+        FieldRef ref{*t};
+        ref.sh_alloc = &static_alloc;
+        return std::move(ref);
+    }
+
+    // construct with existing data, do not manage pointer
+    FieldRef(T& data) : data{data}, sh_alloc{nullptr} {}
+
+    // move operator is valid
+    FieldRef(FieldRef&& other) : data{other.data}, sh_alloc{other.sh_alloc} {
+        // we take ownership of the data; the other wrapper does not manage anymore
+        other.sh_alloc = nullptr;
+    }
+
+    // empty construction, copy, and assignment are invalid
+    FieldRef() = delete;
+    FieldRef(const FieldRef&) = delete;
+    FieldRef operator=(FieldRef&&) = delete;
+    FieldRef operator=(const FieldRef&) = delete;
+
+    ~FieldRef() {
+        // if we created the object, we need to clean up
+        if (sh_alloc) {
+            data.~T();
+            sh_alloc->deallocate(&data);
+        }
+    }
+
+    // access functions are only valid on l-value FieldRefs
+    // to avoid dangling references
+    T* operator->() & { return &data; }
+    T& operator*() & { return data; }
+};
+
+template<typename T>
+struct Unwrapper {
+    T& val;
+    Unwrapper(T& t) : val{t} {}
+};
+
+template<typename T>
+struct Unwrapper<FieldRef<T>> {
+    T& val;
+    Unwrapper(FieldRef<T>& t) : val{*t} {}
+};
+
+template<typename T>
+auto& unwrap(T& t) {
+    return Unwrapper(t).val;
+}
+
+// specialization for StructStoreShared in stst_shared.hpp
 }
 
 #endif

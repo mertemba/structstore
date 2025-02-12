@@ -26,8 +26,8 @@ struct Settings {
 };
 
 TEST(StructStoreTestBasic, refStructInLocalStore) {
-    auto store_ptr = stst::create<stst::StructStore>();
-    stst::StructStore& store = *store_ptr;
+    auto store_ref = stst::StructStore::create();
+    stst::StructStore& store = *store_ref;
     store["num"] = 5;
     std::ostringstream str;
     str << store;
@@ -40,14 +40,15 @@ TEST(StructStoreTestBasic, refStructInLocalStore) {
     settings.subsettings.subnum = 43;
 
     stst::List& list = store["list"];
-    list.push_back(5);
+    list.push_back(4);
+    store["list"][0] = 5;
     list.push_back(42);
     for (int& i: list) {
         ++i;
     }
     EXPECT_EQ(list.size(), 2);
-    auto store_ptr2 = stst::create<stst::StructStore>();
-    list.push_back(*store_ptr2);
+    auto store_ref2 = stst::StructStore::create();
+    list.push_back(*store_ref2);
     list.check();
     EXPECT_EQ(list.size(), 3);
     for (stst::Field& field: list) {
@@ -91,11 +92,11 @@ TEST(StructStoreTestBasic, sharedStore) {
 }
 
 TEST(StructStoreTestBasic, cmpEqual) {
-    auto store_ptr1 = stst::create<stst::StructStore>();
-    stst::StructStore& store1 = *store_ptr1;
+    auto store_ref1 = stst::StructStore::create();
+    stst::StructStore& store1 = *store_ref1;
     Settings settings1{store1};
-    auto store_ptr2 = stst::create<stst::StructStore>();
-    stst::StructStore& store2 = *store_ptr2;
+    auto store_ref2 = stst::StructStore::create();
+    stst::StructStore& store2 = *store_ref2;
     Settings settings2{store2};
     EXPECT_EQ(store1, store2);
     settings2.subsettings.substr += '.';
@@ -119,13 +120,13 @@ TEST(StructStoreTestBasic, cmpEqualShared) {
 }
 
 TEST(StructStoreTestBasic, copyStore) {
-    auto store_ptr = stst::create<stst::StructStore>();
-    stst::StructStore& store = *store_ptr;
+    auto store_ref = stst::StructStore::create();
+    stst::StructStore& store = *store_ref;
     int& num = store["num"];
     num = 5;
     store["str"].get_str() = "foo";
-    auto store_ptr2 = stst::create<stst::StructStore>();
-    stst::StructStore& store2 = *store_ptr2;
+    auto store_ref2 = stst::StructStore::create();
+    stst::StructStore& store2 = *store_ref2;
     store2 = store;
     EXPECT_EQ(store2["num"].get<int>(), 5);
     store.check();

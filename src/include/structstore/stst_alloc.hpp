@@ -13,7 +13,6 @@
 #include <cstddef>
 #include <cstring>
 #include <functional>
-#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
@@ -74,19 +73,6 @@ public:
         mm_free(mm.get(), ptr);
     }
 
-    template<typename T, typename... Args>
-    std::shared_ptr<T> allocate_smart(Args&&... args) {
-        T* ptr = allocate<T>();
-        STST_LOG_DEBUG() << "shared_ptr alloc at " << ptr;
-        new (ptr) T(args...);
-        std::function<void(const void*)> deleter = [this](const void* ptr) {
-            STST_LOG_DEBUG() << "shared_ptr dealloc at " << ptr;
-            if constexpr (std::is_destructible_v<T>) { ((T*) ptr)->~T(); }
-            deallocate(ptr);
-        };
-        return {ptr, deleter};
-    }
-
     bool is_owned(const void* ptr) const {
         if (ptr == nullptr) {
 #ifndef NDEBUG
@@ -110,10 +96,7 @@ public:
 
 extern SharedAlloc& static_alloc;
 
-template<typename T>
-std::shared_ptr<T> create() {
-    return static_alloc.allocate_smart<T>(static_alloc);
-}
+class StructStore;
 
 template<typename T = char>
 class StlAllocator {
@@ -138,7 +121,7 @@ public:
     void deallocate(const OffsetPtr<T, int64_t>& p, std::size_t) { sh_alloc.deallocate(p.get()); }
 
     void construct(T* p) {
-        if constexpr (std::is_constructible_v<T, SharedAlloc&>) {
+        if constexpr (std::is_constructible_v<T, SharedAlloc&> || std::is_same_v<T, StructStore>) {
             new (p) T(sh_alloc);
         } else if constexpr (std::is_constructible_v<T, const StlAllocator<T>&>) {
             new (p) T(StlAllocator<T>{sh_alloc});
@@ -178,9 +161,6 @@ using shr_vector = std::vector<T, StlAllocator<T>>;
 template<class K, class T, class H = ankerl::unordered_dense::hash<K>>
 using shr_unordered_map = ankerl::unordered_dense::map<K, T, H, std::equal_to<K>,
                                                        StlAllocator<std::pair<const K, T>>>;
-
-template<class K, class H = ankerl::unordered_dense::hash<K>>
-using shr_unordered_set = ankerl::unordered_dense::set<K, H, std::equal_to<K>, StlAllocator<K>>;
 
 // instances of this class reside in shared memory, thus no raw pointers
 // or references should be used; use structstore::OffsetPtr<T> instead.
