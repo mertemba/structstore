@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 cmake_policy(VERSION 3.24)
-project(structstore VERSION 0.4.0)
+project(structstore VERSION 0.5.0)
 
 # build options
 
