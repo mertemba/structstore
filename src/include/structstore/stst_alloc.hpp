@@ -60,7 +60,7 @@ public:
         if (ptr == nullptr) {
             std::ostringstream str;
             str << "insufficient space in sh_alloc region, requested: " << field_size;
-            Callstack::throw_with_trace<std::runtime_error>(str.str());
+            Callstack::throw_with_trace(str.str());
         }
         assert((size_t) ptr % ALIGN == 0);
         STST_LOG_DEBUG() << "allocating " << typeid(T).name() << " at " << ptr;

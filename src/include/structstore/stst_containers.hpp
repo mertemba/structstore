@@ -25,6 +25,13 @@ public:
     String& operator=(const std::string& value);
 };
 
+
+// do not use reference wrapper for String class
+template<>
+struct RefWrapper<String> {
+    using W = String&;
+};
+
 // instances of this class reside in shared memory, thus no raw pointers
 // or references should be used; use structstore::OffsetPtr<T> instead.
 class List : public FieldType<List> {

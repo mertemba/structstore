@@ -28,12 +28,12 @@ public:
 protected:
     FieldMap<true> field_map;
 
-    explicit StructStore(SharedAlloc& sh_alloc) : field_map(sh_alloc) {}
-
     StructStore(const StructStore& other) : StructStore{static_alloc} { *this = other; }
 
 public:
     // constructor, assignment, destructor
+
+    explicit StructStore(SharedAlloc& sh_alloc) : field_map(sh_alloc) {}
 
     StructStore& operator=(const StructStore& other) {
         field_map.copy_from(other.field_map, this);
@@ -83,6 +83,9 @@ public:
 
     inline void remove(const std::string& name) { field_map.remove(name); }
 };
+
+static_assert(std::is_same_v<unwrap_type_t<FieldRef<StructStore>>, StructStore>);
+static_assert(std::is_same_v<wrap_type_w<StructStore>, FieldRef<StructStore>>);
 } // namespace structstore
 
 #endif

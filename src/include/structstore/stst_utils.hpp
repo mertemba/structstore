@@ -60,10 +60,7 @@ class NilLog {
 
 #define stst_assert(expr)                                                                          \
     do {                                                                                           \
-        if (!(expr)) {                                                                             \
-            structstore::Callstack::throw_with_trace<std::runtime_error>(                          \
-                    "assertion failed: " #expr);                                                   \
-        }                                                                                          \
+        if (!(expr)) { structstore::Callstack::throw_with_trace("assertion failed: " #expr); }     \
     } while (0)
 
 constexpr uint32_t const_hash(const char* input) {

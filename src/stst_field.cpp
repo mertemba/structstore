@@ -6,14 +6,14 @@
 
 using namespace structstore;
 
-void Field::to_text(std::ostream& os) const {
+void FieldView::to_text(std::ostream& os) const {
     const auto& type_info = typing::get_type(type_hash);
-    type_info.serialize_text_fn(os, data.get());
+    type_info.serialize_text_fn(os, data);
 }
 
-YAML::Node Field::to_yaml() const {
+YAML::Node FieldView::to_yaml() const {
     const auto& type_info = typing::get_type(type_hash);
-    return type_info.serialize_yaml_fn(data.get());
+    return type_info.serialize_yaml_fn(data);
 }
 
 void Field::construct_copy_from(SharedAlloc& sh_alloc, const Field& other,
@@ -41,18 +41,14 @@ void Field::move_from(Field& other) {
     std::swap(data, other.data);
 }
 
-void Field::check(const SharedAlloc& sh_alloc, const FieldTypeBase& parent_field) const {
-    CallstackEntry entry{"structstore::Field::check()"};
-    stst_assert(sh_alloc.is_owned(this));
+void FieldView::check(const SharedAlloc& sh_alloc, const FieldTypeBase& parent_field) const {
+    CallstackEntry entry{"structstore::FieldView::check()"};
     if (data) {
-        stst_assert(sh_alloc.is_owned(data.get()));
+        stst_assert(sh_alloc.is_owned(data));
         const TypeInfo& type_info = typing::get_type(type_hash);
-        type_info.check_fn(sh_alloc, data.get(), parent_field);
+        type_info.check_fn(sh_alloc, data, parent_field);
     }
 }
-
-template<>
-FieldView::FieldView(StructStoreShared& store) : field{&*store} {}
 
 template<>
 ::structstore::String& FieldAccess<false>::get_str() {

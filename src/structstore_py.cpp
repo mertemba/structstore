@@ -52,14 +52,17 @@ NB_MODULE(MODULE_NAME, m) {
     m.def("set_log_level", [](Log::Level level) { Log::level = level; });
 
     // structstore::StructStore
-    nb::class_<StructStore> cls = nb::class_<StructStore>{m, "StructStore"};
-    py::ToPythonFn structstore_to_python_fn = [](const Field& field, py::ToPythonMode mode) -> nb::object {
-        auto& store = field.get<StructStore>();
+    nb::class_<StructStore::Ref> cls = nb::class_<StructStore::Ref>{m, "StructStore"};
+    cls.def("__init__",
+            [](StructStore::Ref* store_ref) { StructStore::Ref::create_in_place(store_ref); });
+    py::ToPythonFn structstore_to_python_fn = [](const FieldView& field_view,
+                                                 py::ToPythonMode mode) -> nb::object {
+        auto& store = field_view.get<StructStore>();
         return py::structstore_to_python(store, mode);
     };
     py::FromPythonFn structstore_from_python_fn = [](FieldAccess<true> access,
                                                      const nanobind::handle& value) {
-        if (py::copy_cast_from_python<StructStore>(access, value)) { return true; }
+        if (py::copy_cast_from_python<StructStore::Ref>(access, value)) { return true; }
         // todo: strict check if this is one of dict, SimpleNamespace, StructStore
         nb::dict dict;
         bool is_dict = false;
@@ -101,7 +104,7 @@ NB_MODULE(MODULE_NAME, m) {
         }
         return false;
     };
-    py::register_type<StructStore>(structstore_from_python_fn, structstore_to_python_fn);
+    py::register_type<StructStore::Ref>(structstore_from_python_fn, structstore_to_python_fn);
     py::register_structstore_funcs(cls);
 
     auto shcls = nb::class_<StructStoreShared>(m, "StructStoreShared");
@@ -138,9 +141,7 @@ NB_MODULE(MODULE_NAME, m) {
         shs.from_buffer((void*) buffer.c_str(), buffer.size());
     });
     shcls.def("close", &StructStoreShared::close);
-    shcls.def_prop_ro("store", [](StructStoreShared& store) -> StructStore& {
-        return *store;
-    });
+    shcls.def_prop_ro("store", [](StructStoreShared& store) { return ref_wrap(*store); });
 
     // built-in field types:
 
@@ -158,33 +159,32 @@ NB_MODULE(MODULE_NAME, m) {
                 }
                 return false;
             },
-            [](const Field& field, py::ToPythonMode) -> nb::object {
-                return nb::str(field.get<structstore::String>().c_str());
+            [](const FieldView& field_view, py::ToPythonMode) -> nb::object {
+                return nb::str(field_view.get<structstore::String>().c_str());
             },
-            [](const Field& field) -> nb::object {
-                return nb::str(field.get<structstore::String>().c_str());
+            [](const FieldView& field_view) -> nb::object {
+                return nb::str(field_view.get<structstore::String>().c_str());
             });
 
     // structstore::List
-    auto list_cls = nb::class_<List>(m, "StructStoreList");
-    list_cls.def("__init__", [](List* list) {
-        new (list) List(static_alloc);
-    });
-    py::ToPythonFn list_to_python_fn = [](const Field& field, py::ToPythonMode mode) -> nb::object {
-        auto& list = field.get<List>();
+    auto list_cls = nb::class_<List::Ref>(m, "StructStoreList");
+    list_cls.def("__init__", [](List::Ref* list_ref) { List::Ref::create_in_place(list_ref); });
+    py::ToPythonFn list_to_python_fn = [](const FieldView& field_view,
+                                          py::ToPythonMode mode) -> nb::object {
+        auto& list = field_view.get<List>();
         auto ret = nb::list();
         for (Field& field_: list) {
             if (mode == py::ToPythonMode::RECURSIVE) {
-                ret.append(py::to_python(field_, py::ToPythonMode::RECURSIVE));
+                ret.append(py::to_python(field_.view(), py::ToPythonMode::RECURSIVE));
             } else { // non-recursive convert
-                ret.append(py::to_python_cast(field_));
+                ret.append(py::to_python_cast(field_.view()));
             }
         }
         return ret;
     };
     py::FromPythonFn list_from_python_fn = [](FieldAccess<true> access,
                                               const nanobind::handle& value) {
-        if (py::copy_cast_from_python<List>(access, value)) { return true; }
+        if (py::copy_cast_from_python<List::Ref>(access, value)) { return true; }
         if (nb::isinstance<nb::list>(value) || nb::isinstance<nb::tuple>(value)) {
             List& list = access.get<List>();
             list.clear();
@@ -197,79 +197,95 @@ NB_MODULE(MODULE_NAME, m) {
         }
         return false;
     };
-    py::register_type<List>(list_from_python_fn, list_to_python_fn);
-    py::register_complex_type_funcs<List>(list_cls);
-    list_cls.def("__len__", [](List& list) {
-        auto lock = list.read_lock();
-        return list.size();
+    py::register_type<List::Ref>(list_from_python_fn, list_to_python_fn);
+    py::register_complex_type_funcs<List::Ref>(list_cls);
+    list_cls.def("__len__", [](List::Ref& list_ref) {
+        auto lock = list_ref->read_lock();
+        return list_ref->size();
     });
-    list_cls.def("insert", [](List& list, size_t index, nb::handle& value) {
-        auto lock = list.write_lock();
-        FieldAccess access = list.insert(index);
-        py::from_python(access, value, std::to_string(index));
-    }, nb::arg("index"), nb::arg("value").none());
-    list_cls.def("extend", [](List& list, nb::iterable& value) {
-        auto lock = list.write_lock();
+    list_cls.def(
+            "insert",
+            [](List::Ref& list_ref, size_t index, nb::handle& value) {
+                auto lock = list_ref->write_lock();
+                FieldAccess access = list_ref->insert(index);
+                py::from_python(access, value, std::to_string(index));
+            },
+            nb::arg("index"), nb::arg("value").none());
+    list_cls.def("extend", [](List::Ref& list_ref, nb::iterable& value) {
+        auto lock = list_ref->write_lock();
         for (const auto& val: value) {
-            std::string field_name = std::to_string(list.size());
-            py::from_python(list.push_back(), val, field_name);
+            std::string field_name = std::to_string(list_ref->size());
+            py::from_python(list_ref->push_back(), val, field_name);
         }
     });
-    list_cls.def("append", [](List& list, nb::handle& value) {
-        auto lock = list.write_lock();
-        FieldAccess access = list.push_back();
-        py::from_python(access, value, std::to_string(list.size() - 1));
-    }, nb::arg("value").none());
-    list_cls.def("pop", [](List& list, size_t index) {
-        auto lock = list.write_lock();
+    list_cls.def(
+            "append",
+            [](List::Ref& list_ref, nb::handle& value) {
+                auto lock = list_ref->write_lock();
+                FieldAccess access = list_ref->push_back();
+                py::from_python(access, value, std::to_string(list_ref->size() - 1));
+            },
+            nb::arg("value").none());
+    list_cls.def("pop", [](List::Ref& list_ref, size_t index) {
+        auto lock = list_ref->write_lock();
         // todo: this returns a recursive copy, is this wanted?
-        auto res = py::to_python(list[index].get_field(), py::ToPythonMode::RECURSIVE);
-        list.erase(index);
+        auto res =
+                py::to_python((*list_ref)[index].get_field().view(), py::ToPythonMode::RECURSIVE);
+        list_ref->erase(index);
         return res;
     });
-    list_cls.def("__add__", [=](List& list, nb::list& value) {
-        auto lock = list.read_lock();
+    list_cls.def("__add__", [=](List::Ref& list_ref, nb::list& value) {
+        auto lock = list_ref->read_lock();
         // todo: this returns a recursive copy, is this wanted?
-        return py::to_python(*FieldView{list}, py::ToPythonMode::RECURSIVE) + value;
+        return py::to_python(FieldView{*list_ref}, py::ToPythonMode::RECURSIVE) + value;
     });
-    list_cls.def("__iadd__", [=](List& list, nb::list& value) {
-        auto lock = list.write_lock();
+    list_cls.def("__iadd__", [=](List::Ref& list_ref, nb::list& value) {
+        auto lock = list_ref->write_lock();
         for (const auto& val: value) {
-            py::from_python(list.push_back(), val, std::to_string(list.size() - 1));
+            py::from_python(list_ref->push_back(), val, std::to_string(list_ref->size() - 1));
         }
-        return py::to_python_cast(*FieldView{list});
+        return py::to_python_cast(FieldView{*list_ref});
     });
-    list_cls.def("__setitem__", [](List& list, size_t index, nb::handle& value) {
-        auto lock = list.write_lock();
-        py::from_python(list[index], value, std::to_string(index));
-    }, nb::arg("index"), nb::arg("value").none());
-    list_cls.def("__getitem__", [](List& list, size_t index) {
-        auto lock = list.read_lock();
-        STST_LOG_DEBUG() << "getting list item of type " << typing::get_type(list[index].get_field().get_type_hash()).name;
-        return py::to_python_cast(list[index].get_field());
+    list_cls.def(
+            "__setitem__",
+            [](List::Ref& list_ref, size_t index, nb::handle& value) {
+                auto lock = list_ref->write_lock();
+                py::from_python((*list_ref)[index], value, std::to_string(index));
+            },
+            nb::arg("index"), nb::arg("value").none());
+    list_cls.def("__getitem__", [](List::Ref& list_ref, size_t index) {
+        auto lock = list_ref->read_lock();
+        STST_LOG_DEBUG() << "getting list item of type "
+                         << typing::get_type((*list_ref)[index].get_field().get_type_hash()).name;
+        return py::to_python_cast((*list_ref)[index].get_field().view());
     });
-    list_cls.def("__delitem__", [](List& list, size_t index) {
-        auto lock = list.write_lock();
-        list.erase(index);
+    list_cls.def("__delitem__", [](List::Ref& list_ref, size_t index) {
+        auto lock = list_ref->write_lock();
+        list_ref->erase(index);
     });
-    list_cls.def("__iter__", [](List& list) {
-        auto lock = list.read_lock();
-        return nb::make_iterator(nb::type<List>(), "list_iter", list.begin(), list.end());
-    }, nb::keep_alive<0, 1>());
-    list_cls.def("clear", [](List& list) {
-        auto lock = list.write_lock();
-        list.clear();
+    list_cls.def(
+            "__iter__",
+            [](List::Ref& list_ref) {
+                auto lock = list_ref->read_lock();
+                return nb::make_iterator(nb::type<List>(), "list_iter", list_ref->begin(),
+                                         list_ref->end());
+            },
+            nb::keep_alive<0, 1>());
+    list_cls.def("clear", [](List::Ref& list_ref) {
+        auto lock = list_ref->write_lock();
+        list_ref->clear();
     });
-    list_cls.def("check", [](List& list) {
+    list_cls.def("check", [](List::Ref& list_ref) {
         STST_LOG_DEBUG() << "checking from python ...";
-        list.check();
+        list_ref.check();
     });
 
 
     // structstore::Matrix
-    auto matrix_cls = nb::class_<Matrix>(m, "StructStoreMatrix");
-    py::ToPythonFn matrix_to_python_fn = [](const Field& field, py::ToPythonMode mode) -> nb::object {
-        Matrix& m = field.get<Matrix>();
+    auto matrix_cls = nb::class_<Matrix::Ref>(m, "StructStoreMatrix");
+    py::ToPythonFn matrix_to_python_fn = [](const FieldView& field_view,
+                                            py::ToPythonMode mode) -> nb::object {
+        Matrix& m = field_view.get<Matrix>();
         if (mode == py::ToPythonMode::RECURSIVE) {
             return nb::cast(nb::ndarray<double, nb::c_contig, nb::numpy>(m.data(), m.ndim(), m.shape(), nb::handle()),
                             nb::rv_policy::copy);
@@ -281,7 +297,7 @@ NB_MODULE(MODULE_NAME, m) {
     };
     py::FromPythonFn matrix_from_python_fn = [](FieldAccess<true> access,
                                                 const nanobind::handle& value) {
-        if (py::copy_cast_from_python<Matrix>(access, value)) { return true; }
+        if (py::copy_cast_from_python<Matrix::Ref>(access, value)) { return true; }
         if (nb::ndarray_check(value)) {
             auto array = nb::cast<nb::ndarray<const double, nb::c_contig>>(value);
             if (array.ndim() > Matrix::MAX_DIMS) {
@@ -293,8 +309,8 @@ NB_MODULE(MODULE_NAME, m) {
         }
         return false;
     };
-    py::register_type<Matrix>(matrix_from_python_fn, matrix_to_python_fn);
-    py::register_complex_type_funcs<Matrix>(matrix_cls);
+    py::register_type<Matrix::Ref>(matrix_from_python_fn, matrix_to_python_fn);
+    py::register_complex_type_funcs<Matrix::Ref>(matrix_cls);
 }
 
 // required to make __iter__ method work
@@ -305,7 +321,7 @@ public:
     NB_TYPE_CASTER(structstore::Field, const_name("Field"))
 
     static handle from_cpp(structstore::Field& src, rv_policy, cleanup_list*) {
-        return py::to_python_cast(src).release();
+        return py::to_python_cast(src.view()).release();
     }
 };
 }

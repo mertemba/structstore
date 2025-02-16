@@ -192,9 +192,12 @@ public:
 
 template<>
 struct Unwrapper<StructStoreShared> {
-    StructStore& val;
-    Unwrapper(StructStoreShared& t) : val{*t} {}
+    using T = StructStore;
+    StructStore& t;
+    Unwrapper(StructStoreShared& w) : t{*w} {}
 };
+static_assert(std::is_same_v<unwrap_type_t<StructStoreShared>, StructStore>);
+static_assert(std::is_same_v<wrap_type_w<StructStoreShared>, StructStoreShared&>);
 
 }  // namespace structstore
 

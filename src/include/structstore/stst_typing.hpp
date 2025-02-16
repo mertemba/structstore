@@ -19,8 +19,6 @@ namespace structstore {
 
 using type_hash_t = uint32_t;
 
-class StructStore;
-
 template<typename T>
 class Struct;
 
@@ -80,6 +78,8 @@ public:
         }
 
     public:
+        using Ref = FieldRef<T>;
+
         static FieldRef<T> create() { return FieldRef<T>::create(); }
 
         friend std::ostream& operator<<(std::ostream& os, const FieldType<T>& t) {
@@ -131,7 +131,7 @@ private:
         ti.type_hash = -1;
         ti.name = name;
         ti.size = sizeof(T);
-        if constexpr (std::is_constructible_v<T, SharedAlloc&> || std::is_same_v<T, StructStore>) {
+        if constexpr (std::is_constructible_v<T, SharedAlloc&>) {
             ti.constructor_fn = [](SharedAlloc& sh_alloc, void* t,
                                    const FieldTypeBase* parent_field) {
                 new (t) T(sh_alloc);

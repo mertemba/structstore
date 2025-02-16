@@ -2,6 +2,8 @@
 #define STST_FIELD_HPP
 
 #include "structstore/stst_alloc.hpp"
+#include "structstore/stst_callstack.hpp"
+#include "structstore/stst_offsetptr.hpp"
 #include "structstore/stst_typing.hpp"
 #include "structstore/stst_utils.hpp"
 
@@ -13,20 +15,15 @@ namespace structstore {
 template<bool managed>
 class FieldMap;
 
-class FieldView;
-
 template<bool managed>
 class FieldAccess;
 
-// instances of this class reside in shared memory, thus no raw pointers
-// or references should be used; use structstore::OffsetPtr<T> instead.
-class Field {
-protected:
-    friend class FieldView;
-    template<bool managed>
-    friend class FieldAccess;
+class Field;
 
-    OffsetPtr<void> data;
+class FieldView {
+    friend class Field;
+
+    void* data;
     type_hash_t type_hash;
 
     void assert_nonempty() const {
@@ -38,6 +35,65 @@ protected:
             throw std::runtime_error("field is replaced/deleted while still initialized!");
         }
     }
+
+public:
+    // constructor, assignment, destructor
+
+    template<typename T>
+    explicit FieldView(T& data) : data{&data}, type_hash{typing::get_type_hash<T>()} {
+        static_assert(typing::is_field_type<T>);
+    }
+
+    explicit FieldView(void* data, type_hash_t type_hash) : data{data}, type_hash{type_hash} {}
+
+    // FieldTypeBase utility functions
+
+    void to_text(std::ostream& os) const;
+
+    YAML::Node to_yaml() const;
+
+    void check(const SharedAlloc& sh_alloc, const FieldTypeBase& parent_field) const;
+
+    bool operator==(const FieldView& other) const {
+        if (!data) { return !other.data; }
+        if (type_hash != other.type_hash) { return false; }
+        return typing::get_type(type_hash).cmp_equal_fn(data, other.data);
+    }
+
+    // query functions
+
+    [[nodiscard]] bool empty() const { return !data; }
+
+    [[nodiscard]] type_hash_t get_type_hash() const { return type_hash; }
+
+    template<typename T>
+    T& get() const {
+        CallstackEntry entry{"FieldView::get()"};
+        static_assert(typing::is_field_type<T>, "field accessed with invalid type");
+        assert_nonempty();
+        if (type_hash != typing::get_type_hash<T>()) {
+            Callstack::throw_with_trace("field accessed with wrong type");
+        }
+        return *(T*) data;
+    }
+};
+
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
+class Field {
+protected:
+    friend class FieldView;
+    template<bool managed>
+    friend class FieldAccess;
+    template<typename T>
+    friend class FieldRef;
+
+    OffsetPtr<void> data;
+    type_hash_t type_hash;
+
+    inline void assert_nonempty() const { view().assert_nonempty(); }
+
+    inline void assert_empty() const { view().assert_empty(); }
 
     template<bool>
     friend class structstore::FieldMap;
@@ -126,17 +182,19 @@ public:
 
     // FieldTypeBase utility functions
 
-    void to_text(std::ostream& os) const;
+    inline FieldView view() const { return FieldView{data.get(), type_hash}; }
 
-    YAML::Node to_yaml() const;
+    inline void to_text(std::ostream& os) const { view().to_text(os); }
 
-    void check(const SharedAlloc& sh_alloc, const FieldTypeBase& parent_field) const;
+    inline YAML::Node to_yaml() const { return view().to_yaml(); }
 
-    bool operator==(const Field& other) const {
-        if (!data) { return !other.data; }
-        if (type_hash != other.type_hash) { return false; }
-        return typing::get_type(type_hash).cmp_equal_fn(data.get(), other.data.get());
+    inline void check(const SharedAlloc& sh_alloc, const FieldTypeBase& parent_field) const {
+        CallstackEntry entry{"structstore::Field::check()"};
+        stst_assert(sh_alloc.is_owned(this));
+        view().check(sh_alloc, parent_field);
     }
+
+    inline bool operator==(const Field& other) const { return view() == other.view(); }
 
     inline bool operator!=(const Field& other) const { return !(*this == other); }
 
@@ -147,13 +205,8 @@ public:
     [[nodiscard]] type_hash_t get_type_hash() const { return type_hash; }
 
     template<typename T>
-    T& get() const {
-        static_assert(typing::is_field_type<T>, "field accessed with invalid type");
-        assert_nonempty();
-        if (type_hash != typing::get_type_hash<T>()) {
-            throw std::runtime_error("field accessed with wrong type");
-        }
-        return *(T*) data.get();
+    inline T& get() const {
+        return view().get<T>();
     }
 
     template<typename T>
@@ -171,29 +224,6 @@ public:
 };
 
 class StructStoreShared;
-
-class FieldView {
-    Field field;
-
-public:
-    template<typename T>
-    explicit FieldView(T& data) : field{&data} {}
-
-    Field& operator*() {
-        return field;
-    }
-
-    Field* operator->() {
-        return &field;
-    }
-
-    ~FieldView() {
-        field.clear_unmanaged();
-    }
-};
-
-template<>
-FieldView::FieldView(structstore::StructStoreShared& data);
 
 class String;
 
@@ -278,6 +308,14 @@ class FieldRef {
 
 public:
     // construct in static memory arena
+    static void create_in_place(FieldRef* ref) {
+        T* t = static_alloc.allocate<T>();
+        StlAllocator<T>(static_alloc).construct(t);
+        new (ref) FieldRef{*t};
+        ref->sh_alloc = &static_alloc;
+    }
+
+    // construct in static memory arena
     static FieldRef create() {
         T* t = static_alloc.allocate<T>();
         StlAllocator<T>(static_alloc).construct(t);
@@ -289,10 +327,16 @@ public:
     // construct with existing data, do not manage pointer
     FieldRef(T& data) : data{data}, sh_alloc{nullptr} {}
 
-    // move operator is valid
+    // move from other is valid
     FieldRef(FieldRef&& other) : data{other.data}, sh_alloc{other.sh_alloc} {
         // we take ownership of the data; the other wrapper does not manage anymore
         other.sh_alloc = nullptr;
+    }
+
+    // move from field is valid
+    FieldRef(Field&& other, SharedAlloc& sh_alloc) : data{other.get<T>()}, sh_alloc{&sh_alloc} {
+        // we take ownership of the data
+        other.clear_unmanaged();
     }
 
     // empty construction, copy, and assignment are invalid
@@ -313,26 +357,90 @@ public:
     // to avoid dangling references
     T* operator->() & { return &data; }
     T& operator*() & { return data; }
+
+    void check() & {
+        CallstackEntry entry{"structstore::FieldRef::check()"};
+        if (sh_alloc) { stst_assert(sh_alloc->is_owned(&data)); }
+        data.check();
+    }
 };
 
-template<typename T>
+// unwrapping FieldRef:
+
+template<typename W>
 struct Unwrapper {
-    T& val;
-    Unwrapper(T& t) : val{t} {}
+    using T = W;
+    T& t;
+    Unwrapper(W& w) : t{w} {}
 };
 
-template<typename T>
-struct Unwrapper<FieldRef<T>> {
-    T& val;
-    Unwrapper(FieldRef<T>& t) : val{*t} {}
+template<typename T_>
+struct Unwrapper<FieldRef<T_>> {
+    using T = T_;
+    T& t;
+    Unwrapper(FieldRef<T>& w) : t{*w} {}
 };
 
-template<typename T>
-auto& unwrap(T& t) {
-    return Unwrapper(t).val;
+// specialization for Unwrapper<StructStoreShared> in stst_shared.hpp
+
+template<typename W>
+auto& unwrap(W& w) {
+    static_assert(std::is_same_v<W, std::remove_const_t<W>>);
+    static_assert(std::is_same_v<W, std::remove_reference_t<W>>);
+    return Unwrapper(w).t;
 }
 
-// specialization for StructStoreShared in stst_shared.hpp
+template<typename W>
+const auto& unwrap(const W& w) {
+    static_assert(std::is_same_v<W, std::remove_const_t<W>>);
+    static_assert(std::is_same_v<W, std::remove_reference_t<W>>);
+    return Unwrapper((W&) w).t;
+}
+
+template<typename W>
+struct unwrap_type {
+    static_assert(std::is_same_v<W, std::remove_const_t<W>>);
+    static_assert(std::is_same_v<W, std::remove_reference_t<W>>);
+    using T = typename Unwrapper<W>::T;
+};
+
+template<typename T>
+using unwrap_type_t = typename unwrap_type<T>::T;
+
+static_assert(std::is_same_v<unwrap_type_t<int>, int>);
+static_assert(std::is_same_v<unwrap_type_t<OffsetPtr<int>>, OffsetPtr<int>>);
+
+// wrapping in FieldRef:
+
+template<typename T, class Enable = void>
+struct RefWrapper {
+    using W = T&;
+};
+
+template<typename T>
+struct RefWrapper<T, std::enable_if_t<std::is_base_of_v<FieldTypeBase, T>>> {
+    using W = FieldRef<T>;
+};
+
+template<typename T>
+decltype(auto) ref_wrap(T& t) {
+    static_assert(std::is_same_v<T, std::remove_const_t<T>>);
+    static_assert(std::is_same_v<T, std::remove_reference_t<T>>);
+    return typename RefWrapper<T>::W(t);
+}
+
+template<typename T>
+struct wrap_type {
+    static_assert(std::is_same_v<T, std::remove_const_t<T>>);
+    static_assert(std::is_same_v<T, std::remove_reference_t<T>>);
+    using W = typename RefWrapper<T>::W;
+};
+
+template<typename T>
+using wrap_type_w = typename wrap_type<T>::W;
+
+static_assert(std::is_same_v<wrap_type_w<int>, int&>);
+static_assert(std::is_same_v<wrap_type_w<OffsetPtr<int>>, OffsetPtr<int>&>);
 }
 
 #endif

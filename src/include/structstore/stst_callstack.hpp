@@ -1,6 +1,7 @@
 #ifndef STST_CALLSTACK_HPP
 #define STST_CALLSTACK_HPP
 
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -18,7 +19,7 @@ public:
 
     std::string format_with_trace(const std::string& what);
 
-    template<typename T>
+    template<typename T = std::runtime_error>
     static void throw_with_trace(const std::string& what) {
         throw T(cur().format_with_trace(what));
     }

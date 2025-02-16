@@ -11,7 +11,7 @@ TEST(StructStoreTestUtils, callstack) {
     std::string what;
     try {
         stst::Callstack::warn_with_trace("inner warning");
-        stst::Callstack::throw_with_trace<std::runtime_error>("inner error");
+        stst::Callstack::throw_with_trace("inner error");
     } catch (const std::runtime_error& e) { what = e.what(); }
 #ifndef NDEBUG
     EXPECT_EQ(what, "first: second: inner error");
