@@ -8,6 +8,8 @@
 
 namespace structstore {
 
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class String : public FieldType<String>, public shr_string {
 public:
     static const TypeInfo& type_info;
@@ -18,13 +20,22 @@ public:
 
     YAML::Node to_yaml() const { return YAML::Node(c_str()); }
 
-    void check(const MiniMalloc* mm_alloc = nullptr) const;
+    void check(const SharedAlloc* sh_alloc = nullptr) const;
 
     String& operator=(const std::string& value);
 };
 
+
+// do not use reference wrapper for String class
+template<>
+struct RefWrapper<String> {
+    using W = String&;
+};
+
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class List : public FieldType<List> {
-    MiniMalloc& mm_alloc;
+    OffsetPtr<SharedAlloc> sh_alloc;
     shr_vector<Field> data;
 
 public:
@@ -62,11 +73,8 @@ public:
         Field& operator*() { return ((List&) list).data.at(index); }
     };
 
-    List() : mm_alloc(static_alloc), data(StlAllocator<Field>(static_alloc)) {
-        throw std::runtime_error("List should not be constructed without an allocator");
-    }
-
-    explicit List(MiniMalloc& mm_alloc) : mm_alloc(mm_alloc), data(StlAllocator<Field>(mm_alloc)) {
+    explicit List(SharedAlloc& sh_alloc)
+        : sh_alloc(&sh_alloc), data(StlAllocator<Field>(sh_alloc)) {
         STST_LOG_DEBUG() << "constructing List at " << this;
     }
 
@@ -75,10 +83,7 @@ public:
         clear();
     }
 
-    List(const List& other) : List() {
-        *this = other;
-    }
-
+    List(const List& other) = delete;
     List(List&&) = delete;
 
     List& operator=(const List& other) {
@@ -93,7 +98,7 @@ public:
 
     FieldAccess<true> push_back() {
         STST_LOG_DEBUG() << "this: " << this << ", cur size: " << data.size();
-        return FieldAccess<true>{data.emplace_back(), mm_alloc, this};
+        return FieldAccess<true>{data.emplace_back(), *sh_alloc, this};
     }
 
     template<typename T>
@@ -105,17 +110,19 @@ public:
         if (index > data.size()) {
             throw std::out_of_range("index out of bounds: " + std::to_string(index));
         }
-        return FieldAccess<true>{*data.emplace(data.begin() + index), mm_alloc, this};
+        return FieldAccess<true>{*data.emplace(data.begin() + index), *sh_alloc, this};
     }
 
     FieldAccess<true> operator[](size_t index) {
         if (index >= data.size()) {
             throw std::out_of_range("index out of bounds: " + std::to_string(index));
         }
-        return FieldAccess<true>{data.at(index), mm_alloc, this};
+        return FieldAccess<true>{data.at(index), *sh_alloc, this};
     }
 
-    FieldAccess<true> at(size_t index) { return FieldAccess<true>{data.at(index), mm_alloc, this}; }
+    FieldAccess<true> at(size_t index) {
+        return FieldAccess<true>{data.at(index), *sh_alloc, this};
+    }
 
     Iterator begin() const { return {(List&) *this, 0, read_lock()}; }
 
@@ -134,7 +141,7 @@ public:
     }
 
     void clear() {
-        for (Field& field: data) { FieldAccess<true>{field, mm_alloc, this}.clear(); }
+        for (Field& field: data) { FieldAccess<true>{field, *sh_alloc, this}.clear(); }
         data.clear();
     }
 
@@ -142,11 +149,13 @@ public:
 
     YAML::Node to_yaml() const;
 
-    void check(const MiniMalloc* mm_alloc = nullptr) const;
+    void check(const SharedAlloc* sh_alloc = nullptr) const;
 
     bool operator==(const List& other) const;
 };
 
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class Matrix : public FieldType<Matrix> {
 public:
     static constexpr int MAX_DIMS = 8;
@@ -154,16 +163,16 @@ public:
     static const TypeInfo& type_info;
 
 protected:
-    MiniMalloc& mm_alloc;
+    OffsetPtr<SharedAlloc> sh_alloc;
     size_t _ndim;
     size_t _shape[MAX_DIMS] = {};
-    double* _data;
+    OffsetPtr<double> _data;
 
 public:
-    Matrix(MiniMalloc& mm_alloc) : Matrix(0, 0, mm_alloc) {}
+    Matrix(SharedAlloc& sh_alloc) : Matrix(0, 0, sh_alloc) {}
 
-    Matrix(size_t ndim, const size_t* shape, MiniMalloc& mm_alloc)
-            : mm_alloc(mm_alloc), _ndim(ndim) {
+    Matrix(size_t ndim, const size_t* shape, SharedAlloc& sh_alloc)
+        : sh_alloc(&sh_alloc), _ndim(ndim) {
         if (ndim == 0) {
             _data = nullptr;
         } else {
@@ -172,19 +181,14 @@ public:
     }
 
     ~Matrix() {
-        if (_data != nullptr) {
-            mm_alloc.deallocate(_data);
-        }
+        if (_data) { sh_alloc->deallocate(_data.get()); }
     }
 
     Matrix(Matrix&&) = delete;
-
-    Matrix(const Matrix& other) : Matrix(0, 0, other.mm_alloc) {
-        *this = other;
-    }
+    Matrix(const Matrix&) = delete;
 
     Matrix& operator=(Matrix&& other) {
-        if (&mm_alloc != &other.mm_alloc) {
+        if (&sh_alloc != &other.sh_alloc) {
             throw std::runtime_error("move assignment of structstore::Matrix between different StructStores is not supported");
         }
         std::swap(_ndim, other._ndim);
@@ -194,7 +198,7 @@ public:
     }
 
     Matrix& operator=(const Matrix& other) {
-        from(other._ndim, other._shape, other._data);
+        from(other._ndim, other._shape, other._data.get());
         return *this;
     }
 
@@ -202,10 +206,10 @@ public:
 
     const size_t* shape() const { return _shape; }
 
-    double* data() { return _data; }
+    double* data() { return _data.get(); }
 
     void from(size_t ndim, const size_t* shape, const double* data) {
-        if (data == _data) {
+        if (data == _data.get()) {
             if (ndim != _ndim) {
                 throw std::runtime_error("setting matrix data to same pointer but different size");
             }
@@ -216,8 +220,8 @@ public:
             }
             return;
         }
-        if (_data != nullptr) {
-            mm_alloc.deallocate(_data);
+        if (_data) {
+            sh_alloc->deallocate(_data.get());
             _data = nullptr;
         }
         _ndim = ndim;
@@ -230,10 +234,8 @@ public:
             size *= shape[i];
         }
         if (size > 0) {
-            _data = (double*) mm_alloc.allocate(size);
-            if (data != nullptr) {
-                std::memcpy(_data, data, size);
-            }
+            _data = (double*) sh_alloc->allocate(size);
+            if (data != nullptr) { std::memcpy(_data.get(), data, size); }
         }
     }
 
@@ -241,7 +243,7 @@ public:
 
     YAML::Node to_yaml() const;
 
-    void check(const MiniMalloc* mm_alloc = nullptr) const;
+    void check(const SharedAlloc* sh_alloc = nullptr) const;
 
     bool operator==(const Matrix& other) const;
 };

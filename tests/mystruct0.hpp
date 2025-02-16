@@ -10,17 +10,13 @@ struct Frame : public stst::Struct<Frame> {
 
     double t = 0.0;
     bool flag = false;
-    double* t_ptr = &t;
+    stst::OffsetPtr<double> t_ptr = &t;
 
-    Frame() : Frame(stst::static_alloc) {}
-
-    explicit Frame(stst::MiniMalloc& mm_alloc) : Struct(mm_alloc) {
+    explicit Frame(stst::SharedAlloc& sh_alloc) : Struct(sh_alloc) {
         store_ref("t", t);
         store_ref("flag", flag);
         store_ref("t_ptr", t_ptr);
     }
-
-    Frame(const Frame& other) : Frame() { *this = other; }
 
     Frame& operator=(const Frame& other) {
         copy_from(other);

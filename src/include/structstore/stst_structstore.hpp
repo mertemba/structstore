@@ -11,8 +11,16 @@ namespace structstore {
 
 class py;
 
+// todo: when returning a FieldAccess, there should be a read lock on the parent StructStore
+
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class StructStore : public FieldType<StructStore> {
-    friend class py;
+    friend class ::structstore::typing;
+    friend class ::structstore::SharedAlloc;
+    friend class ::structstore::StlAllocator<StructStore>;
+    friend class ::structstore::StructStoreShared;
+    friend class ::structstore::py;
 
 public:
     static const TypeInfo& type_info;
@@ -20,12 +28,12 @@ public:
 protected:
     FieldMap<true> field_map;
 
+    StructStore(const StructStore& other) : StructStore{static_alloc} { *this = other; }
+
 public:
     // constructor, assignment, destructor
 
-    explicit StructStore(MiniMalloc& mm_alloc) : field_map(mm_alloc) {}
-
-    StructStore(const StructStore& other) : StructStore{static_alloc} { *this = other; }
+    explicit StructStore(SharedAlloc& sh_alloc) : field_map(sh_alloc) {}
 
     StructStore& operator=(const StructStore& other) {
         field_map.copy_from(other.field_map, this);
@@ -46,7 +54,7 @@ public:
 
     inline YAML::Node to_yaml() const { return field_map.to_yaml(); }
 
-    void check(const MiniMalloc* mm_alloc = nullptr) const;
+    void check(const SharedAlloc* sh_alloc = nullptr) const;
 
     inline bool operator==(const StructStore& other) const { return field_map == other.field_map; }
 
@@ -54,7 +62,7 @@ public:
 
     inline bool empty() const { return field_map.empty(); }
 
-    inline MiniMalloc& get_alloc() { return field_map.get_alloc(); }
+    inline SharedAlloc& get_alloc() { return field_map.get_alloc(); }
 
     FieldAccess<true> at(const std::string& name);
 
@@ -67,7 +75,7 @@ public:
         return (*this)[name];
     }
 
-    inline StructStore& substore(const std::string& name) { return get<StructStore>(name); }
+    StructStore& substore(const std::string& name) { return get<StructStore>(name); }
 
     // remove operations
 
@@ -75,6 +83,9 @@ public:
 
     inline void remove(const std::string& name) { field_map.remove(name); }
 };
+
+static_assert(std::is_same_v<unwrap_type_t<FieldRef<StructStore>>, StructStore>);
+static_assert(std::is_same_v<wrap_type_w<StructStore>, FieldRef<StructStore>>);
 } // namespace structstore
 
 #endif

@@ -1,67 +1,76 @@
 #ifndef STST_ALLOC_HPP
 #define STST_ALLOC_HPP
 
+#include "ankerl/unordered_dense.h"
 #include "structstore/mini_malloc.hpp"
 #include "structstore/stst_callstack.hpp"
 #include "structstore/stst_lock.hpp"
+#include "structstore/stst_offsetptr.hpp"
+#include "structstore/stst_utils.hpp"
 
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 #include <functional>
 #include <sstream>
 #include <stdexcept>
-#include <unordered_set>
+#include <type_traits>
 
 namespace structstore {
 
 class StringStorage;
 
-class MiniMalloc {
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
+class SharedAlloc {
     using byte = uint8_t;
     static constexpr size_t ALIGN = 8;
 
     // member variables
-    mini_malloc* mm;
+    OffsetPtr<mini_malloc> mm;
     SpinMutex mutex;
-    byte* const buffer;
-    const size_t blocksize;
-    StringStorage* string_storage;
+    const uint32_t blocksize;
+    OffsetPtr<StringStorage> string_storage;
 
 public:
-    MiniMalloc(void* buffer, size_t size);
+    SharedAlloc(void* buffer, size_t size);
 
-    ~MiniMalloc() noexcept(false);
+    ~SharedAlloc() noexcept(false);
 
-    MiniMalloc() = delete;
+    SharedAlloc() = delete;
 
-    MiniMalloc(MiniMalloc&&) = delete;
+    SharedAlloc(SharedAlloc&&) = delete;
 
-    MiniMalloc(const MiniMalloc&) = delete;
+    SharedAlloc(const SharedAlloc&) = delete;
 
-    MiniMalloc& operator=(MiniMalloc&&) = delete;
+    SharedAlloc& operator=(SharedAlloc&&) = delete;
 
-    MiniMalloc& operator=(const MiniMalloc&) = delete;
+    SharedAlloc& operator=(const SharedAlloc&) = delete;
 
     bool init() { return true; }
 
     void dispose() {}
 
-    void* allocate(size_t field_size) {
+    template<typename T = void>
+    T* allocate(size_t field_size = sizeof(T)) {
         if (field_size == 0) { field_size = ALIGN; }
         ScopedLock<true> lock{mutex};
-        void* ptr = mm_allocate(mm, field_size);
+        void* ptr = mm_allocate(mm.get(), field_size);
         if (ptr == nullptr) {
             std::ostringstream str;
-            str << "insufficient space in mm_alloc region, requested: " << field_size;
-            Callstack::throw_with_trace<std::runtime_error>(str.str());
+            str << "insufficient space in sh_alloc region, requested: " << field_size;
+            Callstack::throw_with_trace(str.str());
         }
-        return ptr;
+        assert((size_t) ptr % ALIGN == 0);
+        STST_LOG_DEBUG() << "allocating " << typeid(T).name() << " at " << ptr;
+        return (T*) ptr;
     }
 
-    void deallocate(void* ptr) {
+    void deallocate(const void* ptr) {
+        STST_LOG_DEBUG() << "deallocating at " << ptr;
         ScopedLock<true> lock{mutex};
-        mm_free(mm, ptr);
+        mm_free(mm.get(), ptr);
     }
 
     bool is_owned(const void* ptr) const {
@@ -71,7 +80,7 @@ public:
 #endif
             return false;
         }
-        if (ptr < buffer || ptr >= buffer + blocksize) {
+        if (ptr < (byte*) mm.get() || ptr >= (byte*) mm.get() + blocksize) {
 #ifndef NDEBUG
             Callstack::warn_with_trace("checked pointer is outside arena");
 #endif
@@ -80,79 +89,94 @@ public:
         return true;
     }
 
-    inline StringStorage& strings() { return *string_storage; }
+    inline StringStorage& strings() { return *string_storage.get(); }
+
+    inline const StringStorage& strings() const { return *string_storage.get(); }
 };
 
-extern MiniMalloc static_alloc;
+extern SharedAlloc& static_alloc;
+
+class StructStore;
 
 template<typename T = char>
 class StlAllocator {
     template<typename U>
     friend class StlAllocator;
 
-    MiniMalloc& mm_alloc;
+    SharedAlloc& sh_alloc;
 
 public:
     using value_type = T;
+    using pointer = OffsetPtr<T, int64_t>;
 
-    explicit StlAllocator(MiniMalloc& a) : mm_alloc(a) {}
+    explicit StlAllocator(SharedAlloc& a) : sh_alloc(a) {}
 
     template<typename U>
-    StlAllocator(const StlAllocator<U>& other) : mm_alloc(other.mm_alloc) {}
+    StlAllocator(const StlAllocator<U>& other) : sh_alloc(other.sh_alloc) {}
 
-    T* allocate(std::size_t n) { return static_cast<T*>(mm_alloc.allocate(n * sizeof(T))); }
+    T* allocate(std::size_t n) { return static_cast<T*>(sh_alloc.allocate(n * sizeof(T))); }
 
-    void deallocate(T* p, std::size_t) { mm_alloc.deallocate(p); }
+    void deallocate(T* p, std::size_t) { sh_alloc.deallocate(p); }
+    void deallocate(const OffsetPtr<T, int32_t>& p, std::size_t) { sh_alloc.deallocate(p.get()); }
+    void deallocate(const OffsetPtr<T, int64_t>& p, std::size_t) { sh_alloc.deallocate(p.get()); }
 
-    // defined in stst_typing.hpp
-    inline void construct(T* p);
+    void construct(T* p) {
+        if constexpr (std::is_constructible_v<T, SharedAlloc&> || std::is_same_v<T, StructStore>) {
+            new (p) T(sh_alloc);
+        } else if constexpr (std::is_constructible_v<T, const StlAllocator<T>&>) {
+            new (p) T(StlAllocator<T>{sh_alloc});
+        } else {
+            new (p) T();
+        }
+    }
 
     void construct(T* p, T&& other) {
-        construct(p);
-        *p = std::move(other);
+        new (p) T(std::move(other));
     }
 
     void construct(T* p, const T& other) {
-        construct(p);
-        *p = other;
+        new (p) T(other);
     }
 
     template<typename U>
     bool operator==(StlAllocator<U> const& rhs) const {
-        return &mm_alloc == &rhs.mm_alloc;
+        return &sh_alloc == &rhs.sh_alloc;
     }
 
     template<typename U>
     bool operator!=(StlAllocator<U> const& rhs) const {
-        return &mm_alloc != &rhs.mm_alloc;
+        return &sh_alloc != &rhs.sh_alloc;
     }
 
-    MiniMalloc& get_alloc() { return mm_alloc; }
+    SharedAlloc& get_alloc() { return sh_alloc; }
 };
 
 using shr_string = std::basic_string<char, std::char_traits<char>, StlAllocator<char>>;
 
+using shr_string_idx = uint16_t;
+
 template<class T>
 using shr_vector = std::vector<T, StlAllocator<T>>;
 
-template<class K, class T>
-using shr_unordered_map = std::unordered_map<K, T, std::hash<K>, std::equal_to<K>,
-                                             StlAllocator<std::pair<const K, T>>>;
+template<class K, class T, class H = ankerl::unordered_dense::hash<K>>
+using shr_unordered_map = ankerl::unordered_dense::map<K, T, H, std::equal_to<K>,
+                                                       StlAllocator<std::pair<const K, T>>>;
 
-template<class T>
-using shr_unordered_set = std::unordered_set<T, std::hash<T>, std::equal_to<T>, StlAllocator<T>>;
-
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class StringStorage {
-    MiniMalloc& mm_alloc;
-    shr_unordered_set<shr_string> data;
-    SpinMutex mutex;
+    shr_unordered_map<shr_string, shr_string_idx> map;
+    shr_vector<shr_string> data;
+    mutable SpinMutex mutex;
 
 public:
-    StringStorage(MiniMalloc& mm_alloc) : mm_alloc{mm_alloc}, data{StlAllocator<int>(mm_alloc)} {}
+    StringStorage(SharedAlloc& sh_alloc);
 
-    const shr_string* internalize(const std::string& str);
+    shr_string_idx internalize(const std::string& str, SharedAlloc& sh_alloc);
 
-    const shr_string* get(const std::string& str);
+    shr_string_idx get_idx(const std::string& str, SharedAlloc& sh_alloc) const;
+
+    const shr_string* get(shr_string_idx idx) const;
 };
 
 } // namespace structstore

@@ -123,6 +123,7 @@ static size_index_type get_size_index_upper(size_type size_) {
 }
 
 static size_index_type get_size_index_lower(size_type size) {
+    assert(size % ALIGN == 0);
     size_index_type idx = get_size_index_upper(size);
     assert(idx >= 0 && idx < SIZES_COUNT);
     while (size < sizes[idx]) {
@@ -165,10 +166,9 @@ static void prepend_free_node(mini_malloc* mm, memnode* node, size_index_type si
     attach_free_nodes(node, old_first_free);
 }
 
-mini_malloc* structstore::init_mini_malloc(void* buffer, size_t blocksize) {
-    mini_malloc* mm = (mini_malloc*) buffer;
+void structstore::init_mini_malloc(mini_malloc* mm, size_t blocksize) {
     static_assert((sizeof(mini_malloc) % ALIGN) == 0);
-    buffer = (byte*) buffer + sizeof(mini_malloc);
+    byte* buffer = (byte*) mm + sizeof(mini_malloc);
     blocksize -= sizeof(mini_malloc);
 
     // ensure alignment
@@ -200,13 +200,15 @@ mini_malloc* structstore::init_mini_malloc(void* buffer, size_t blocksize) {
     last_node->size = 0;
     set_next_free_node(get_free_nodes_head(mm, SIZES_COUNT - 1), block_node);
     assert((byte*) last_node + ALLOC_NODE_SIZE == (byte*) buffer + blocksize);
-    return mm;
 }
 
 void* structstore::mm_allocate(mini_malloc* mm, size_t size) {
     if (size == 0) return NULL;
 
-    if (size % ALIGN) { size += ALIGN - size % ALIGN; }
+    if (size % ALIGN) {
+        size += ALIGN - size % ALIGN;
+        assert(size % ALIGN == 0);
+    }
     size_index_type size_index = get_size_index_upper(size);
     assert(size_index >= 0 && size_index < SIZES_COUNT);
     if (size_index < SIZES_COUNT - 1) { size = sizes[size_index]; }
@@ -233,6 +235,7 @@ void* structstore::mm_allocate(mini_malloc* mm, size_t size) {
     int32_t left_size = node->size - size - ALLOC_NODE_SIZE;
     assert(left_size >= -ALLOC_NODE_SIZE);
     if (left_size >= ALIGN) {
+        assert(left_size % ALIGN == 0);
         size_index_type left_size_index = get_size_index_lower(left_size);
         memnode* new_node = (memnode*) (((byte*) node) + size + ALLOC_NODE_SIZE);
         new_node->size = left_size;
@@ -258,6 +261,7 @@ static void join_with_next(mini_malloc* mm, memnode* node) {
     memnode* next_node = get_next_node(node);
     if (next_node == NULL || is_allocated(next_node)) { return; }
     node->size += next_node->size + ALLOC_NODE_SIZE;
+    assert(node->size % ALIGN == 0);
     // remove node from free nodes list:
     attach_free_nodes(get_prev_free_node(node), get_next_free_node(node));
     // remove next_node from nodes lists:
@@ -270,10 +274,11 @@ static void join_with_next(mini_malloc* mm, memnode* node) {
     prepend_free_node(mm, node, size_index);
 }
 
-void structstore::mm_free(mini_malloc* mm, void* ptr) {
+void structstore::mm_free(mini_malloc* mm, const void* ptr) {
     if (!ptr) return;
 
     memnode* node = (memnode*) (((byte*) ptr) - ALLOC_NODE_SIZE);
+    assert(node->size % ALIGN == 0);
     size_index_type size_index = get_size_index_lower(node->size);
     set_unallocated(node);
     // prepend node to free nodes list:

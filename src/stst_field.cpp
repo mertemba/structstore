@@ -6,33 +6,33 @@
 
 using namespace structstore;
 
-void Field::to_text(std::ostream& os) const {
+void FieldView::to_text(std::ostream& os) const {
     const auto& type_info = typing::get_type(type_hash);
     type_info.serialize_text_fn(os, data);
 }
 
-YAML::Node Field::to_yaml() const {
+YAML::Node FieldView::to_yaml() const {
     const auto& type_info = typing::get_type(type_hash);
     return type_info.serialize_yaml_fn(data);
 }
 
-void Field::construct_copy_from(MiniMalloc& mm_alloc, const Field& other,
+void Field::construct_copy_from(SharedAlloc& sh_alloc, const Field& other,
                                 const FieldTypeBase* parent_field) {
     assert_empty();
     type_hash = other.type_hash;
     const auto& type_info = typing::get_type(type_hash);
-    data = mm_alloc.allocate(type_info.size);
-    type_info.constructor_fn(mm_alloc, data, parent_field);
-    type_info.copy_fn(mm_alloc, data, other.data);
+    data = sh_alloc.allocate(type_info.size);
+    type_info.constructor_fn(sh_alloc, data.get(), parent_field);
+    type_info.copy_fn(sh_alloc, data.get(), other.data.get());
 }
 
-void Field::copy_from(MiniMalloc& mm_alloc, const Field& other) {
+void Field::copy_from(SharedAlloc& sh_alloc, const Field& other) {
     assert_nonempty();
     if (type_hash != other.type_hash) {
         throw std::runtime_error("copying field with different type");
     }
     const auto& type_info = typing::get_type(type_hash);
-    type_info.copy_fn(mm_alloc, data, other.data);
+    type_info.copy_fn(sh_alloc, data.get(), other.data.get());
 }
 
 void Field::move_from(Field& other) {
@@ -41,18 +41,14 @@ void Field::move_from(Field& other) {
     std::swap(data, other.data);
 }
 
-void Field::check(const MiniMalloc& mm_alloc, const FieldTypeBase& parent_field) const {
-    CallstackEntry entry{"structstore::Field::check()"};
-    stst_assert(mm_alloc.is_owned(this));
+void FieldView::check(const SharedAlloc& sh_alloc, const FieldTypeBase& parent_field) const {
+    CallstackEntry entry{"structstore::FieldView::check()"};
     if (data) {
-        stst_assert(mm_alloc.is_owned(data));
+        stst_assert(sh_alloc.is_owned(data));
         const TypeInfo& type_info = typing::get_type(type_hash);
-        type_info.check_fn(mm_alloc, data, parent_field);
+        type_info.check_fn(sh_alloc, data, parent_field);
     }
 }
-
-template<>
-FieldView::FieldView(StructStoreShared& store) : field{&*store} {}
 
 template<>
 ::structstore::String& FieldAccess<false>::get_str() {

@@ -17,7 +17,7 @@ class TestPickle0(unittest.TestCase):
         state.lst = [1, 2, 3, 5, 8]
         state.tuple = (0.0, 0.0)
         state.check()
-        
+
         data = pickle.dumps(state)
         state2 = pickle.loads(data)
         print(state2)

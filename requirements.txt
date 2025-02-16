@@ -24,9 +24,6 @@ lark==1.2.2 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:ca807d0162cd16cef15a8feecb862d7319e7a09bdb13aef927968e45040fed80
 nanobind-stubgen==0.1.5 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:3f4e3c852dfb6ce2bd51fa5e710f3019180176669280fd00e7293e08dee76709
-nanobind==2.4.0 ; python_version >= "3.10" and python_version < "4.0" \
-    --hash=sha256:8cf27b04fbadeb9deb4a73f02bd838bf9f7e3e5a8ce44c50c93142b5728da58a \
-    --hash=sha256:a0392dee5f58881085b2ac8bfe8e53f74285aa4868b1472bfaf76cfb414e1c96
 numpy==2.2.1 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:059e6a747ae84fce488c3ee397cee7e5f905fd1bda5fb18c66bc41807ff119b2 \
     --hash=sha256:08ef779aed40dbc52729d6ffe7dd51df85796a702afbf68a4f4e41fafdc8bda5 \

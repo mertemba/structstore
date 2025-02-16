@@ -28,12 +28,10 @@ class TestBytes0(unittest.TestCase):
         print(shmem.deepcopy())
         shmem.check()
         buf = shmem.to_bytes()
-        addr = shmem.addr()
         del shmem
 
         shmem = structstore.StructStoreShared(
-            "/dyn_shdata_store2", 4096, reinit=True, cleanup=structstore.CleanupMode.ALWAYS,
-            target_addr=addr)
+            "/dyn_shdata_store2", 4096, reinit=True, cleanup=structstore.CleanupMode.ALWAYS)
         shmem.from_bytes(buf)
         print(shmem.deepcopy())
         shmem.check()

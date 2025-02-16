@@ -1,8 +1,7 @@
+from types import SimpleNamespace
 import unittest
-from dataclasses import dataclass
-from typing import Dict, List
+import pickle
 
-import numpy as np
 from _mystruct0_py import Frame, Track
 
 import structstore
@@ -13,7 +12,7 @@ class TestMystruct0(unittest.TestCase):
         frame = Frame()
         frame.t = 2.5
         self.assertEqual(frame, frame)
-        self.assertEqual(type(frame.copy()), dict)
+        self.assertEqual(type(frame.copy()), SimpleNamespace)
         state = structstore.StructStore()
         state.frame = frame
         self.assertEqual(state.frame.t, 2.5)
@@ -33,6 +32,28 @@ class TestMystruct0(unittest.TestCase):
         self.assertNotEqual(state.track.frame1, state.track.frame2)
         state.track.frame_ptr = state.frame
         self.assertEqual(type(state.track.frame_ptr), Frame)
-        self.assertEqual(type(state.track.frame_ptr.copy()), dict)
+        self.assertEqual(type(state.track.frame_ptr.copy()), SimpleNamespace)
         self.assertEqual(state.track.frame_ptr, state.frame)
+        frame_ptr = state.track.deepcopy().frame_ptr
+        self.assertEqual(type(frame_ptr), SimpleNamespace)
         state.check()
+
+        self.assertEqual(dir(state.track), ["frame1", "frame2", "frame_ptr"])
+
+        shmem = structstore.StructStoreShared("/dyn_shdata_store2", 16384)
+        shmem.frame = Frame()
+
+        def assign_invalid_ptr():
+            try:
+                state.track.frame_ptr = shmem.frame
+            except RuntimeError as e:
+                self.assertEqual(str(e), 'cannot assign pointer to different memory region')
+                raise
+
+        self.assertRaises(RuntimeError, assign_invalid_ptr)
+
+        state.frame = state.frame.deepcopy()
+        state.track.frame1 = state.frame.deepcopy()
+
+        data = pickle.dumps(state.frame)
+        frame = pickle.loads(data)

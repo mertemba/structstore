@@ -3,29 +3,19 @@
 #include "structstore/stst_callstack.hpp"
 #include "structstore/stst_structstore.hpp"
 
+// todo: provide a .to_local() method to get a StructStore copy using static_alloc
+
 using namespace structstore;
 
-std::random_device structstore::rnd_dev;
-
 StructStoreShared::SharedData::SharedData(size_t size, size_t bufsize, void* buffer)
-    : original_ptr{this}, size{size}, usage_count{1}, mm_alloc{buffer, bufsize},
-      invalidated{false} {
-    store = StlAllocator<StructStore>(mm_alloc).allocate(1);
-    new (store) StructStore(mm_alloc);
+    : size{size}, usage_count{1}, sh_alloc{buffer, bufsize}, invalidated{false} {
+    store = sh_alloc.allocate<StructStore>();
+    new (store.get()) StructStore(sh_alloc);
 }
 
-StructStoreShared::StructStoreShared(
-        const std::string& path,
-        size_t bufsize,
-        bool reinit,
-        bool use_file,
-        CleanupMode cleanup,
-        void* target_addr)
-        : path(path),
-          fd{-1},
-          sh_data_ptr{nullptr},
-          use_file{use_file},
-          cleanup{cleanup} {
+StructStoreShared::StructStoreShared(const std::string& path, size_t bufsize, bool reinit,
+                                     bool use_file, CleanupMode cleanup)
+    : path(path), fd{-1}, sh_data_ptr{nullptr}, use_file{use_file}, cleanup{cleanup} {
 
     if (use_file) {
         fd = FD(open(path.c_str(), O_EXCL | O_CREAT | O_RDWR, 0600));
@@ -101,31 +91,10 @@ StructStoreShared::StructStoreShared(
 
         // share memory
 
-        if (target_addr == nullptr) {
-            // choose a random address in 48 bit space to avoid collisions
-            std::mt19937 rng(rnd_dev());
-            std::uniform_int_distribution<std::mt19937::result_type> dist(1, 1 << 30);
-            target_addr = (void*) (((uint64_t) dist(rng)) << (47 - 30));
-        }
-        auto map_flags = MAP_SHARED | MAP_FIXED_NOREPLACE;
-        #ifdef __SANITIZE_ADDRESS__
-        target_addr = nullptr;
-        map_flags = MAP_SHARED;
-        #endif
-        sh_data_ptr = (SharedData*) mmap(
-                target_addr,
-                size,
-                PROT_READ | PROT_WRITE,
-                map_flags,
-                fd.get(),
-                0);
+        sh_data_ptr =
+                (SharedData*) mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
 
-        if (sh_data_ptr == MAP_FAILED) {
-            throw std::runtime_error("mmap'ing new memory failed");
-        }
-        if (target_addr != nullptr && sh_data_ptr != target_addr) {
-            throw std::runtime_error("mmap'ing new memory to requested address failed");
-        }
+        if (sh_data_ptr == MAP_FAILED) { throw std::runtime_error("mmap'ing new memory failed"); }
 
         // initialize data
 
@@ -161,30 +130,10 @@ StructStoreShared::StructStoreShared(int fd, bool init)
     size_t bufsize = size - sizeof(SharedData);
 
     if (init) {
-        // choose a random address in 48 bit space to avoid collisions
-        std::mt19937 rng(rnd_dev());
-        std::uniform_int_distribution<std::mt19937::result_type> dist(1, 1 << 30);
-        void* target_addr = (void*) (((uint64_t) dist(rng)) << (47 - 30));
         // map new memory
-        auto map_flags = MAP_SHARED | MAP_FIXED_NOREPLACE;
-        #ifdef __SANITIZE_ADDRESS__
-        target_addr = nullptr;
-        map_flags = MAP_SHARED;
-        #endif
-        sh_data_ptr = (SharedData*) mmap(
-                target_addr,
-                size,
-                PROT_READ | PROT_WRITE,
-                map_flags,
-                fd,
-                0);
+        sh_data_ptr = (SharedData*) mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
-        if (sh_data_ptr == MAP_FAILED) {
-            throw std::runtime_error("mmap'ing new memory failed");
-        }
-        if (sh_data_ptr != target_addr) {
-            throw std::runtime_error("mmap'ing new memory to requested address failed");
-        }
+        if (sh_data_ptr == MAP_FAILED) { throw std::runtime_error("mmap'ing new memory failed"); }
 
         // initialize data
         static_assert((sizeof(SharedData) % 8) == 0);
@@ -200,15 +149,8 @@ StructStoreShared::StructStoreShared(int fd, bool init)
 
 void StructStoreShared::mmap_existing_fd() {
 
-    SharedData* original_ptr;
-
-    ssize_t result = read(fd.get(), &original_ptr, sizeof(SharedData*));
-    if (result != sizeof(SharedData*)) {
-        throw std::runtime_error("reading original pointer failed");
-    }
-
     size_t size;
-    result = read(fd.get(), &size, sizeof(size_t));
+    ssize_t result = read(fd.get(), &size, sizeof(size_t));
 
     if (result != sizeof(size_t)) {
         throw std::runtime_error("reading original size failed");
@@ -219,24 +161,10 @@ void StructStoreShared::mmap_existing_fd() {
     }
 
     lseek(fd.get(), 0, SEEK_SET);
-    sh_data_ptr = (SharedData*) mmap(
-            original_ptr,
-            size,
-            PROT_READ | PROT_WRITE,
-            // ensures that the shared memory segment is mapped
-            // to the same region of memory for all processes
-            // the memory allocator relies on that
-            MAP_SHARED | MAP_FIXED_NOREPLACE,
-            fd.get(),
-            0);
+    sh_data_ptr =
+            (SharedData*) mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
 
-    if (sh_data_ptr == MAP_FAILED || sh_data_ptr != original_ptr) {
-        throw std::runtime_error("mmap'ing existing memory failed");
-    }
-
-    if (sh_data_ptr->original_ptr != original_ptr) {
-        throw std::runtime_error("inconsistency detected");
-    }
+    if (sh_data_ptr == MAP_FAILED) { throw std::runtime_error("mmap'ing existing memory failed"); }
 
     ++sh_data_ptr->usage_count;
 
@@ -308,8 +236,8 @@ void StructStoreShared::close() {
         // if cleanup == ALWAYS this ensure that unlink is done exactly once
         if (sh_data_ptr->invalidated.compare_exchange_strong(expected, true, std::memory_order_acquire)) {
             sh_data_ptr->store->~StructStore();
-            sh_data_ptr->mm_alloc.deallocate(sh_data_ptr->store);
-            sh_data_ptr->mm_alloc.~MiniMalloc();
+            sh_data_ptr->sh_alloc.deallocate(sh_data_ptr->store.get());
+            sh_data_ptr->sh_alloc.~SharedAlloc();
             if (use_file) {
                 unlink(path.c_str());
             } else {
@@ -335,9 +263,6 @@ void StructStoreShared::from_buffer(void* buffer, size_t bufsize) {
     if (bufsize < ((SharedData*) buffer)->size) {
         throw std::runtime_error("source buffer too small");
     }
-    if (((SharedData*) buffer)->original_ptr != sh_data_ptr) {
-        throw std::runtime_error("target address mismatch; please reopen with correct target address");
-    }
     std::memcpy(sh_data_ptr, buffer, ((SharedData*) buffer)->size);
 }
 
@@ -349,6 +274,5 @@ bool StructStoreShared::operator==(const StructStoreShared& other) const {
 
 void StructStoreShared::check() const {
     CallstackEntry entry{"structstore::StructStoreShared::check()"};
-    stst_assert(sh_data_ptr->mm_alloc.is_owned(sh_data_ptr->store));
-    sh_data_ptr->store->check(&sh_data_ptr->mm_alloc);
+    sh_data_ptr->store->check(&sh_data_ptr->sh_alloc);
 }

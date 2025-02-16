@@ -12,12 +12,14 @@ using namespace structstore;
 
 namespace nb = nanobind;
 
-std::unordered_map<uint64_t, const py::PyType>& py::get_py_types() {
-    static auto* from_python_fns = new std::unordered_map<uint64_t, const py::PyType>();
+nb::object py::SimpleNamespace;
+
+std::unordered_map<type_hash_t, const py::PyType>& py::get_py_types() {
+    static auto* from_python_fns = new std::unordered_map<type_hash_t, const py::PyType>();
     return *from_python_fns;
 }
 
-const py::PyType& py::get_py_type(uint64_t type_hash) {
+const py::PyType& py::get_py_type(type_hash_t type_hash) {
     try {
         return py::get_py_types().at(type_hash);
     } catch (const std::out_of_range&) {
@@ -29,33 +31,45 @@ const py::PyType& py::get_py_type(uint64_t type_hash) {
 
 __attribute__((__visibility__("default"))) nb::object
 py::field_map_to_python(const FieldMapBase& field_map, py::ToPythonMode mode) {
-    auto dict = nb::dict();
-    for (const shr_string* str: field_map.get_slots()) {
-        auto key = nb::str(str->c_str());
+    CallstackEntry entry{"py::field_map_to_python()"};
+    auto obj = SimpleNamespace();
+    for (shr_string_idx str_idx: field_map.get_slots()) {
+        auto key = nb::str(field_map.get_alloc().strings().get(str_idx)->c_str());
         if (mode == py::ToPythonMode::RECURSIVE) {
-            dict[key] = py::to_python(field_map.at(str), py::ToPythonMode::RECURSIVE);
+            nb::setattr(obj, key,
+                        py::to_python(field_map.at(str_idx).view(), py::ToPythonMode::RECURSIVE));
         } else { // non-recursive convert
-            dict[key] = py::to_python_cast(field_map.at(str));
+            nb::setattr(obj, key, py::to_python_cast(field_map.at(str_idx).view()));
         }
     }
-    return dict;
+    return obj;
 }
 
-__attribute__((__visibility__("default"))) nb::object py::to_python(const Field& field,
+__attribute__((__visibility__("default"))) void
+py::field_map_from_python(FieldMap<false>& field_map, const nb::dict& dict,
+                          const FieldTypeBase& parent_field) {
+    STST_LOG_DEBUG() << "copying __dict__ to " << &field_map;
+    if (field_map.get_slots().size() != dict.size()) {
+        Callstack::throw_with_trace("cannot copy dict with wrong fields into struct");
+    }
+    for (shr_string_idx str_idx: field_map.get_slots()) {
+        std::string key_str = field_map.get_alloc().strings().get(str_idx)->c_str();
+        py::set_field(field_map, key_str, dict[key_str.c_str()], parent_field);
+    }
+}
+
+__attribute__((__visibility__("default"))) nb::object py::to_python(const FieldView& field_view,
                                                                     ToPythonMode mode) {
-    if (field.empty()) {
-        return nb::none();
-    }
-    py::ToPythonFn to_python_fn = py::get_to_python_fn(field.get_type_hash());
-    return to_python_fn(field, mode);
+    if (field_view.empty()) { return nb::none(); }
+    py::ToPythonFn to_python_fn = py::get_to_python_fn(field_view.get_type_hash());
+    return to_python_fn(field_view, mode);
 }
 
-__attribute__((__visibility__("default"))) nb::object py::to_python_cast(const Field& field) {
-    if (field.empty()) {
-        return nb::none();
-    }
-    py::ToPythonCastFn to_python_cast_fn = py::get_to_python_cast_fn(field.get_type_hash());
-    return to_python_cast_fn(field);
+__attribute__((__visibility__("default"))) nb::object
+py::to_python_cast(const FieldView& field_view) {
+    if (field_view.empty()) { return nb::none(); }
+    py::ToPythonCastFn to_python_cast_fn = py::get_to_python_cast_fn(field_view.get_type_hash());
+    return to_python_cast_fn(field_view);
 }
 
 __attribute__((__visibility__("default"))) void
@@ -111,7 +125,7 @@ __attribute__((__visibility__("default"))) nb::object py::get_field(const FieldM
     if (field == nullptr) {
         throw nb::attribute_error();
     }
-    return to_python_cast(*field);
+    return to_python_cast(field->view());
 }
 
 __attribute__((__visibility__("default"))) void py::set_field(FieldMap<false>& field_map,

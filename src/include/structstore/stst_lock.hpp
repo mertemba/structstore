@@ -5,6 +5,8 @@
 
 namespace structstore {
 
+// instances of this class reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 class SpinMutex {
     template<bool write>
     friend class ScopedLock;
@@ -14,10 +16,10 @@ class SpinMutex {
     // randomly assigned pseudo thread id
     static thread_local uint32_t tid;
 
-    // >0 is read-locked, 0 is unlocked, <0 is write-locked
-    std::atomic_int32_t level{0};
     // thread id currently holding the write lock, or zero
     uint32_t write_lock_tid{0};
+    // >0 is read-locked, 0 is unlocked, <0 is write-locked
+    std::atomic_int16_t level{0};
 
     SpinMutex(SpinMutex&&) = delete;
 
@@ -32,6 +34,9 @@ class SpinMutex {
 
     void write_lock();
     void write_unlock();
+
+    void read_or_write_lock();
+    void read_or_write_unlock();
 
 public:
     SpinMutex() = default;

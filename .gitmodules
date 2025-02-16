@@ -1,0 +1,6 @@
+[submodule "ext/nanobind"]
+	path = ext/nanobind
+	url = https://github.com/wjakob/nanobind
+[submodule "ext/ankerl_unordered_dense"]
+	path = ext/ankerl_unordered_dense
+	url = https://github.com/martinus/unordered_dense

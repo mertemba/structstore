@@ -16,3 +16,8 @@ fi
 if [ ! -z "$BUILD_WITH_SANITIZER" ]; then
     cmake_options="$cmake_options -DBUILD_WITH_SANITIZER=ON"
 fi
+if [ ! -z "$BUILD_RELEASE" ]; then
+    cmake_options="$cmake_options -DCMAKE_BUILD_TYPE=RelWithDebInfo"
+else
+    cmake_options="$cmake_options -DCMAKE_BUILD_TYPE=Debug"
+fi

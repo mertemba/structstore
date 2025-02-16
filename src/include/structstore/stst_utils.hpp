@@ -60,16 +60,13 @@ class NilLog {
 
 #define stst_assert(expr)                                                                          \
     do {                                                                                           \
-        if (!(expr)) {                                                                             \
-            structstore::Callstack::throw_with_trace<std::runtime_error>(                          \
-                    "assertion failed: " #expr);                                                   \
-        }                                                                                          \
+        if (!(expr)) { structstore::Callstack::throw_with_trace("assertion failed: " #expr); }     \
     } while (0)
 
-constexpr uint64_t const_hash(const char* input) {
+constexpr uint32_t const_hash(const char* input) {
     // FNV1a hash of reversed string
-    return *input != 0 ? (const_hash(input + 1) ^ uint64_t((uint8_t) *input)) * 0x100000001b3ull
-                       : 0xcbf29ce484222325ull;
+    return *input != 0 ? (const_hash(input + 1) ^ uint32_t((uint8_t) *input)) * 0x01000193ul
+                       : 0x811C9DC5ul;
 }
 
 } // namespace structstore

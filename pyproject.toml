@@ -6,13 +6,12 @@ authors = [{ 'name' = 'Max Mertens', 'email' = 'max.mail@dameweb.de' }]
 license = { 'file' = 'LICENSE' }
 readme = 'README.md'
 urls = { 'Homepage' = 'https://github.com/mertemba/structstore' }
-dependencies = ['nanobind']
+dependencies = []
 dynamic = ['version']
 
 [build-system]
 requires = [
     'py-build-cmake~=0.1.8',
-    'nanobind~=2.2.0',
     'nanobind-stubgen~=0.1.5',
 ]
 build-backend = 'py_build_cmake.build'
@@ -22,7 +21,7 @@ name = 'structstore'
 directory = 'src'
 
 [tool.py-build-cmake.sdist]
-include = ['CMakeLists.txt', 'cmake/*', 'src/include/structstore/*.hpp', 'src/*.cpp']
+include = ['CMakeLists.txt', 'cmake/*', 'src/include/structstore/*.hpp', 'src/*.cpp', 'ext/*']
 exclude = []
 
 [tool.py-build-cmake.cmake]
@@ -61,7 +60,6 @@ version = '0'
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
 py-build-cmake = "^0.3.4"
-nanobind = "^2.4.0"
 nanobind-stubgen = "^0.1.5"
 numpy = "^2.2.0"
 build = "^1.2.2.post1"
