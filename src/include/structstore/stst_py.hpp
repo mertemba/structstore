@@ -21,10 +21,6 @@ namespace nanobind::detail {
 template<class T>
 class type_caster<structstore::shr_vector<T>>
     : public type_caster_base<structstore::shr_vector<T>> {};
-
-template<class K, class T>
-class type_caster<structstore::shr_unordered_map<K, T>>
-    : public type_caster_base<structstore::shr_unordered_map<K, T>> {};
 } // namespace nanobind::detail
 
 namespace structstore {

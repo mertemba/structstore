@@ -200,7 +200,10 @@ private:
         ti.cmp_equal_fn = [](const void* t, const void* other) {
             return *(const T*) t == *(const T*) other || **(const T*) t == **(const T*) other;
         };
-        ti.copy_fn = [](SharedAlloc&, void* t, const void* other) { *(T*) t = *(const T*) other; };
+        ti.copy_fn = [](SharedAlloc& sh_alloc, void* t, const void* other) {
+            // copy pointer only if it points to the same memory region
+            if (sh_alloc.is_owned((*(const T*) other).get())) { *(T*) t = *(const T*) other; }
+        };
         return ti;
     }
 
