@@ -102,9 +102,11 @@ class StructStoreShared {
 
     std::string path{};
     FD fd{};
-    SharedData* sh_data_ptr{};
-    bool use_file{};
-    CleanupMode cleanup{};
+    SharedData* sh_data_ptr = nullptr;
+    bool use_file = false;
+    CleanupMode cleanup = NEVER;
+
+    void mmap_existing_fd();
 
 public:
     explicit StructStoreShared(const std::string& path, size_t bufsize = 4096, bool reinit = false,
@@ -117,21 +119,13 @@ public:
     }
 
     StructStoreShared& operator=(StructStoreShared&& other) noexcept {
-        path = std::move(other.path);
-        fd = std::move(other.fd);
-        sh_data_ptr = other.sh_data_ptr;
-        use_file = other.use_file;
-        cleanup = other.cleanup;
-        other.sh_data_ptr = nullptr;
-        other.cleanup = NEVER;
+        std::swap(path, other.path);
+        std::swap(fd, other.fd);
+        std::swap(sh_data_ptr, other.sh_data_ptr);
+        std::swap(use_file, other.use_file);
+        std::swap(cleanup, other.cleanup);
         return *this;
     }
-
-private:
-
-    void mmap_existing_fd();
-
-public:
 
     bool valid() const {
         return sh_data_ptr != nullptr && !sh_data_ptr->invalidated.load();

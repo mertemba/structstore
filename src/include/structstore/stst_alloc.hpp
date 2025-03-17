@@ -98,57 +98,55 @@ extern SharedAlloc& static_alloc;
 
 class StructStore;
 
+// instances of this class can reside in shared memory, thus no raw pointers
+// or references should be used; use structstore::OffsetPtr<T> instead.
 template<typename T = char>
 class StlAllocator {
     template<typename U>
     friend class StlAllocator;
 
-    SharedAlloc& sh_alloc;
+    OffsetPtr<SharedAlloc, int64_t> sh_alloc;
 
 public:
     using value_type = T;
     using pointer = OffsetPtr<T, int64_t>;
 
-    explicit StlAllocator(SharedAlloc& a) : sh_alloc(a) {}
+    explicit StlAllocator(SharedAlloc& a) : sh_alloc(&a) {}
 
     template<typename U>
-    StlAllocator(const StlAllocator<U>& other) : sh_alloc(other.sh_alloc) {}
+    StlAllocator(const StlAllocator<U>& other) : sh_alloc(other.sh_alloc.get()) {}
 
-    T* allocate(std::size_t n) { return static_cast<T*>(sh_alloc.allocate(n * sizeof(T))); }
+    T* allocate(std::size_t n) { return static_cast<T*>(sh_alloc->allocate(n * sizeof(T))); }
 
-    void deallocate(T* p, std::size_t) { sh_alloc.deallocate(p); }
-    void deallocate(const OffsetPtr<T, int32_t>& p, std::size_t) { sh_alloc.deallocate(p.get()); }
-    void deallocate(const OffsetPtr<T, int64_t>& p, std::size_t) { sh_alloc.deallocate(p.get()); }
+    void deallocate(T* p, std::size_t) { sh_alloc->deallocate(p); }
+    void deallocate(const OffsetPtr<T, int32_t>& p, std::size_t) { sh_alloc->deallocate(p.get()); }
+    void deallocate(const OffsetPtr<T, int64_t>& p, std::size_t) { sh_alloc->deallocate(p.get()); }
 
     void construct(T* p) {
         if constexpr (std::is_constructible_v<T, SharedAlloc&> || std::is_same_v<T, StructStore>) {
-            new (p) T(sh_alloc);
+            new (p) T(*sh_alloc);
         } else if constexpr (std::is_constructible_v<T, const StlAllocator<T>&>) {
-            new (p) T(StlAllocator<T>{sh_alloc});
+            new (p) T(StlAllocator<T>{*sh_alloc});
         } else {
             new (p) T();
         }
     }
 
-    void construct(T* p, T&& other) {
-        new (p) T(std::move(other));
-    }
+    void construct(T* p, T&& other) { new (p) T(std::move(other)); }
 
-    void construct(T* p, const T& other) {
-        new (p) T(other);
-    }
+    void construct(T* p, const T& other) { new (p) T(other); }
 
     template<typename U>
     bool operator==(StlAllocator<U> const& rhs) const {
-        return &sh_alloc == &rhs.sh_alloc;
+        return sh_alloc.get() == rhs.sh_alloc.get();
     }
 
     template<typename U>
     bool operator!=(StlAllocator<U> const& rhs) const {
-        return &sh_alloc != &rhs.sh_alloc;
+        return sh_alloc.get() != rhs.sh_alloc.get();
     }
 
-    SharedAlloc& get_alloc() { return sh_alloc; }
+    SharedAlloc& get_alloc() { return *sh_alloc; }
 };
 
 using shr_string = std::basic_string<char, std::char_traits<char>, StlAllocator<char>>;
