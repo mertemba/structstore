@@ -44,8 +44,8 @@ class NilLog {
 };
 
 #ifdef NDEBUG
-#define STST_LOG_DEBUG() NilLog()
-#define STST_LOG_INFO() NilLog()
+#define STST_LOG_DEBUG() structstore::NilLog()
+#define STST_LOG_INFO() structstore::NilLog()
 #else
 #define STST_LOG_DEBUG()                                                                           \
     if (structstore::Log::Level::DEBUG >= structstore::Log::level) structstore::Log("debug: ")

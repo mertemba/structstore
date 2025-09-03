@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <structstore/structstore.hpp>
+#include <structstore/stst_alloc.hpp>
 
 namespace stst = structstore;
 

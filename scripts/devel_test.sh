@@ -12,8 +12,8 @@ source "$venvdir/bin/activate"
 export ASAN_OPTIONS=verify_asan_link_order=0
 
 # build, just to be sure everything is up-to-date
-cmake --build "$builddir"
-cmake --install "$builddir"
+cmake --build "$builddir" || cmake --build "$builddir" -j1
+cmake --install "$builddir" >/dev/null
 
 # add test Python libs to search path
 export PYTHONPATH="$PYTHONPATH:$builddir"

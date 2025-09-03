@@ -89,6 +89,13 @@ TEST(StructStoreTestBasic, sharedStore) {
     str << *shsettings_store;
     EXPECT_EQ(str.str(), "{\"num\":5,\"value\":3.14,\"flag\":1,\"str\":foo,\"subsettings\":{\"subnum\":42,\"substr\":bar,},}");
     shsettings_store.check();
+    auto& lst = shsettings_store->get<stst::List>("lst");
+    lst.push_back() = 42;
+    stst::StructStoreShared shsettings_store2("/shsettings_store");
+    auto& lst2 = shsettings_store2->get<stst::List>("lst");
+    lst2.clear();
+    lst2.push_back() = 43;
+    EXPECT_EQ(*shsettings_store, *shsettings_store2);
 }
 
 TEST(StructStoreTestBasic, cmpEqual) {

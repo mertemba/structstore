@@ -133,12 +133,9 @@ mmap'ed by several processes.
   bool, list, NumPy float64 vectors, 2D NumPy float64 arrays, nested structures.
 * The arena memory region currently has a fixed size, i.e. at some point,
   additional allocations will throw an exception.
-* Shared memory is mmap'ed to the same address in all processes (using
-  MAP_FIXED_NOREPLACE), this might fail when the memory region is already
-  reserved in a process.
+* The arena memory region is limited to a size of 2GB due to 32bit offset pointers.
 * Opening shared memory multiple times (e.g. in separate threads) from one
   process is currently not supported.
-* Locking a shared structure (or parts of it) currently has only basic support.
 
 ## License
 

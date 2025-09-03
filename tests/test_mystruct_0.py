@@ -41,6 +41,18 @@ class TestMystruct0(unittest.TestCase):
         self.assertEqual(dir(state.track), ["frame1", "frame2", "frame_ptr"])
 
         shmem = structstore.StructStoreShared("/dyn_shdata_store2", 16384)
+        shmem.check()
+        print(f'checking done')
+        print(f'creating track')
+        track = Track()
+        shmem.check()
+        print(f'assigning list')
+        shmem.lst = []
+        shmem.check()
+        print('appending to lst')
+        shmem.lst.append(None)
+        shmem.check()
+        print(f'assigning frame')
         shmem.frame = Frame()
 
         def assign_invalid_ptr():
