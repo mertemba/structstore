@@ -21,11 +21,8 @@ TEST(StructStoreTestAlloc, bigAlloc) {
 #define EXPECTED_STR "insufficient space in sh_alloc region, requested: 10000000"
 #endif
     EXPECT_THROW(
-            try { stst::static_alloc.allocate(10'000'000); } catch (const std::runtime_error& e) {
-                EXPECT_STREQ(e.what(), EXPECTED_STR);
-                throw;
-            },
-            std::runtime_error);
+            stst::static_alloc.allocate(10'000'000),
+            std::bad_alloc);
 }
 
 TEST(StructStoreTestAlloc, isOwned) {

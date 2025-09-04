@@ -167,6 +167,8 @@ static void prepend_free_node(mini_malloc* mm, memnode* node, size_index_type si
 }
 
 void structstore::init_mini_malloc(mini_malloc* mm, size_t blocksize) {
+    blocksize -= blocksize % ALIGN;
+    assert(blocksize % ALIGN == 0);
     static_assert((sizeof(mini_malloc) % ALIGN) == 0);
     byte* buffer = (byte*) mm + sizeof(mini_malloc);
     blocksize -= sizeof(mini_malloc);

@@ -5,7 +5,7 @@ srcdir="$PWD"
 # this defines builddir and cmake_options
 source "$srcdir/scripts/build_config.sh"
 
-! test -d "$builddir"
+test ! -d "$builddir"
 
 mkdir "$builddir"
 source "$srcdir/scripts/setup_venv.sh"

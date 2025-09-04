@@ -136,7 +136,7 @@ public:
             }
         }
         STST_LOG_DEBUG() << "registering unmanaged data at " << &t << "in FieldMap at " << this
-                         << " with alloc at " << &sh_alloc
+                         << " with alloc at " << sh_alloc.get()
                          << " (static alloc: " << (sh_alloc.get() == &static_alloc) << ")";
         shr_string_idx name_idx = sh_alloc->strings().internalize(name, *sh_alloc);
         auto [it, inserted] = fields.emplace(name_idx, Field{});
@@ -153,7 +153,7 @@ public:
 
     void clear() {
         static_assert(managed, "removing fields from unmanaged FieldMap is not supported");
-        STST_LOG_DEBUG() << "clearing FieldMap at " << this << "with alloc at " << &sh_alloc;
+        STST_LOG_DEBUG() << "clearing FieldMap at " << this << " with alloc at " << sh_alloc.get();
         if (sh_alloc.get() == &static_alloc) STST_LOG_DEBUG() << "(this is using the static_alloc)";
         for (auto& [key, value]: fields) { value.clear(*sh_alloc); }
         fields.clear();
@@ -162,7 +162,7 @@ public:
 
     void clear_unmanaged() {
         static_assert(!managed);
-        STST_LOG_DEBUG() << "clearing FieldMap at " << this << "with alloc at " << &sh_alloc;
+        STST_LOG_DEBUG() << "clearing FieldMap at " << this << " with alloc at " << sh_alloc.get();
         if (sh_alloc.get() == &static_alloc) STST_LOG_DEBUG() << "(this is using the static_alloc)";
         for (auto& [key, value]: fields) { value.clear_unmanaged(); }
         fields.clear();

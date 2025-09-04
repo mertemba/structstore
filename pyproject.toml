@@ -26,7 +26,7 @@ exclude = []
 
 [tool.py-build-cmake.cmake]
 minimum_version = '3.10'
-build_type = 'Release'
+build_type = 'RelWithDebInfo'
 source_path = '.' # Containing CMakeLists.txt
 args = ['-Wdev']
 find_python = true
@@ -38,15 +38,15 @@ options = { 'BUILD_WITH_PYTHON' = 'ON', 'BUILD_WITH_PY_BUILD_CMAKE' = 'ON' }
 
 [tool.py-build-cmake.linux.cmake] # Linux-specific options
 generator = 'Ninja Multi-Config'
-config = ['Release']
+config = ['RelWithDebInfo']
 env = { 'CMAKE_PREFIX_PATH' = '${HOME}/.local' }
 
 [tool.py-build-cmake.mac.cmake] # macOS-specific options
 generator = 'Ninja Multi-Config'
-config = ['Release']
+config = ['RelWithDebInfo']
 
 [tool.py-build-cmake.windows.cmake] # Windows-specific options
-config = ['Release']
+config = ['RelWithDebInfo']
 
 [tool.py-build-cmake.stubgen]
 args = ['-v']

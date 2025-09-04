@@ -209,13 +209,12 @@ endif()
 
 foreach(TARGET ${STRUCTSTORE_LIB_TARGETS} ${STRUCTSTORE_PY_TARGETS})
     target_include_directories(${TARGET}
-            PUBLIC
-            "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/include>"
-            "$<INSTALL_INTERFACE:${STRUCTSTORE_INSTALL_INCLUDEDIR}>")
+            PUBLIC "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/include>"
+            PUBLIC "$<INSTALL_INTERFACE:${STRUCTSTORE_INSTALL_INCLUDEDIR}>")
     target_include_directories(${TARGET}
-            SYSTEM PUBLIC
-            "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/ext/ankerl_unordered_dense/include>"
-            "$<INSTALL_INTERFACE:${STRUCTSTORE_INSTALL_LIBDIR}/ext/ankerl_unordered_dense/include>")
+            SYSTEM
+            PUBLIC "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/ext/ankerl_unordered_dense/include>"
+            PUBLIC "$<INSTALL_INTERFACE:${STRUCTSTORE_INSTALL_LIBDIR}/ext/ankerl_unordered_dense/include>")
 endforeach()
 
 # inspired by https://stackoverflow.com/a/49857699

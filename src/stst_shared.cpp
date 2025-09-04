@@ -2,6 +2,7 @@
 #include "structstore/stst_alloc.hpp"
 #include "structstore/stst_callstack.hpp"
 #include "structstore/stst_structstore.hpp"
+#include <cstddef>
 
 // todo: provide a .to_local() method to get a StructStore copy using static_alloc
 
@@ -99,7 +100,6 @@ StructStoreShared::StructStoreShared(const std::string& path, size_t bufsize, bo
         // initialize data
 
         static_assert((sizeof(SharedData) % 8) == 0);
-        std::memset(sh_data_ptr, 0, size);
         new(sh_data_ptr) SharedData(size, bufsize, (char*) sh_data_ptr + sizeof(SharedData));
         STST_LOG_DEBUG() << "created shared StructStore at " << sh_data_ptr;
 
@@ -137,7 +137,6 @@ StructStoreShared::StructStoreShared(int fd, bool init)
 
         // initialize data
         static_assert((sizeof(SharedData) % 8) == 0);
-        std::memset(sh_data_ptr, 0, size);
         new(sh_data_ptr) SharedData(size, bufsize, (char*) sh_data_ptr + sizeof(SharedData));
     } else {
         this->fd = FD(fd);
@@ -165,6 +164,7 @@ void StructStoreShared::mmap_existing_fd() {
             (SharedData*) mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
 
     if (sh_data_ptr == MAP_FAILED) { throw std::runtime_error("mmap'ing existing memory failed"); }
+    assert((std::ptrdiff_t) sh_data_ptr % 8 == 0);
 
     ++sh_data_ptr->usage_count;
 
@@ -255,7 +255,7 @@ void StructStoreShared::to_buffer(void* buffer, size_t bufsize) const {
     if (bufsize < sh_data_ptr->size) {
         throw std::runtime_error("target buffer too small");
     }
-    std::memcpy(buffer, sh_data_ptr, sh_data_ptr->size);
+    std::memcpy((void*) buffer, sh_data_ptr, sh_data_ptr->size);
 }
 
 void StructStoreShared::from_buffer(void* buffer, size_t bufsize) {
@@ -263,7 +263,7 @@ void StructStoreShared::from_buffer(void* buffer, size_t bufsize) {
     if (bufsize < ((SharedData*) buffer)->size) {
         throw std::runtime_error("source buffer too small");
     }
-    std::memcpy(sh_data_ptr, buffer, ((SharedData*) buffer)->size);
+    std::memcpy((void*) sh_data_ptr, buffer, ((SharedData*) buffer)->size);
 }
 
 bool StructStoreShared::operator==(const StructStoreShared& other) const {

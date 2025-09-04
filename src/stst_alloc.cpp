@@ -1,6 +1,5 @@
 #include "structstore/stst_alloc.hpp"
 #include "structstore/stst_utils.hpp"
-#include <limits>
 
 using namespace structstore;
 
@@ -41,6 +40,7 @@ StringStorage::StringStorage(SharedAlloc& sh_alloc)
 }
 
 shr_string_idx StringStorage::internalize(const std::string& str, SharedAlloc& sh_alloc) {
+    stst_assert(str != "");
     if (shr_string_idx found_idx = get_idx(str, sh_alloc)) { return found_idx; }
     shr_string str_{str, StlAllocator{sh_alloc}};
     ScopedLock<true> lock{mutex};
@@ -48,11 +48,14 @@ shr_string_idx StringStorage::internalize(const std::string& str, SharedAlloc& s
     if (inserted) {
         it->second = data.size();
         data.emplace_back(str_);
+    } else {
+        stst_assert(it->second > 0);
     }
     return it->second;
 }
 
 shr_string_idx StringStorage::get_idx(const std::string& str, SharedAlloc& sh_alloc) const {
+    stst_assert(str != "");
     shr_string str_{str, StlAllocator{sh_alloc}};
     ScopedLock<false> lock{mutex};
     auto it = map.find(str_);
